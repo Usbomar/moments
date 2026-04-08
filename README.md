@@ -24,6 +24,22 @@ npm run dev
 
 Open `http://localhost:3000`.
 
+## Configure Supabase storage and DB
+Set these environment variables in `.env.local`:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=...
+SUPABASE_SERVICE_ROLE_KEY=...
+SUPABASE_STORAGE_BUCKET=moments
+```
+
+Then create the schema from `database/schema.sql` in your Supabase SQL editor.
+The app now supports:
+- Drag-and-drop uploader in the main UI.
+- Real upload to Supabase Storage (`/api/upload`).
+- Asset persistence in `assets` + `asset_files`.
+- Automatic library refresh after upload (`/api/assets`).
+
 ## Next phase hooks
 - `src/lib/grouping.ts` includes initial event window logic for story generation.
 - `src/lib/types.ts` includes `autoTags` and `people`-ready model extensions.

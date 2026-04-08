@@ -1,12 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { albums, assets } from "@/lib/mock-data";
 import { filterAssets } from "@/lib/search";
 import { LibraryGrid } from "@/components/library-grid";
 import { TimelineView } from "@/components/timeline-view";
 import { FullscreenViewer } from "@/components/fullscreen-viewer";
 import { buildMemoryStories } from "@/lib/memories";
+import type { Asset } from "@/lib/types";
+import { UploadDropzone } from "@/components/upload-dropzone";
 
 type ViewMode = "library" | "timeline" | "albums" | "favorites" | "memories";
 
@@ -14,8 +16,26 @@ export default function HomePage() {
   const [view, setView] = useState<ViewMode>("library");
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [library, setLibrary] = useState<Asset[]>(assets);
+  const [loadingLibrary, setLoadingLibrary] = useState(false);
 
-  const baseFiltered = useMemo(() => filterAssets(assets, { query }), [query]);
+  async function refreshLibrary() {
+    setLoadingLibrary(true);
+    try {
+      const response = await fetch("/api/assets", { cache: "no-store" });
+      if (!response.ok) return;
+      const body = (await response.json()) as { assets?: Asset[] };
+      setLibrary(body.assets ?? []);
+    } finally {
+      setLoadingLibrary(false);
+    }
+  }
+
+  useEffect(() => {
+    void refreshLibrary();
+  }, []);
+
+  const baseFiltered = useMemo(() => filterAssets(library, { query }), [library, query]);
 
   const viewItems = useMemo(() => {
     if (view === "favorites") return baseFiltered.filter((x) => x.favorite);
@@ -51,6 +71,8 @@ export default function HomePage() {
       </header>
 
       <section className="card" style={{ padding: 14 }}>
+        <UploadDropzone onUploaded={refreshLibrary} />
+        {loadingLibrary ? <p style={{ color: "var(--muted)" }}>Actualitzant biblioteca...</p> : null}
         {view === "timeline" ? <TimelineView items={viewItems} onOpen={(asset) => setSelectedId(asset.id)} /> : null}
         {view === "library" || view === "favorites" ? (
           <LibraryGrid items={viewItems} onOpen={(asset) => setSelectedId(asset.id)} />

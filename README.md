@@ -25,6 +25,8 @@ npm run dev
 Open `http://localhost:3000`.
 
 ## Configure Supabase storage and DB
+Without `.env.local`, the app runs in **demo mode**: sample library only, uploads disabled, with Catalan UI hints instead of raw errors.
+
 Set these environment variables in `.env.local`:
 
 ```bash

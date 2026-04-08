@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import sharp from "sharp";
 import { processUpload } from "@/lib/pipeline";
 import { getStorageBucket, getSupabaseAdmin } from "@/lib/server/supabase-admin";
+import { isSupabaseConfigured } from "@/lib/server/supabase-config";
 import type { MediaType } from "@/lib/types";
 
 const SIGNED_URL_TTL = 60 * 60 * 24 * 365 * 5;
@@ -13,6 +14,17 @@ export async function POST(request: Request) {
     const file = form.get("file");
     if (!(file instanceof File)) {
       return NextResponse.json({ error: "Missing file field" }, { status: 400 });
+    }
+
+    if (!isSupabaseConfigured()) {
+      return NextResponse.json(
+        {
+          error: "SUPABASE_NOT_CONFIGURED",
+          message:
+            "Supabase no està configurat. Crea un fitxer .env.local amb NEXT_PUBLIC_SUPABASE_URL i SUPABASE_SERVICE_ROLE_KEY (veure .env.example)."
+        },
+        { status: 503 }
+      );
     }
 
     const processed = await processUpload({

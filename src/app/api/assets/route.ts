@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { Asset } from "@/lib/types";
 import { getSupabaseAdmin } from "@/lib/server/supabase-admin";
+import { isSupabaseConfigured } from "@/lib/server/supabase-config";
 
 function toAsset(row: {
   id: string;
@@ -59,7 +60,10 @@ export async function GET() {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ assets: (data ?? []).map(toAsset) });
+    return NextResponse.json({
+      assets: (data ?? []).map(toAsset),
+      supabaseConfigured: true
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 500 });

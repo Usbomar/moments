@@ -1,11 +1,12 @@
 import { createClient } from "@supabase/supabase-js";
+import { isSupabaseConfigured } from "@/lib/server/supabase-config";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 export function getSupabaseAdmin() {
-  if (!supabaseUrl || !supabaseServiceRole) {
-    throw new Error("Missing Supabase env vars: NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY");
+  if (!isSupabaseConfigured() || !supabaseUrl || !supabaseServiceRole) {
+    throw new Error("SUPABASE_NOT_CONFIGURED");
   }
 
   return createClient(supabaseUrl, supabaseServiceRole, {

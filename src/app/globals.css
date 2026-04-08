@@ -146,3 +146,47 @@ button.active {
 .dropzone small {
   color: var(--muted);
 }
+
+.dropzone--disabled {
+  background: #fafbfc;
+  pointer-events: none;
+}
+
+.dropzone--disabled .dropzone-hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.dropzone code {
+  font-size: 12px;
+  background: #eef1f5;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.dropzone .status-ok {
+  color: #1b6b3a;
+}
+
+.dropzone .status-err {
+  color: #a02828;
+}
+
+.config-banner {
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border-radius: 10px;
+  background: #fff8e6;
+  border: 1px solid #f0e0b8;
+  font-size: 14px;
+  color: #4a3d1a;
+}
+
+.config-banner code {
+  font-size: 12px;
+  background: #fff3cc;
+  padding: 2px 6px;
+  border-radius: 6px;
+}

@@ -18,18 +18,28 @@ export default function HomePage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [library, setLibrary] = useState<Asset[]>(assets);
   const [loadingLibrary, setLoadingLibrary] = useState(false);
+  const [supabaseConfigured, setSupabaseConfigured] = useState<boolean | undefined>(undefined);
 
   async function refreshLibrary() {
     setLoadingLibrary(true);
     try {
       const response = await fetch("/api/assets", { cache: "no-store" });
       if (!response.ok) return;
-      const body = (await response.json()) as { assets?: Asset[] };
+      const body = (await response.json()) as { assets?: Asset[]; supabaseConfigured?: boolean };
+      if (body.supabaseConfigured === false) {
+        return;
+      }
       setLibrary(body.assets ?? []);
     } finally {
       setLoadingLibrary(false);
     }
   }
+
+  useEffect(() => {
+    void fetch("/api/config", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((b: { supabaseConfigured?: boolean }) => setSupabaseConfigured(!!b.supabaseConfigured));
+  }, []);
 
   useEffect(() => {
     void refreshLibrary();
@@ -71,7 +81,13 @@ export default function HomePage() {
       </header>
 
       <section className="card" style={{ padding: 14 }}>
-        <UploadDropzone onUploaded={refreshLibrary} />
+        {supabaseConfigured === false ? (
+          <div className="config-banner" role="status">
+            Estàs veient dades de mostra. Per activar pujades i emmagatzematge real, configura les variables de Supabase a{" "}
+            <code>.env.local</code>.
+          </div>
+        ) : null}
+        <UploadDropzone onUploaded={refreshLibrary} supabaseConfigured={supabaseConfigured} />
         {loadingLibrary ? <p style={{ color: "var(--muted)" }}>Actualitzant biblioteca...</p> : null}
         {view === "timeline" ? <TimelineView items={viewItems} onOpen={(asset) => setSelectedId(asset.id)} /> : null}
         {view === "library" || view === "favorites" ? (

@@ -38,6 +38,7 @@ The app now supports:
 - Drag-and-drop uploader in the main UI.
 - Real upload to Supabase Storage (`/api/upload`).
 - Asset persistence in `assets` + `asset_files`.
+- Real image variants generation (preview + thumb in WebP).
 - Automatic library refresh after upload (`/api/assets`).
 
 ## Next phase hooks

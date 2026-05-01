@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
-import { isSupabaseConfigured } from "@/lib/server/supabase-config";
+import { getSupabaseConfigStatus } from "@/lib/server/supabase-config";
 
 export async function GET() {
-  return NextResponse.json({ supabaseConfigured: isSupabaseConfigured() });
+  const status = getSupabaseConfigStatus();
+  return NextResponse.json({
+    supabaseConfigured: status.configured,
+    missingEnv: status.missingEnv
+  });
 }

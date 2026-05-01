@@ -21,7 +21,7 @@ export async function POST(request: Request) {
         {
           error: "SUPABASE_NOT_CONFIGURED",
           message:
-            "Supabase no està configurat. Crea un fitxer .env.local amb NEXT_PUBLIC_SUPABASE_URL i SUPABASE_SERVICE_ROLE_KEY (veure .env.example)."
+            "Supabase no està configurat. Crea un fitxer .env.local amb NEXT_PUBLIC_SUPABASE_URL (o SUPABASE_URL) i SUPABASE_SERVICE_ROLE_KEY (veure .env.example)."
         },
         { status: 503 }
       );

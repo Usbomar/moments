@@ -50,6 +50,13 @@ function toAsset(row: {
 
 export async function GET() {
   try {
+    if (!isSupabaseConfigured()) {
+      return NextResponse.json({
+        assets: [],
+        supabaseConfigured: false
+      });
+    }
+
     const supabase = getSupabaseAdmin();
     const { data, error } = await supabase
       .from("assets")
@@ -66,6 +73,12 @@ export async function GET() {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
+    if (message === "SUPABASE_NOT_CONFIGURED") {
+      return NextResponse.json({
+        assets: [],
+        supabaseConfigured: false
+      });
+    }
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

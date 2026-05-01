@@ -6,6 +6,7 @@ interface Props {
   onUploaded: () => Promise<void>;
   /** undefined = encara comprovant; false = sense Supabase; true = pujada disponible */
   supabaseConfigured?: boolean;
+  missingEnv?: string[];
 }
 
 function mapUploadError(payload: { error?: string; message?: string }): string {
@@ -18,7 +19,7 @@ function mapUploadError(payload: { error?: string; message?: string }): string {
   return payload.message ?? payload.error ?? "No s’ha pogut pujar el fitxer.";
 }
 
-export function UploadDropzone({ onUploaded, supabaseConfigured }: Props) {
+export function UploadDropzone({ onUploaded, supabaseConfigured, missingEnv = [] }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [status, setStatus] = useState<string>("");
@@ -69,10 +70,19 @@ export function UploadDropzone({ onUploaded, supabaseConfigured }: Props) {
           Supabase.
         </p>
         <p className="dropzone-hint">
-          Crea <code>.env.local</code> amb <code>NEXT_PUBLIC_SUPABASE_URL</code> i{" "}
-          <code>SUPABASE_SERVICE_ROLE_KEY</code> (copia des de <code>.env.example</code>) i reinicia{" "}
-          <code>npm run dev</code>.
+          Crea <code>.env.local</code> (pots copiar <code>.env.example</code>) i reinicia <code>npm run dev</code>.
         </p>
+        {missingEnv.length ? (
+          <p className="dropzone-hint">
+            Variables pendents:{" "}
+            {missingEnv.map((name, idx) => (
+              <span key={name}>
+                <code>{name}</code>
+                {idx < missingEnv.length - 1 ? ", " : ""}
+              </span>
+            ))}
+          </p>
+        ) : null}
         <button type="button" disabled>
           Pujada desactivada
         </button>

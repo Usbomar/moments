@@ -9,17 +9,33 @@ interface Props {
   missingEnv?: string[];
 }
 
-type RowStatus = "pending" | "uploading" | "ok" | "error";
+type RowStatus = "pending" | "uploading" | "duplicate" | "skipped" | "ok" | "error";
 
 interface FileRowState {
   id: string;
+  index: number;
   name: string;
   size: number;
   status: RowStatus;
   error?: string;
+  duplicateAssetId?: string;
 }
 
+type UploadPayload = {
+  error?: string;
+  message?: string;
+  isDuplicate?: boolean;
+  duplicateAssetId?: string;
+};
+
+type UploadResult =
+  | { ok: true }
+  | { ok: false; error: string }
+  | { ok: false; isDuplicate: true; duplicateAssetId: string; message: string };
+
 const CONCURRENCY = 5;
+/** Si no hi ha resposta al duplicat, s’omet automàticament (evita bloquejar la cua). */
+const DUPLICATE_CHOICE_MS = 120_000;
 
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
@@ -35,7 +51,7 @@ function formatEta(seconds: number): string {
   return `~${m} min ${s} s`;
 }
 
-function mapUploadError(payload: { error?: string; message?: string }): string {
+function mapUploadError(payload: UploadPayload): string {
   if (payload.error === "SUPABASE_NOT_CONFIGURED" && payload.message) {
     return payload.message;
   }
@@ -45,12 +61,25 @@ function mapUploadError(payload: { error?: string; message?: string }): string {
   return payload.message ?? payload.error ?? "No s’ha pogut pujar el fitxer.";
 }
 
-async function uploadOne(file: File): Promise<{ ok: true } | { ok: false; error: string }> {
+async function uploadOne(file: File, options?: { force?: boolean }): Promise<UploadResult> {
   const formData = new FormData();
   formData.append("file", file);
+  if (options?.force) {
+    formData.append("force", "true");
+  }
   try {
     const response = await fetch("/api/upload", { method: "POST", body: formData });
-    const payload = (await response.json()) as { error?: string; message?: string };
+    const payload = (await response.json()) as UploadPayload;
+
+    if (response.status === 409 && payload.isDuplicate === true && payload.duplicateAssetId) {
+      return {
+        ok: false,
+        isDuplicate: true,
+        duplicateAssetId: payload.duplicateAssetId,
+        message: payload.error ?? "Aquesta foto ja existeix."
+      };
+    }
+
     if (!response.ok) {
       return { ok: false, error: mapUploadError(payload) };
     }
@@ -60,10 +89,6 @@ async function uploadOne(file: File): Promise<{ ok: true } | { ok: false; error:
   }
 }
 
-/**
- * Runs `fn` on each item with at most `limit` concurrent executions.
- * Index order is preserved in results (same as `items` order).
- */
 async function mapPool<T, R>(items: readonly T[], limit: number, fn: (item: T, index: number) => Promise<R>): Promise<R[]> {
   const results: R[] = new Array(items.length);
   let nextIndex = 0;
@@ -83,6 +108,8 @@ async function mapPool<T, R>(items: readonly T[], limit: number, fn: (item: T, i
 
 export function UploadDropzone({ onUploaded, supabaseConfigured, missingEnv = [] }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const duplicateChoiceRef = useRef(new Map<number, (choice: "skip" | "force") => void>());
+
   const [dragging, setDragging] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string>("");
@@ -91,6 +118,18 @@ export function UploadDropzone({ onUploaded, supabaseConfigured, missingEnv = []
 
   const ready = supabaseConfigured === true;
   const checking = supabaseConfigured === undefined;
+
+  const resolveDuplicateChoice = useCallback((index: number, choice: "skip" | "force") => {
+    const resolve = duplicateChoiceRef.current.get(index);
+    resolve?.(choice);
+    duplicateChoiceRef.current.delete(index);
+  }, []);
+
+  const waitDuplicateChoice = useCallback((index: number): Promise<"skip" | "force"> => {
+    return new Promise((resolve) => {
+      duplicateChoiceRef.current.set(index, resolve);
+    });
+  }, []);
 
   const uploadFiles = useCallback(
     async (fileList: FileList | null) => {
@@ -102,6 +141,7 @@ export function UploadDropzone({ onUploaded, supabaseConfigured, missingEnv = []
 
       const initialRows: FileRowState[] = files.map((f, i) => ({
         id: `${i}-${f.name}-${f.size}`,
+        index: i,
         name: f.name,
         size: f.size,
         status: "pending"
@@ -116,11 +156,15 @@ export function UploadDropzone({ onUploaded, supabaseConfigured, missingEnv = []
       let finished = 0;
       let failedCount = 0;
       let bytesDone = 0;
+      let duplicatesSkipped = 0;
+      let anyServerSuccess = false;
 
       const updateRow = (index: number, patch: Partial<FileRowState>) => {
         setFileRows((prev) => {
           const next = [...prev];
-          next[index] = { ...next[index], ...patch };
+          const idx = next.findIndex((r) => r.index === index);
+          if (idx === -1) return prev;
+          next[idx] = { ...next[idx], ...patch };
           return next;
         });
       };
@@ -140,33 +184,67 @@ export function UploadDropzone({ onUploaded, supabaseConfigured, missingEnv = []
       try {
         await mapPool(files, CONCURRENCY, async (file, index) => {
           updateRow(index, { status: "uploading" });
-          const result = await uploadOne(file);
+          let result = await uploadOne(file);
+
+          if (!result.ok && "isDuplicate" in result && result.isDuplicate) {
+            updateRow(index, {
+              status: "duplicate",
+              duplicateAssetId: result.duplicateAssetId,
+              error: "⚠️ This photo already exists"
+            });
+            const choice = await Promise.race([
+              waitDuplicateChoice(index),
+              new Promise<"skip">((resolve) => {
+                setTimeout(() => {
+                  const r = duplicateChoiceRef.current.get(index);
+                  if (r) {
+                    duplicateChoiceRef.current.delete(index);
+                    r("skip");
+                  }
+                }, DUPLICATE_CHOICE_MS);
+              })
+            ]);
+            if (choice === "skip") {
+              updateRow(index, { status: "skipped", error: undefined });
+              duplicatesSkipped += 1;
+              bumpProgress(file, true);
+              return;
+            }
+            updateRow(index, { status: "uploading", error: undefined });
+            result = await uploadOne(file, { force: true });
+          }
+
           if (result.ok) {
             updateRow(index, { status: "ok" });
+            anyServerSuccess = true;
             bumpProgress(file, true);
-          } else {
+          } else if ("error" in result) {
             updateRow(index, { status: "error", error: result.error });
             bumpProgress(file, false);
           }
-          return result;
         });
 
+        const dupMsg =
+          duplicatesSkipped > 0 ? ` · ${duplicatesSkipped} foto(s) ja eren a la biblioteca` : "";
+
         if (failedCount === 0) {
-          setStatus("Pujada completada");
-          await onUploaded();
+          setStatus(`Pujada completada${dupMsg}`);
+          if (anyServerSuccess) await onUploaded();
         } else if (failedCount === total) {
-          setStatus(`Cap fitxer s’ha pogut pujar (${failedCount} errors).`);
+          setStatus(`Cap fitxer s’ha pogut pujar (${failedCount} errors).${dupMsg}`);
         } else {
-          setStatus(`Pujada parcial: ${total - failedCount} correctes, ${failedCount} errors.`);
-          await onUploaded();
+          setStatus(`Pujada parcial: ${total - failedCount} correctes, ${failedCount} errors.${dupMsg}`);
+          if (anyServerSuccess) await onUploaded();
         }
       } catch (e) {
         setStatus(e instanceof Error ? e.message : "No s’ha pogut completar la pujada.");
       } finally {
+        duplicateChoiceRef.current.forEach((r) => r("skip"));
+        duplicateChoiceRef.current.clear();
         setBusy(false);
       }
     },
-    [onUploaded, ready]
+    [onUploaded, ready, waitDuplicateChoice]
   );
 
   if (checking) {
@@ -269,13 +347,56 @@ export function UploadDropzone({ onUploaded, supabaseConfigured, missingEnv = []
               }}
             >
               <span style={{ flexShrink: 0, width: 22, textAlign: "center" }} aria-hidden>
-                {row.status === "ok" ? "✓" : row.status === "error" ? "✗" : row.status === "uploading" ? "…" : "○"}
+                {row.status === "ok"
+                  ? "✓"
+                  : row.status === "error"
+                    ? "✗"
+                    : row.status === "duplicate"
+                      ? "⚠"
+                      : row.status === "skipped"
+                        ? "−"
+                        : row.status === "uploading"
+                          ? "…"
+                          : "○"}
               </span>
               <span style={{ flex: 1, minWidth: 0, wordBreak: "break-word" }}>
                 <strong>{row.name}</strong>
                 <span style={{ color: "var(--muted)" }}> · {formatBytes(row.size)}</span>
                 {row.error ? (
-                  <span style={{ display: "block", color: "#a02828", fontSize: 12 }}>{row.error}</span>
+                  <span
+                    style={{
+                      display: "block",
+                      color: row.status === "duplicate" ? "#8a5a00" : "#a02828",
+                      fontSize: 12
+                    }}
+                  >
+                    {row.error}
+                    {row.duplicateAssetId ? (
+                      <span style={{ color: "var(--muted)" }}> ({row.duplicateAssetId})</span>
+                    ) : null}
+                  </span>
+                ) : null}
+                {row.status === "duplicate" ? (
+                  <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+                    <button
+                      type="button"
+                      className="dup-btn"
+                      disabled={!busy}
+                      onClick={() => resolveDuplicateChoice(row.index, "skip")}
+                      style={{ fontSize: 12, padding: "4px 10px", borderRadius: 8 }}
+                    >
+                      Ometre
+                    </button>
+                    <button
+                      type="button"
+                      className="dup-btn"
+                      disabled={!busy}
+                      onClick={() => resolveDuplicateChoice(row.index, "force")}
+                      style={{ fontSize: 12, padding: "4px 10px", borderRadius: 8 }}
+                    >
+                      Pujar igualment
+                    </button>
+                  </div>
                 ) : null}
               </span>
             </li>

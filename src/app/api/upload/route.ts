@@ -39,9 +39,38 @@ export async function POST(request: Request) {
       mimeType: file.type
     });
 
+    const supabase = getSupabaseAdmin();
+    const forceRaw = form.get("force");
+    const force =
+      forceRaw === "true" ||
+      forceRaw === "1" ||
+      (typeof forceRaw === "string" && forceRaw.toLowerCase() === "true");
+
+    if (!force) {
+      const { data: dupRow, error: dupErr } = await supabase
+        .from("asset_files")
+        .select("asset_id")
+        .eq("checksum", processed.checksum)
+        .limit(1)
+        .maybeSingle();
+
+      if (dupErr) {
+        return NextResponse.json({ error: dupErr.message }, { status: 500 });
+      }
+      if (dupRow?.asset_id) {
+        return NextResponse.json(
+          {
+            error: `This photo already exists (ID: ${dupRow.asset_id}). Upload cancelled.`,
+            isDuplicate: true,
+            duplicateAssetId: dupRow.asset_id
+          },
+          { status: 409 }
+        );
+      }
+    }
+
     const paths = extractStoragePath(file.name, processed.checksum);
 
-    const supabase = getSupabaseAdmin();
     const bucket = getStorageBucket();
     const buffer = Buffer.from(await file.arrayBuffer());
 
@@ -181,7 +210,8 @@ export async function POST(request: Request) {
       originalUrl,
       previewUrl,
       thumbUrl,
-      checksum: processed.checksum
+      checksum: processed.checksum,
+      isDuplicate: false
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

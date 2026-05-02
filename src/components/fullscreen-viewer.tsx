@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect } from "react";
 import type { Asset } from "@/lib/types";
 
@@ -31,17 +30,14 @@ export function FullscreenViewer({ items, selectedId, onClose, onSelect }: Props
   return (
     <div className="viewer" onClick={onClose}>
       <div className="viewer-inner" onClick={(e) => e.stopPropagation()}>
-        <Image
+        <img
           className="viewer-media"
           src={current.files.previewUrl}
           alt={current.title}
-          width={current.width}
-          height={current.height}
-          priority
-          unoptimized={
-            current.files.previewUrl.includes("supabase.co") &&
-            current.files.previewUrl.includes("/storage/")
-          }
+          width={current.width || undefined}
+          height={current.height || undefined}
+          fetchPriority="high"
+          referrerPolicy="no-referrer"
         />
       </div>
     </div>

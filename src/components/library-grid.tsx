@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import type { Asset } from "@/lib/types";
 
 interface Props {
@@ -8,22 +7,18 @@ interface Props {
   onOpen: (asset: Asset) => void;
 }
 
-function isSupabaseStorageUrl(src: string): boolean {
-  return src.includes("supabase.co") && src.includes("/storage/");
-}
-
+/** Native img: signed Supabase URLs often break under next/image (remotePatterns / optimizer). */
 export function LibraryGrid({ items, onOpen }: Props) {
   return (
     <div className="grid">
       {items.map((asset) => (
         <button className="tile" key={asset.id} onClick={() => onOpen(asset)}>
-          <Image
+          <img
             src={asset.files.thumbUrl}
             alt={asset.title}
-            fill
-            sizes="250px"
             loading="lazy"
-            unoptimized={isSupabaseStorageUrl(asset.files.thumbUrl)}
+            decoding="async"
+            referrerPolicy="no-referrer"
           />
           {asset.favorite ? <span className="badge">Favorite</span> : null}
         </button>

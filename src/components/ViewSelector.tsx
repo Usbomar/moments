@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export type GalleryView = "masonry" | "map" | "timeline" | "colors" | "slider";
 
@@ -21,8 +21,11 @@ const OPTIONS: Array<{ id: GalleryView; label: string; icon: string }> = [
 
 export function ViewSelector({ value, onChange }: Props) {
   const [open, setOpen] = useState(false);
+  const hydratedRef = useRef(false);
 
   useEffect(() => {
+    if (hydratedRef.current) return;
+    hydratedRef.current = true;
     const stored = window.localStorage.getItem(STORAGE_KEY) as GalleryView | null;
     if (stored && OPTIONS.some((item) => item.id === stored) && stored !== value) {
       onChange(stored);

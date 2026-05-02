@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { Asset } from "@/lib/types";
 
@@ -38,16 +38,18 @@ const placeholderStyle: CSSProperties = {
 function LibraryTile({ asset, onOpen }: { asset: Asset; onOpen: (a: Asset) => void }) {
   const thumbUrl = asset.files.thumbUrl?.trim() ?? "";
   const [loadState, setLoadState] = useState<LoadState>(() => (thumbUrl ? "loading" : "error"));
+  const lastThumbUrlRef = useRef<string>(thumbUrl);
 
   useEffect(() => {
+    if (lastThumbUrlRef.current === thumbUrl) return;
+    lastThumbUrlRef.current = thumbUrl;
+
     if (!thumbUrl) {
-      setLoadState("error");
+      setLoadState((prev) => (prev === "error" ? prev : "error"));
       return;
     }
-    // Debug: remove in production if noisy.
-    console.log(`Loading thumb: ${thumbUrl}`);
     setLoadState("loading");
-  }, [thumbUrl, asset.id]);
+  }, [thumbUrl]);
 
   if (!thumbUrl) {
     return (
@@ -76,8 +78,8 @@ function LibraryTile({ asset, onOpen }: { asset: Asset; onOpen: (a: Asset) => vo
           loading="lazy"
           decoding="async"
           referrerPolicy="no-referrer"
-          onLoad={() => setLoadState("loaded")}
-          onError={() => setLoadState("error")}
+          onLoad={() => setLoadState((prev) => (prev === "loaded" ? prev : "loaded"))}
+          onError={() => setLoadState((prev) => (prev === "error" ? prev : "error"))}
           style={{
             position: "absolute",
             inset: 0,

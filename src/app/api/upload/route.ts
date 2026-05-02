@@ -4,6 +4,11 @@ import sharp from "sharp";
 import { processUpload } from "@/lib/pipeline";
 import { getStorageBucket, getSupabaseAdmin } from "@/lib/server/supabase-admin";
 import { isSupabaseConfigured } from "@/lib/server/supabase-config";
+import {
+  extractStoragePath,
+  generateSignedUrls,
+  validateSignedUrl
+} from "@/lib/server/storage-utils";
 import type { MediaType } from "@/lib/types";
 
 const SIGNED_URL_TTL = 60 * 60 * 24 * 365 * 5;
@@ -33,12 +38,14 @@ export async function POST(request: Request) {
       mimeType: file.type
     });
 
+    const paths = extractStoragePath(file.name, processed.checksum);
+
     const supabase = getSupabaseAdmin();
     const bucket = getStorageBucket();
     const buffer = Buffer.from(await file.arrayBuffer());
     const { data: originalUpload, error: originalError } = await supabase.storage
       .from(bucket)
-      .upload(processed.originalPath, buffer, {
+      .upload(paths.original, buffer, {
         contentType: file.type,
         upsert: false
       });
@@ -72,7 +79,7 @@ export async function POST(request: Request) {
 
       const { data: previewUpload, error: previewError } = await supabase.storage
         .from(bucket)
-        .upload(processed.previewPath, previewBuffer, {
+        .upload(paths.preview, previewBuffer, {
           contentType: "image/webp",
           upsert: false
         });
@@ -83,7 +90,7 @@ export async function POST(request: Request) {
 
       const { data: thumbUpload, error: thumbError } = await supabase.storage
         .from(bucket)
-        .upload(processed.thumbPath, thumbBuffer, {
+        .upload(paths.thumb, thumbBuffer, {
           contentType: "image/webp",
           upsert: false
         });
@@ -93,18 +100,36 @@ export async function POST(request: Request) {
       thumbPath = thumbUpload.path;
     }
 
-    const [{ data: originalSigned }, { data: previewSigned }, { data: thumbSigned }] = await Promise.all([
-      supabase.storage.from(bucket).createSignedUrl(originalUpload.path, SIGNED_URL_TTL),
-      supabase.storage.from(bucket).createSignedUrl(previewPath, SIGNED_URL_TTL),
-      supabase.storage.from(bucket).createSignedUrl(thumbPath, SIGNED_URL_TTL)
-    ]);
+    const { originalUrl, previewUrl, thumbUrl } = await generateSignedUrls(
+      bucket,
+      {
+        original: originalUpload.path,
+        preview: previewPath,
+        thumb: thumbPath
+      },
+      SIGNED_URL_TTL
+    );
 
-    const originalUrl = originalSigned?.signedUrl;
-    const previewUrl = previewSigned?.signedUrl;
-    const thumbUrl = thumbSigned?.signedUrl;
-    if (!originalUrl || !previewUrl || !thumbUrl) {
-      return NextResponse.json({ error: "Could not generate signed URLs" }, { status: 500 });
+    const checks = [
+      ["original", originalUrl] as const,
+      ["preview", previewUrl] as const,
+      ["thumb", thumbUrl] as const
+    ];
+
+    for (const [label, url] of checks) {
+      if (!validateSignedUrl(url)) {
+        throw new Error(
+          `Invalid signed URL for ${label}: missing token, too short, or malformed. length=${url.length}`
+        );
+      }
     }
+
+    console.log(
+      "Generated signed URLs:",
+      `[original length=${originalUrl.length}]`,
+      `[preview length=${previewUrl.length}]`,
+      `[thumb length=${thumbUrl.length}]`
+    );
 
     const { error: assetError } = await supabase.from("assets").insert({
       id,

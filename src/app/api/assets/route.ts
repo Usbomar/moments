@@ -67,8 +67,21 @@ export async function GET() {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    const rows = data ?? [];
+    for (const row of rows) {
+      const files = row.asset_files;
+      if (files == null || (Array.isArray(files) && files.length === 0)) {
+        console.warn("Asset has no asset_files:", row.id);
+      }
+    }
+
+    console.log("Raw Supabase data (first row):", JSON.stringify(rows[0], null, 2));
+
+    const mapped = rows.map(toAsset);
+    console.log("Mapped assets (first one):", JSON.stringify(mapped[0], null, 2));
+
     return NextResponse.json({
-      assets: (data ?? []).map(toAsset),
+      assets: mapped,
       supabaseConfigured: true
     });
   } catch (error) {

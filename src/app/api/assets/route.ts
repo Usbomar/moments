@@ -46,9 +46,25 @@ type LocationNested =
 
 type TagNested = { tag: string; origin: "manual" | "auto" }[] | null | undefined;
 
+function isAssetFileRow(value: unknown): value is AssetFileRow {
+  if (!value || typeof value !== "object") return false;
+  const row = value as Partial<AssetFileRow>;
+  return (
+    typeof row.original_url === "string" &&
+    typeof row.preview_url === "string" &&
+    typeof row.thumb_url === "string" &&
+    typeof row.checksum === "string" &&
+    typeof row.size === "number"
+  );
+}
+
 function pickFirstAssetFile(raw: AssetFilesNested): AssetFileRow | null {
   if (raw == null) return null;
-  return Array.isArray(raw) ? (raw[0] ?? null) : raw;
+  if (Array.isArray(raw)) {
+    const first = raw[0];
+    return isAssetFileRow(first) ? first : null;
+  }
+  return isAssetFileRow(raw) ? raw : null;
 }
 
 function pickFirstLocation(raw: LocationNested) {
@@ -91,6 +107,19 @@ function toAsset(row: {
   const location = pickFirstLocation(row.asset_locations);
   const tags = (row.asset_tags ?? []).map((tag) => tag.tag);
   const autoTags = (row.asset_tags ?? []).filter((tag) => tag.origin === "auto").map((tag) => tag.tag);
+  const resultFiles = {
+    originalUrl: file?.original_url ?? "",
+    previewUrl: file?.preview_url ?? "",
+    thumbUrl: file?.thumb_url ?? "",
+    checksum: file?.checksum ?? "",
+    size: file?.size ?? 0
+  };
+  console.log("toAsset processing:", {
+    raw_files: row.asset_files,
+    picked_file: file,
+    result_files: resultFiles
+  });
+
   return {
     id: row.id,
     userId: row.user_id,
@@ -115,13 +144,7 @@ function toAsset(row: {
             country: location.country
           }
         : undefined,
-    files: {
-      originalUrl: file?.original_url ?? "",
-      previewUrl: file?.preview_url ?? "",
-      thumbUrl: file?.thumb_url ?? "",
-      checksum: file?.checksum ?? "",
-      size: file?.size ?? 0
-    }
+    files: resultFiles
   };
 }
 

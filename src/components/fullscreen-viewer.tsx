@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import type { CSSProperties } from "react";
 import type { Asset } from "@/lib/types";
 
 interface Props {
@@ -9,6 +10,24 @@ interface Props {
   onClose: () => void;
   onSelect: (id: string) => void;
 }
+
+/** Matches library-grid placeholder look (gray gradient + centered text). */
+const placeholderStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 8,
+  padding: 24,
+  textAlign: "center",
+  fontSize: 14,
+  color: "var(--muted, #68707c)",
+  background: "linear-gradient(145deg, #eef1f5, #f9fafb)",
+  minHeight: "40vh",
+  width: "100%",
+  borderRadius: 12,
+  boxSizing: "border-box"
+};
 
 export function FullscreenViewer({ items, selectedId, onClose, onSelect }: Props) {
   const index = items.findIndex((x) => x.id === selectedId);
@@ -27,18 +46,27 @@ export function FullscreenViewer({ items, selectedId, onClose, onSelect }: Props
 
   if (!current) return null;
 
+  const previewUrl = current.files.previewUrl?.trim() ?? "";
+
   return (
     <div className="viewer" onClick={onClose}>
       <div className="viewer-inner" onClick={(e) => e.stopPropagation()}>
-        <img
-          className="viewer-media"
-          src={current.files.previewUrl}
-          alt={current.title}
-          width={current.width || undefined}
-          height={current.height || undefined}
-          fetchPriority="high"
-          referrerPolicy="no-referrer"
-        />
+        {previewUrl ? (
+          <img
+            className="viewer-media"
+            src={previewUrl}
+            alt={current.title}
+            width={current.width || undefined}
+            height={current.height || undefined}
+            fetchPriority="high"
+            referrerPolicy="no-referrer"
+          />
+        ) : (
+          <div className="viewer-media" style={placeholderStyle} role="img" aria-label="Image not available">
+            <span style={{ fontWeight: 600, color: "var(--text, #151719)" }}>Image not available</span>
+            <span style={{ wordBreak: "break-word", maxWidth: "100%" }}>{current.title}</span>
+          </div>
+        )}
       </div>
     </div>
   );

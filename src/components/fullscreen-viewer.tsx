@@ -38,6 +38,10 @@ export function FullscreenViewer({ items, selectedId, onClose, onSelect }: Props
           width={current.width}
           height={current.height}
           priority
+          unoptimized={
+            current.files.previewUrl.includes("supabase.co") &&
+            current.files.previewUrl.includes("/storage/")
+          }
         />
       </div>
     </div>

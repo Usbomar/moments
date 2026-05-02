@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { Asset } from "@/lib/types";
 
@@ -8,16 +7,6 @@ interface Props {
   items: Asset[];
   onOpen: (asset: Asset) => void;
 }
-
-type LoadState = "loading" | "loaded" | "error";
-
-const skeletonStyle: CSSProperties = {
-  position: "absolute",
-  inset: 0,
-  background: "linear-gradient(145deg, #e4e9ef 0%, #f6f7f9 45%, #dce3ec 100%)",
-  pointerEvents: "none",
-  borderRadius: "inherit"
-};
 
 const placeholderStyle: CSSProperties = {
   position: "absolute",
@@ -37,19 +26,6 @@ const placeholderStyle: CSSProperties = {
 
 function LibraryTile({ asset, onOpen }: { asset: Asset; onOpen: (a: Asset) => void }) {
   const thumbUrl = asset.files.thumbUrl?.trim() ?? "";
-  const [loadState, setLoadState] = useState<LoadState>(() => (thumbUrl ? "loading" : "error"));
-  const lastThumbUrlRef = useRef<string>(thumbUrl);
-
-  useEffect(() => {
-    if (lastThumbUrlRef.current === thumbUrl) return;
-    lastThumbUrlRef.current = thumbUrl;
-
-    if (!thumbUrl) {
-      setLoadState((prev) => (prev === "error" ? prev : "error"));
-      return;
-    }
-    setLoadState("loading");
-  }, [thumbUrl]);
 
   if (!thumbUrl) {
     return (
@@ -65,32 +41,30 @@ function LibraryTile({ asset, onOpen }: { asset: Asset; onOpen: (a: Asset) => vo
 
   return (
     <button type="button" className="tile" onClick={() => onOpen(asset)}>
-      {loadState === "loading" ? <div style={skeletonStyle} aria-hidden /> : null}
-      {loadState === "error" ? (
-        <div style={placeholderStyle}>
-          <span style={{ fontWeight: 600, color: "var(--text, #151719)" }}>Could not load</span>
-          <span style={{ wordBreak: "break-word", maxWidth: "100%" }}>{asset.title}</span>
-        </div>
-      ) : (
-        <img
-          src={thumbUrl}
-          alt={asset.title}
-          loading="lazy"
-          decoding="async"
-          referrerPolicy="no-referrer"
-          onLoad={() => setLoadState((prev) => (prev === "loaded" ? prev : "loaded"))}
-          onError={() => setLoadState((prev) => (prev === "error" ? prev : "error"))}
-          style={{
-            position: "absolute",
-            inset: 0,
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            opacity: loadState === "loaded" ? 1 : 0,
-            transition: "opacity 180ms ease"
-          }}
-        />
-      )}
+      <img
+        src={thumbUrl}
+        alt={asset.title}
+        loading="lazy"
+        decoding="async"
+        referrerPolicy="no-referrer"
+        onError={(event) => {
+          event.currentTarget.style.display = "none";
+          const fallback = event.currentTarget.nextElementSibling as HTMLElement | null;
+          if (fallback) fallback.style.display = "flex";
+        }}
+        style={{
+          position: "absolute",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          transition: "opacity 180ms ease"
+        }}
+      />
+      <div style={{ ...placeholderStyle, display: "none" }}>
+        <span style={{ fontWeight: 600, color: "var(--text, #151719)" }}>Could not load</span>
+        <span style={{ wordBreak: "break-word", maxWidth: "100%" }}>{asset.title}</span>
+      </div>
       {asset.favorite ? <span className="badge">Favorite</span> : null}
     </button>
   );

@@ -1,20 +1,24 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { albums, assets } from "@/lib/mock-data";
-import { filterAssets } from "@/lib/search";
+import dynamic from "next/dynamic";
+import { assets } from "@/lib/mock-data";
 import { LibraryGrid } from "@/components/library-grid";
 import { TimelineView } from "@/components/timeline-view";
 import { FullscreenViewer } from "@/components/fullscreen-viewer";
-import { buildMemoryStories } from "@/lib/memories";
 import type { Asset } from "@/lib/types";
 import { UploadDropzone } from "@/components/upload-dropzone";
+import { FilterBar } from "@/components/FilterBar";
+import { ViewSelector, type GalleryView } from "@/components/ViewSelector";
+import { FilterProvider, useFilters } from "@/context/FilterContext";
+import { ColorView } from "@/views/ColorView";
+import { SliderView } from "@/views/SliderView";
 
-type ViewMode = "library" | "timeline" | "albums" | "favorites" | "memories";
+const MapView = dynamic(() => import("@/views/MapView").then((mod) => mod.MapView), { ssr: false });
 
-export default function HomePage() {
-  const [view, setView] = useState<ViewMode>("library");
-  const [query, setQuery] = useState("");
+function HomeContent() {
+  const { filters } = useFilters();
+  const [view, setView] = useState<GalleryView>("masonry");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [library, setLibrary] = useState<Asset[]>(assets);
   const [loadingLibrary, setLoadingLibrary] = useState(false);
@@ -24,7 +28,13 @@ export default function HomePage() {
   async function refreshLibrary() {
     setLoadingLibrary(true);
     try {
-      const response = await fetch("/api/assets", { cache: "no-store" });
+      const params = new URLSearchParams();
+      params.set("years", `${filters.year[0]}-${filters.year[1]}`);
+      if (filters.location.length) params.set("locations", filters.location.join(","));
+      if (filters.tags.length) params.set("tags", filters.tags.join(","));
+      if (filters.searchQuery.trim()) params.set("q", filters.searchQuery.trim());
+
+      const response = await fetch(`/api/assets?${params.toString()}`, { cache: "no-store" });
       if (!response.ok) return;
       const body = (await response.json()) as { assets?: Asset[]; supabaseConfigured?: boolean };
       if (body.supabaseConfigured === false) {
@@ -47,75 +57,40 @@ export default function HomePage() {
 
   useEffect(() => {
     void refreshLibrary();
-  }, []);
+  }, [filters.year, filters.location, filters.tags, filters.searchQuery]);
 
-  const baseFiltered = useMemo(() => filterAssets(library, { query }), [library, query]);
-
-  const viewItems = useMemo(() => {
-    if (view === "favorites") return baseFiltered.filter((x) => x.favorite);
-    return baseFiltered;
-  }, [baseFiltered, view]);
-
-  const albumGroups = useMemo(
-    () =>
-      albums.map((album) => ({
-        album,
-        items: baseFiltered.filter((asset) => asset.albumIds.includes(album.id))
-      })),
-    [baseFiltered]
-  );
-  const memoryStories = useMemo(() => buildMemoryStories(baseFiltered).slice(0, 5), [baseFiltered]);
+  const viewItems = useMemo(() => library, [library]);
 
   return (
     <main className="app-shell">
       <header className="topbar">
-        <input
-          aria-label="Search photos"
-          placeholder="Search by date, city or tag"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-        <div className="controls">
-          {(["library", "timeline", "albums", "favorites", "memories"] as ViewMode[]).map((mode) => (
-            <button key={mode} className={view === mode ? "active" : ""} onClick={() => setView(mode)}>
-              {mode}
-            </button>
-          ))}
-        </div>
+        <ViewSelector value={view} onChange={setView} />
       </header>
 
       <section className="card" style={{ padding: 14 }}>
+        <FilterBar />
         <UploadDropzone onUploaded={refreshLibrary} supabaseConfigured={supabaseConfigured} missingEnv={missingEnv} />
         {loadingLibrary ? <p style={{ color: "var(--muted)" }}>Actualitzant biblioteca...</p> : null}
         {view === "timeline" ? <TimelineView items={viewItems} onOpen={(asset) => setSelectedId(asset.id)} /> : null}
-        {view === "library" || view === "favorites" ? (
+        {view === "masonry" ? (
           <LibraryGrid items={viewItems} onOpen={(asset) => setSelectedId(asset.id)} />
         ) : null}
-        {view === "albums"
-          ? albumGroups.map(({ album, items }) => (
-              <section key={album.id} style={{ marginBottom: 20 }}>
-                <h3>{album.name}</h3>
-                <LibraryGrid items={items} onOpen={(asset) => setSelectedId(asset.id)} />
-              </section>
-            ))
-          : null}
-        {view === "memories" ? (
-          <div>
-            <h3>Story Mode (Phase 2-ready)</h3>
-            <p style={{ color: "var(--muted)" }}>
-              Auto-generated stories will use event windows, music and transitions from the background pipeline.
-            </p>
-            <div className="controls" style={{ marginBottom: 12 }}>
-              {memoryStories.map((story) => (
-                <button key={story.id}>{story.title}</button>
-              ))}
-            </div>
-            <LibraryGrid items={viewItems.slice(0, 12)} onOpen={(asset) => setSelectedId(asset.id)} />
-          </div>
-        ) : null}
+        {view === "map" ? <MapView items={viewItems} onOpen={(asset) => setSelectedId(asset.id)} /> : null}
+        {view === "colors" ? <ColorView items={viewItems} onOpen={(asset) => setSelectedId(asset.id)} /> : null}
+        {view === "slider" ? <SliderView items={viewItems} /> : null}
       </section>
 
-      <FullscreenViewer items={viewItems} selectedId={selectedId} onSelect={setSelectedId} onClose={() => setSelectedId(null)} />
+      {view !== "slider" ? (
+        <FullscreenViewer items={viewItems} selectedId={selectedId} onSelect={setSelectedId} onClose={() => setSelectedId(null)} />
+      ) : null}
     </main>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <FilterProvider>
+      <HomeContent />
+    </FilterProvider>
   );
 }

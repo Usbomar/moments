@@ -9,6 +9,7 @@ import {
   generateSignedUrls,
   validateSignedUrl
 } from "@/lib/server/storage-utils";
+import { extractExif } from "@/lib/exif-extractor";
 import type { MediaType } from "@/lib/types";
 
 const SIGNED_URL_TTL = 60 * 60 * 24 * 365 * 5;
@@ -43,6 +44,22 @@ export async function POST(request: Request) {
     const supabase = getSupabaseAdmin();
     const bucket = getStorageBucket();
     const buffer = Buffer.from(await file.arrayBuffer());
+
+    const uploadedAt = new Date().toISOString();
+    const mediaType: MediaType = file.type.startsWith("video/") ? "video" : "photo";
+    let takenAtIso = uploadedAt;
+    if (mediaType === "photo") {
+      const exif = await extractExif(buffer, file.type);
+      if (exif.takenAt) {
+        takenAtIso = exif.takenAt.toISOString();
+      }
+      const coords =
+        exif.latitude != null && exif.longitude != null ? `${exif.latitude},${exif.longitude}` : "none";
+      console.log(
+        `EXIF extracted: takenAt=${exif.takenAt?.toISOString() ?? "none"}, coordinates=${coords}, camera=${[exif.cameraManufacturer, exif.cameraModel].filter(Boolean).join(" ") || "none"}`
+      );
+      // GPS persistència a BD: Fase 2 (locations / asset_locations).
+    }
     const { data: originalUpload, error: originalError } = await supabase.storage
       .from(bucket)
       .upload(paths.original, buffer, {
@@ -55,8 +72,6 @@ export async function POST(request: Request) {
     }
 
     const id = crypto.randomUUID();
-    const now = new Date().toISOString();
-    const mediaType: MediaType = file.type.startsWith("video/") ? "video" : "photo";
     let width = 0;
     let height = 0;
     let previewPath = originalUpload.path;
@@ -136,8 +151,8 @@ export async function POST(request: Request) {
       user_id: "u-1",
       type: mediaType,
       title: file.name,
-      taken_at: now,
-      uploaded_at: now,
+      taken_at: takenAtIso,
+      uploaded_at: uploadedAt,
       width,
       height,
       duration: null,

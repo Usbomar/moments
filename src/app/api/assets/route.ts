@@ -3,6 +3,23 @@ import type { Asset } from "@/lib/types";
 import { getSupabaseAdmin } from "@/lib/server/supabase-admin";
 import { isSupabaseConfigured } from "@/lib/server/supabase-config";
 
+/** One row from `asset_files` as returned by PostgREST. */
+type AssetFileRow = {
+  original_url: string;
+  preview_url: string;
+  thumb_url: string;
+  checksum: string;
+  size: number;
+};
+
+/** Nested embed: Supabase/PostgREST may return one-to-one as object or as array of one. */
+type AssetFilesNested = AssetFileRow | AssetFileRow[] | null | undefined;
+
+function pickFirstAssetFile(raw: AssetFilesNested): AssetFileRow | null {
+  if (raw == null) return null;
+  return Array.isArray(raw) ? (raw[0] ?? null) : raw;
+}
+
 function toAsset(row: {
   id: string;
   user_id: string;
@@ -14,15 +31,9 @@ function toAsset(row: {
   height: number;
   duration: number | null;
   favorite: boolean;
-  asset_files: {
-    original_url: string;
-    preview_url: string;
-    thumb_url: string;
-    checksum: string;
-    size: number;
-  }[] | null;
+  asset_files: AssetFilesNested;
 }): Asset {
-  const file = row.asset_files?.[0];
+  const file = pickFirstAssetFile(row.asset_files);
   return {
     id: row.id,
     userId: row.user_id,
@@ -69,8 +80,7 @@ export async function GET() {
 
     const rows = data ?? [];
     for (const row of rows) {
-      const files = row.asset_files;
-      if (files == null || (Array.isArray(files) && files.length === 0)) {
+      if (!pickFirstAssetFile(row.asset_files)) {
         console.warn("Asset has no asset_files:", row.id);
       }
     }

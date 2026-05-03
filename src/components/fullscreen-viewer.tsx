@@ -11,6 +11,8 @@ interface Props {
   onSelect: (id: string) => void;
   /** Obre l’editor de metadades (títol, tags, ubicació, etc.). */
   onEditDetails: (asset: Asset) => void;
+  /** Obre l’editor d’imatge (retall, filtres, export, IA). */
+  onEditImage: (asset: Asset) => void;
 }
 
 /** Matches library-grid placeholder look (gray gradient + centered text). */
@@ -31,7 +33,7 @@ const placeholderStyle: CSSProperties = {
   boxSizing: "border-box"
 };
 
-export function FullscreenViewer({ items, selectedId, onClose, onSelect, onEditDetails }: Props) {
+export function FullscreenViewer({ items, selectedId, onClose, onSelect, onEditDetails, onEditImage }: Props) {
   const index = items.findIndex((x) => x.id === selectedId);
   const current = index >= 0 ? items[index] : null;
 
@@ -76,9 +78,12 @@ export function FullscreenViewer({ items, selectedId, onClose, onSelect, onEditD
           <button
             type="button"
             className="viewer-toolbar-btn"
-            disabled
-            title="Properament disponible"
-            aria-label="Editar imatge (properament disponible)"
+            disabled={current.type !== "photo"}
+            title={current.type !== "photo" ? "Només fotos" : undefined}
+            aria-label="Editar imatge"
+            onClick={() => {
+              if (current.type === "photo") onEditImage(current);
+            }}
           >
             Editar imatge
           </button>

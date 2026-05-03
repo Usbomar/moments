@@ -103,7 +103,9 @@ button.active {
 .viewer {
   position: fixed;
   inset: 0;
-  background: rgba(5, 8, 12, 0.9);
+  background: rgba(5, 8, 12, 0.82);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   display: flex;
   align-items: center;
   justify-content: center;

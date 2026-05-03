@@ -9,7 +9,7 @@ function clamp(n: number, min: number, max: number): number {
  * Apply edit operations in order (same contract as client canvas preview).
  */
 export async function applyImageOperationsToBuffer(input: Buffer, operations: EditOperation[]): Promise<Buffer> {
-  let pipeline = sharp(input, { failOn: "none" }).ensureAlpha().removeAlpha();
+  let pipeline = sharp(input, { failOn: "none" });
 
   for (const op of operations) {
     switch (op.type) {
@@ -28,6 +28,24 @@ export async function applyImageOperationsToBuffer(input: Buffer, operations: Ed
         if (op.angle !== 0) {
           /* Canvas preview uses clockwise degrees; Sharp rotates counter-clockwise. */
           pipeline = pipeline.rotate(-op.angle);
+        }
+        break;
+      }
+      case "resize": {
+        const meta = await pipeline.metadata();
+        const cw = meta.width ?? 1;
+        const ch = meta.height ?? 1;
+        const tw = Math.max(1, Math.round(op.width));
+        const th = Math.max(1, Math.round(op.height));
+        let nw = tw;
+        let nh = th;
+        if (op.maintainAspect) {
+          const scale = Math.min(tw / cw, th / ch);
+          nw = Math.max(1, Math.round(cw * scale));
+          nh = Math.max(1, Math.round(ch * scale));
+          pipeline = pipeline.resize({ width: nw, height: nh, fit: "inside", withoutEnlargement: false });
+        } else {
+          pipeline = pipeline.resize({ width: nw, height: nh, fit: "fill", position: "centre" });
         }
         break;
       }
@@ -63,6 +81,13 @@ export async function applyImageOperationsToBuffer(input: Buffer, operations: Ed
         break;
       }
       case "autoEnhance": {
+        const meta = await pipeline.metadata();
+        const mw = meta.width ?? 0;
+        const mh = meta.height ?? 0;
+        const edge = op.targetMaxEdge != null && op.targetMaxEdge > 0 ? Math.round(op.targetMaxEdge) : 0;
+        if (edge >= 64 && mw > 0 && mh > 0 && Math.max(mw, mh) > edge) {
+          pipeline = pipeline.resize({ width: edge, height: edge, fit: "inside", withoutEnlargement: true });
+        }
         const b = clamp(1 + op.brightness / 100, 0.2, 2.5);
         const s = clamp(1 + op.saturation / 100, 0, 3);
         const c = clamp(op.contrast / 100, -0.95, 0.95);

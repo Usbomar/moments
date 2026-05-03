@@ -5,11 +5,11 @@ import type { Asset } from "@/lib/types";
 
 interface Props {
   items: Asset[];
-  /** Obre el visor a pantalla completa (doble clic). */
+  /** Clic al thumbnail: obre el visor a pantalla completa (prioritat sobre onOpenModal). */
   onOpenViewer?: (asset: Asset) => void;
-  /** Obre el modal d'edició (clic simple). */
+  /** Opcional: només si no hi ha onOpenViewer (p. ex. eines internes). */
   onOpenModal?: (asset: Asset) => void;
-  /** Compatibilitat enrere: si no hi ha onOpenModal/onOpenViewer, s'utilitza onOpen al clic simple. */
+  /** Compatibilitat enrere: si no hi ha onOpenViewer ni onOpenModal. */
   onOpen?: (asset: Asset) => void;
 }
 
@@ -43,6 +43,10 @@ function LibraryTile({
   const thumbUrl = asset.files.thumbUrl?.trim() ?? "";
 
   const handleClick = () => {
+    if (onOpenViewer) {
+      onOpenViewer(asset);
+      return;
+    }
     if (onOpenModal) {
       onOpenModal(asset);
       return;
@@ -50,17 +54,9 @@ function LibraryTile({
     onOpen?.(asset);
   };
 
-  const handleDoubleClick = () => {
-    if (onOpenViewer) {
-      onOpenViewer(asset);
-      return;
-    }
-    onOpen?.(asset);
-  };
-
   if (!thumbUrl) {
     return (
-      <button type="button" className="tile" onClick={handleClick} onDoubleClick={handleDoubleClick}>
+      <button type="button" className="tile" onClick={handleClick}>
         <div style={placeholderStyle}>
           <span style={{ fontWeight: 600, color: "var(--text, #151719)" }}>No image</span>
           <span style={{ wordBreak: "break-word", maxWidth: "100%" }}>{asset.title}</span>
@@ -71,7 +67,7 @@ function LibraryTile({
   }
 
   return (
-    <button type="button" className="tile" onClick={handleClick} onDoubleClick={handleDoubleClick}>
+    <button type="button" className="tile" onClick={handleClick}>
       <img
         src={thumbUrl}
         alt={asset.title}

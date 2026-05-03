@@ -1,19 +1,14 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Map as LeafletMap, Marker as LeafletMarker } from "leaflet";
 import { loadCollections, saveCollections } from "@/lib/collections-storage";
-import type { Asset, AssetFile, LocationInfo } from "@/lib/types";
-
-const ImageEditor = dynamic(() => import("@/components/ImageEditor").then((m) => m.ImageEditor), { ssr: false });
+import type { Asset, LocationInfo } from "@/lib/types";
 
 interface Props {
   asset: Asset | null;
   onClose: () => void;
   onSave: (updated: Asset) => void | Promise<void>;
-  /** Després d’editar la imatge al servidor, actualitza biblioteca / asset seleccionat. */
-  onImageSaved?: (updated: Asset) => void;
 }
 
 function toDateInputValue(iso: string): string {
@@ -59,7 +54,7 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
   return debounced;
 }
 
-export function PhotoModal({ asset, onClose, onSave, onImageSaved }: Props) {
+export function PhotoModal({ asset, onClose, onSave }: Props) {
   const [title, setTitle] = useState(() => asset?.title ?? "");
   const [description, setDescription] = useState(() => asset?.description ?? "");
   const [tagInput, setTagInput] = useState("");
@@ -71,8 +66,6 @@ export function PhotoModal({ asset, onClose, onSave, onImageSaved }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const [geocodeHint, setGeocodeHint] = useState<string | null>(null);
-  const [showImageEditor, setShowImageEditor] = useState(false);
-  const [localFiles, setLocalFiles] = useState<AssetFile | null>(null);
   const [collections, setCollections] = useState(() => loadCollections());
 
   useEffect(() => {
@@ -101,8 +94,6 @@ export function PhotoModal({ asset, onClose, onSave, onImageSaved }: Props) {
     setFavorite(asset.favorite ?? false);
     setError(null);
     setGeocodeHint(null);
-    setLocalFiles(null);
-    setShowImageEditor(false);
   }, [asset]);
 
   const mapRootRef = useRef<HTMLDivElement | null>(null);
@@ -168,7 +159,6 @@ export function PhotoModal({ asset, onClose, onSave, onImageSaved }: Props) {
         }
       }
 
-      const files = localFiles ?? asset.files;
       const updated: Asset = {
         ...asset,
         title: trimmed,
@@ -177,12 +167,12 @@ export function PhotoModal({ asset, onClose, onSave, onImageSaved }: Props) {
         takenAt: fromDateInputValue(dateValue),
         favorite,
         location,
-        files
+        files: asset.files
       };
       await onSave(updated);
       onClose();
     })();
-  }, [asset, dateValue, description, favorite, localFiles, locationText, onClose, onSave, pickedLocation, tags, title]);
+  }, [asset, dateValue, description, favorite, locationText, onClose, onSave, pickedLocation, tags, title]);
 
   const toggleCollectionMembership = useCallback(
     (collectionId: string, checked: boolean) => {
@@ -358,17 +348,15 @@ export function PhotoModal({ asset, onClose, onSave, onImageSaved }: Props) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (showImageEditor) return;
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose, showImageEditor]);
+  }, [onClose]);
 
   if (!asset) return null;
 
-  const files = localFiles ?? asset.files;
-  const imageUrl = (files.previewUrl || files.originalUrl).trim();
+  const imageUrl = (asset.files.previewUrl || asset.files.originalUrl).trim();
 
   return (
     <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Editor de foto" onClick={onClose}>
@@ -386,14 +374,6 @@ export function PhotoModal({ asset, onClose, onSave, onImageSaved }: Props) {
         ) : (
           <p className="modal-muted">Sense imatge de previsualització.</p>
         )}
-
-        {asset.type === "photo" ? (
-          <div className="form-group" style={{ marginTop: 4 }}>
-            <button type="button" className="primary" onClick={() => setShowImageEditor(true)}>
-              Editar imatge
-            </button>
-          </div>
-        ) : null}
 
         {collections.length ? (
           <div className="form-group">
@@ -493,18 +473,6 @@ export function PhotoModal({ asset, onClose, onSave, onImageSaved }: Props) {
           </button>
         </div>
       </div>
-
-      {showImageEditor && asset.type === "photo" ? (
-        <ImageEditor
-          asset={asset}
-          onClose={() => setShowImageEditor(false)}
-          onDiscard={() => setShowImageEditor(false)}
-          onSaveSuccess={(updated) => {
-            setLocalFiles(updated.files);
-            onImageSaved?.(updated);
-          }}
-        />
-      ) : null}
     </div>
   );
 }

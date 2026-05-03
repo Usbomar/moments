@@ -19,6 +19,7 @@ import { Memories } from "@/components/Memories";
 
 const MapView = dynamic(() => import("@/views/MapView").then((mod) => mod.MapView), { ssr: false });
 const PhotoModal = dynamic(() => import("@/components/PhotoModal").then((mod) => mod.PhotoModal), { ssr: false });
+const ImageEditor = dynamic(() => import("@/components/ImageEditor").then((mod) => mod.ImageEditor), { ssr: false });
 
 type MainTab = "library" | "collections" | "memories" | "analytics";
 
@@ -34,6 +35,7 @@ function HomeContent() {
   const [view, setView] = useState<GalleryView>("masonry");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
+  const [imageEditorAsset, setImageEditorAsset] = useState<Asset | null>(null);
   const [mainTab, setMainTab] = useState<MainTab>("library");
   const [slideshowItems, setSlideshowItems] = useState<Asset[] | null>(null);
   const [library, setLibrary] = useState<Asset[]>(assets);
@@ -86,6 +88,12 @@ function HomeContent() {
     setSelectedAsset(asset);
   }, []);
 
+  const openImageEditorFromViewer = useCallback((asset: Asset) => {
+    setSelectedId(null);
+    setSlideshowItems(null);
+    setImageEditorAsset(asset);
+  }, []);
+
   const handleMainTab = useCallback((tab: MainTab) => {
     setMainTab(tab);
   }, []);
@@ -103,7 +111,7 @@ function HomeContent() {
 
   const onImageSaved = useCallback((updated: Asset) => {
     setLibrary((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
-    setSelectedAsset(updated);
+    setSelectedAsset((prev) => (prev?.id === updated.id ? updated : prev));
     void refreshLibraryRef.current();
   }, []);
 
@@ -210,6 +218,7 @@ function HomeContent() {
         onSelect={setSelectedId}
         onClose={onViewerClose}
         onEditDetails={openDetailsEditorFromViewer}
+        onEditImage={openImageEditorFromViewer}
       />
 
       {selectedAsset ? (
@@ -218,7 +227,19 @@ function HomeContent() {
           asset={selectedAsset}
           onClose={() => setSelectedAsset(null)}
           onSave={onPhotoSave}
-          onImageSaved={onImageSaved}
+        />
+      ) : null}
+
+      {imageEditorAsset ? (
+        <ImageEditor
+          key={imageEditorAsset.id}
+          asset={imageEditorAsset}
+          onClose={() => setImageEditorAsset(null)}
+          onDiscard={() => setImageEditorAsset(null)}
+          onSaveSuccess={(updated) => {
+            onImageSaved(updated);
+            setImageEditorAsset(null);
+          }}
         />
       ) : null}
     </main>

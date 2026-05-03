@@ -1,7 +1,13 @@
 import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import sharp from "sharp";
-import { isEditOperation, MAX_EDIT_OPERATIONS, type EditOperation } from "@/lib/image-edit-ops";
+import {
+  isEditOperation,
+  isExportOptions,
+  MAX_EDIT_OPERATIONS,
+  type EditOperation,
+  type ExportOptions
+} from "@/lib/image-edit-ops";
 import { applyImageOperationsToBuffer, makePreviewWebp, makeThumbWebp } from "@/lib/server/apply-image-operations";
 import { pickFirstAssetFile, toAsset } from "@/lib/server/asset-map";
 import { extractStoragePath, generateSignedUrls } from "@/lib/server/storage-utils";
@@ -13,7 +19,12 @@ const SIGNED_URL_TTL = 60 * 60 * 24 * 365 * 5;
 
 type Body = {
   operations?: unknown[];
+  export?: unknown;
 };
+
+function clamp(n: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, n));
+}
 
 async function resolveId(context: { params: Promise<{ id: string }> } | { params: { id: string } }) {
   const params = await Promise.resolve(context.params);
@@ -52,6 +63,18 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         return NextResponse.json({ error: "Invalid operation in list" }, { status: 400 });
       }
       operations.push(item);
+    }
+
+    const defaultExport: ExportOptions = { webpQuality: 85, maxLongEdge: 0 };
+    let exportOpts: ExportOptions = defaultExport;
+    if (body.export !== undefined) {
+      if (!isExportOptions(body.export)) {
+        return NextResponse.json({ error: "Invalid export options" }, { status: 400 });
+      }
+      exportOpts = {
+        webpQuality: Math.round(clamp(body.export.webpQuality, 40, 98)),
+        maxLongEdge: Math.round(Math.max(0, Math.min(8192, body.export.maxLongEdge)))
+      };
     }
 
     const supabase = getSupabaseAdmin();
@@ -114,9 +137,23 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       return NextResponse.json({ error: msg }, { status: 400 });
     }
 
-    const originalWebp = await sharp(edited, { failOn: "none" }).webp({ quality: 85 }).toBuffer();
-    const previewBuf = await makePreviewWebp(edited, 1600, 80);
-    const thumbBuf = await makeThumbWebp(edited, 480, 72);
+    let outSharp = sharp(edited, { failOn: "none" });
+    if (exportOpts.maxLongEdge > 0) {
+      const em = await outSharp.metadata();
+      const ew = em.width ?? 0;
+      const eh = em.height ?? 0;
+      if (ew > 0 && eh > 0 && Math.max(ew, eh) > exportOpts.maxLongEdge) {
+        outSharp = outSharp.resize({
+          width: exportOpts.maxLongEdge,
+          height: exportOpts.maxLongEdge,
+          fit: "inside",
+          withoutEnlargement: true
+        });
+      }
+    }
+    const originalWebp = await outSharp.webp({ quality: exportOpts.webpQuality }).toBuffer();
+    const previewBuf = await makePreviewWebp(originalWebp, 1600, 80);
+    const thumbBuf = await makeThumbWebp(originalWebp, 480, 72);
 
     const checksum = crypto.createHash("sha256").update(originalWebp).digest("hex");
     const size = originalWebp.length;

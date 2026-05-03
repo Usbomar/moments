@@ -1,0 +1,196 @@
+import crypto from "node:crypto";
+import { NextResponse } from "next/server";
+import sharp from "sharp";
+import { isEditOperation, MAX_EDIT_OPERATIONS, type EditOperation } from "@/lib/image-edit-ops";
+import { applyImageOperationsToBuffer, makePreviewWebp, makeThumbWebp } from "@/lib/server/apply-image-operations";
+import { pickFirstAssetFile, toAsset } from "@/lib/server/asset-map";
+import { extractStoragePath, generateSignedUrls } from "@/lib/server/storage-utils";
+import { objectPathFromSignedUrl } from "@/lib/server/signed-url-path";
+import { getStorageBucket, getSupabaseAdmin } from "@/lib/server/supabase-admin";
+import { isSupabaseConfigured } from "@/lib/server/supabase-config";
+
+const SIGNED_URL_TTL = 60 * 60 * 24 * 365 * 5;
+
+type Body = {
+  operations?: unknown[];
+};
+
+async function resolveId(context: { params: Promise<{ id: string }> } | { params: { id: string } }) {
+  const params = await Promise.resolve(context.params);
+  return params.id;
+}
+
+export async function POST(request: Request, context: { params: Promise<{ id: string }> } | { params: { id: string } }) {
+  if (request.method !== "POST") {
+    return NextResponse.json({ error: "Method not allowed" }, { status: 405 });
+  }
+
+  try {
+    if (!isSupabaseConfigured()) {
+      return NextResponse.json({ error: "SUPABASE_NOT_CONFIGURED" }, { status: 503 });
+    }
+
+    const id = await resolveId(context);
+    let body: Body;
+    try {
+      body = (await request.json()) as Body;
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    }
+
+    const rawOps = body.operations;
+    if (!Array.isArray(rawOps)) {
+      return NextResponse.json({ error: "operations must be an array" }, { status: 400 });
+    }
+    if (rawOps.length > MAX_EDIT_OPERATIONS) {
+      return NextResponse.json({ error: `Too many operations (max ${MAX_EDIT_OPERATIONS})` }, { status: 400 });
+    }
+
+    const operations: EditOperation[] = [];
+    for (const item of rawOps) {
+      if (!isEditOperation(item)) {
+        return NextResponse.json({ error: "Invalid operation in list" }, { status: 400 });
+      }
+      operations.push(item);
+    }
+
+    const supabase = getSupabaseAdmin();
+    const bucket = getStorageBucket();
+
+    const { data: row, error: rowErr } = await supabase
+      .from("assets")
+      .select(
+        "id,user_id,type,title,description,taken_at,uploaded_at,width,height,duration,favorite,asset_files(original_url,preview_url,thumb_url,checksum,size),asset_locations(location_id,locations(lat,lng,city,country)),asset_tags(tag,origin)"
+      )
+      .eq("id", id)
+      .maybeSingle();
+
+    if (rowErr) return NextResponse.json({ error: rowErr.message }, { status: 500 });
+    if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (row.user_id !== "u-1") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    if (row.type !== "photo") {
+      return NextResponse.json({ error: "Only photo assets can be edited" }, { status: 400 });
+    }
+
+    const fileRow = pickFirstAssetFile(row.asset_files);
+    if (!fileRow || typeof fileRow.original_url !== "string") {
+      return NextResponse.json({ error: "Missing asset files" }, { status: 500 });
+    }
+
+    const originalUrl = fileRow.original_url.trim();
+    const previewUrl = typeof fileRow.preview_url === "string" ? fileRow.preview_url.trim() : "";
+    const thumbUrl = typeof fileRow.thumb_url === "string" ? fileRow.thumb_url.trim() : "";
+
+    let originalPath = objectPathFromSignedUrl(originalUrl);
+    let previewPath = objectPathFromSignedUrl(previewUrl);
+    let thumbPath = objectPathFromSignedUrl(thumbUrl);
+    if (!originalPath || !previewPath || !thumbPath) {
+      try {
+        const paths = extractStoragePath(row.title || "photo.jpg", fileRow.checksum);
+        originalPath = originalPath ?? paths.original;
+        previewPath = previewPath ?? paths.preview;
+        thumbPath = thumbPath ?? paths.thumb;
+      } catch {
+        /* ignore */
+      }
+    }
+    if (!originalPath || !previewPath || !thumbPath) {
+      return NextResponse.json({ error: "Could not resolve storage paths from URLs" }, { status: 500 });
+    }
+
+    const imgRes = await fetch(originalUrl);
+    if (!imgRes.ok) {
+      return NextResponse.json({ error: `Failed to download original image (${imgRes.status})` }, { status: 502 });
+    }
+    const inputBuffer = Buffer.from(await imgRes.arrayBuffer());
+
+    let edited: Buffer;
+    try {
+      edited = await applyImageOperationsToBuffer(inputBuffer, operations);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Sharp processing failed";
+      return NextResponse.json({ error: msg }, { status: 400 });
+    }
+
+    const originalWebp = await sharp(edited, { failOn: "none" }).webp({ quality: 85 }).toBuffer();
+    const previewBuf = await makePreviewWebp(edited, 1600, 80);
+    const thumbBuf = await makeThumbWebp(edited, 480, 72);
+
+    const checksum = crypto.createHash("sha256").update(originalWebp).digest("hex");
+    const size = originalWebp.length;
+
+    const { error: upOrig } = await supabase.storage.from(bucket).upload(originalPath, originalWebp, {
+      contentType: "image/webp",
+      upsert: true
+    });
+    if (upOrig) return NextResponse.json({ error: upOrig.message }, { status: 500 });
+
+    const { error: upPrev } = await supabase.storage.from(bucket).upload(previewPath, previewBuf, {
+      contentType: "image/webp",
+      upsert: true
+    });
+    if (upPrev) return NextResponse.json({ error: upPrev.message }, { status: 500 });
+
+    const { error: upThumb } = await supabase.storage.from(bucket).upload(thumbPath, thumbBuf, {
+      contentType: "image/webp",
+      upsert: true
+    });
+    if (upThumb) return NextResponse.json({ error: upThumb.message }, { status: 500 });
+
+    const signed = await generateSignedUrls(
+      bucket,
+      { original: originalPath, preview: previewPath, thumb: thumbPath },
+      SIGNED_URL_TTL
+    );
+
+    const sharpMeta = await sharp(originalWebp, { failOn: "none" }).metadata();
+    const width = sharpMeta.width ?? row.width;
+    const height = sharpMeta.height ?? row.height;
+    const uploadedAt = new Date().toISOString();
+
+    const { error: upAsset } = await supabase
+      .from("assets")
+      .update({ width, height, uploaded_at: uploadedAt })
+      .eq("id", id)
+      .eq("user_id", "u-1");
+    if (upAsset) return NextResponse.json({ error: upAsset.message }, { status: 500 });
+
+    const { error: upFiles } = await supabase
+      .from("asset_files")
+      .update({
+        original_url: signed.originalUrl,
+        preview_url: signed.previewUrl,
+        thumb_url: signed.thumbUrl,
+        checksum,
+        size
+      })
+      .eq("asset_id", id);
+    if (upFiles) return NextResponse.json({ error: upFiles.message }, { status: 500 });
+
+    const { data: fresh, error: freshErr } = await supabase
+      .from("assets")
+      .select(
+        "id,user_id,type,title,description,taken_at,uploaded_at,width,height,duration,favorite,asset_files(original_url,preview_url,thumb_url,checksum,size),asset_locations(location_id,locations(lat,lng,city,country)),asset_tags(tag,origin)"
+      )
+      .eq("id", id)
+      .maybeSingle();
+
+    if (freshErr || !fresh) {
+      return NextResponse.json({ error: freshErr?.message ?? "Failed to reload asset" }, { status: 500 });
+    }
+
+    const asset = toAsset(fresh);
+    const fileSizeMB = size / (1024 * 1024);
+
+    return NextResponse.json({
+      success: true,
+      asset,
+      fileSizeMB: Math.round(fileSizeMB * 1000) / 1000
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}

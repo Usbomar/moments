@@ -1,13 +1,19 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Map as LeafletMap, Marker as LeafletMarker } from "leaflet";
-import type { Asset, LocationInfo } from "@/lib/types";
+import { loadCollections, saveCollections } from "@/lib/collections-storage";
+import type { Asset, AssetFile, LocationInfo } from "@/lib/types";
+
+const ImageEditor = dynamic(() => import("@/components/ImageEditor").then((m) => m.ImageEditor), { ssr: false });
 
 interface Props {
   asset: Asset | null;
   onClose: () => void;
   onSave: (updated: Asset) => void | Promise<void>;
+  /** Després d’editar la imatge al servidor, actualitza biblioteca / asset seleccionat. */
+  onImageSaved?: (updated: Asset) => void;
 }
 
 function toDateInputValue(iso: string): string {
@@ -53,7 +59,7 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
   return debounced;
 }
 
-export function PhotoModal({ asset, onClose, onSave }: Props) {
+export function PhotoModal({ asset, onClose, onSave, onImageSaved }: Props) {
   const [title, setTitle] = useState(() => asset?.title ?? "");
   const [description, setDescription] = useState(() => asset?.description ?? "");
   const [tagInput, setTagInput] = useState("");
@@ -65,10 +71,26 @@ export function PhotoModal({ asset, onClose, onSave }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const [geocodeHint, setGeocodeHint] = useState<string | null>(null);
+  const [showImageEditor, setShowImageEditor] = useState(false);
+  const [localFiles, setLocalFiles] = useState<AssetFile | null>(null);
+  const [collections, setCollections] = useState(() => loadCollections());
 
-  /** Reset local editor state when the opened asset changes (single dependency). */
+  useEffect(() => {
+    const onCol = () => setCollections(loadCollections());
+    window.addEventListener("moments:collections-changed", onCol);
+    return () => window.removeEventListener("moments:collections-changed", onCol);
+  }, []);
+
+  const syncedAssetIdRef = useRef<string | null>(null);
+
+  /**
+   * Sincronitza el formulari només quan canvia l’ID de l’asset (altra foto).
+   * Evita esborrar edicions locals quan el pare refresca el mateix asset (p. ex. després d’editar imatge).
+   */
   useEffect(() => {
     if (!asset) return;
+    if (syncedAssetIdRef.current === asset.id) return;
+    syncedAssetIdRef.current = asset.id;
     setTitle(asset.title ?? "");
     setDescription(asset.description ?? "");
     setTagInput("");
@@ -79,6 +101,8 @@ export function PhotoModal({ asset, onClose, onSave }: Props) {
     setFavorite(asset.favorite ?? false);
     setError(null);
     setGeocodeHint(null);
+    setLocalFiles(null);
+    setShowImageEditor(false);
   }, [asset]);
 
   const mapRootRef = useRef<HTMLDivElement | null>(null);
@@ -144,6 +168,7 @@ export function PhotoModal({ asset, onClose, onSave }: Props) {
         }
       }
 
+      const files = localFiles ?? asset.files;
       const updated: Asset = {
         ...asset,
         title: trimmed,
@@ -151,12 +176,39 @@ export function PhotoModal({ asset, onClose, onSave }: Props) {
         tags: [...tags],
         takenAt: fromDateInputValue(dateValue),
         favorite,
-        location
+        location,
+        files
       };
       await onSave(updated);
       onClose();
     })();
-  }, [asset, dateValue, description, favorite, locationText, onClose, onSave, pickedLocation, tags, title]);
+  }, [asset, dateValue, description, favorite, localFiles, locationText, onClose, onSave, pickedLocation, tags, title]);
+
+  const toggleCollectionMembership = useCallback(
+    (collectionId: string, checked: boolean) => {
+      if (!asset) return;
+      const all = loadCollections();
+      const idx = all.findIndex((c) => c.id === collectionId);
+      if (idx === -1) return;
+      const c = { ...all[idx] };
+      if (checked) {
+        if (!c.assetIds.includes(asset.id)) {
+          c.assetIds = [...c.assetIds, asset.id];
+          if (!c.coverAssetId) c.coverAssetId = asset.id;
+        }
+      } else {
+        c.assetIds = c.assetIds.filter((id) => id !== asset.id);
+        if (c.coverAssetId === asset.id) {
+          c.coverAssetId = c.assetIds[0] ?? null;
+        }
+      }
+      const next = [...all];
+      next[idx] = c;
+      saveCollections(next);
+      setCollections(loadCollections());
+    },
+    [asset]
+  );
 
   useEffect(() => {
     if (!asset) return;
@@ -306,15 +358,17 @@ export function PhotoModal({ asset, onClose, onSave }: Props) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (showImageEditor) return;
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, showImageEditor]);
 
   if (!asset) return null;
 
-  const imageUrl = (asset.files.previewUrl || asset.files.originalUrl).trim();
+  const files = localFiles ?? asset.files;
+  const imageUrl = (files.previewUrl || files.originalUrl).trim();
 
   return (
     <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Editor de foto" onClick={onClose}>
@@ -333,6 +387,34 @@ export function PhotoModal({ asset, onClose, onSave }: Props) {
           <p className="modal-muted">Sense imatge de previsualització.</p>
         )}
 
+        {asset.type === "photo" ? (
+          <div className="form-group" style={{ marginTop: 4 }}>
+            <button type="button" className="primary" onClick={() => setShowImageEditor(true)}>
+              Editar imatge
+            </button>
+          </div>
+        ) : null}
+
+        {collections.length ? (
+          <div className="form-group">
+            <span className="modal-muted" style={{ fontSize: 13 }}>
+              Col·leccions (local)
+            </span>
+            <div className="collection-check-list">
+              {collections.map((c) => (
+                <label key={c.id} className="collection-check-row">
+                  <input
+                    type="checkbox"
+                    checked={c.assetIds.includes(asset.id)}
+                    onChange={(e) => toggleCollectionMembership(c.id, e.target.checked)}
+                  />
+                  {c.name}
+                </label>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
         {error ? <p className="modal-error">{error}</p> : null}
 
         <div className="form-group">
@@ -346,9 +428,21 @@ export function PhotoModal({ asset, onClose, onSave }: Props) {
         </div>
 
         <div className="form-group">
-          <label>Tags</label>
+          <label htmlFor="photo-tags">Tags</label>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <input type="text" value={tagInput} onChange={(e) => setTagInput(e.target.value)} placeholder="nou tag" />
+            <input
+              id="photo-tags"
+              type="text"
+              value={tagInput}
+              onChange={(e) => setTagInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleAddTag();
+                }
+              }}
+              placeholder="nou tag"
+            />
             <button type="button" onClick={handleAddTag}>
               Afegir
             </button>
@@ -399,6 +493,18 @@ export function PhotoModal({ asset, onClose, onSave }: Props) {
           </button>
         </div>
       </div>
+
+      {showImageEditor && asset.type === "photo" ? (
+        <ImageEditor
+          asset={asset}
+          onClose={() => setShowImageEditor(false)}
+          onDiscard={() => setShowImageEditor(false)}
+          onSaveSuccess={(updated) => {
+            setLocalFiles(updated.files);
+            onImageSaved?.(updated);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

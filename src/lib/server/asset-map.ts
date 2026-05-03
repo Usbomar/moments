@@ -100,12 +100,6 @@ export function toAsset(row: {
     checksum: file?.checksum ?? "",
     size: file?.size ?? 0
   };
-  console.log("toAsset processing:", {
-    raw_files: row.asset_files,
-    picked_file: file,
-    result_files: resultFiles
-  });
-
   return {
     id: row.id,
     userId: row.user_id,

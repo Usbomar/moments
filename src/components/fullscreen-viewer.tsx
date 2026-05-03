@@ -9,6 +9,8 @@ interface Props {
   selectedId: string | null;
   onClose: () => void;
   onSelect: (id: string) => void;
+  /** Obre l’editor de metadades (títol, tags, ubicació, etc.). */
+  onEditDetails: (asset: Asset) => void;
 }
 
 /** Matches library-grid placeholder look (gray gradient + centered text). */
@@ -29,7 +31,7 @@ const placeholderStyle: CSSProperties = {
   boxSizing: "border-box"
 };
 
-export function FullscreenViewer({ items, selectedId, onClose, onSelect }: Props) {
+export function FullscreenViewer({ items, selectedId, onClose, onSelect, onEditDetails }: Props) {
   const index = items.findIndex((x) => x.id === selectedId);
   const current = index >= 0 ? items[index] : null;
 
@@ -67,6 +69,20 @@ export function FullscreenViewer({ items, selectedId, onClose, onSelect }: Props
             <span style={{ wordBreak: "break-word", maxWidth: "100%" }}>{current.title}</span>
           </div>
         )}
+        <div className="viewer-toolbar" role="toolbar" aria-label="Accions de la foto">
+          <button type="button" className="viewer-toolbar-btn viewer-toolbar-btn--primary" onClick={() => onEditDetails(current)}>
+            Editar dades
+          </button>
+          <button
+            type="button"
+            className="viewer-toolbar-btn"
+            disabled
+            title="Properament disponible"
+            aria-label="Editar imatge (properament disponible)"
+          >
+            Editar imatge
+          </button>
+        </div>
       </div>
     </div>
   );

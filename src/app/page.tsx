@@ -13,15 +13,29 @@ import { ViewSelector, type GalleryView } from "@/components/ViewSelector";
 import { FilterProvider, useFilters } from "@/context/FilterContext";
 import { ColorView } from "@/views/ColorView";
 import { SliderView } from "@/views/SliderView";
+import { Analytics } from "@/components/Analytics";
+import { Collections } from "@/components/Collections";
+import { Memories } from "@/components/Memories";
 
 const MapView = dynamic(() => import("@/views/MapView").then((mod) => mod.MapView), { ssr: false });
 const PhotoModal = dynamic(() => import("@/components/PhotoModal").then((mod) => mod.PhotoModal), { ssr: false });
+
+type MainTab = "library" | "collections" | "memories" | "analytics";
+
+const MAIN_TAB_LABELS: Record<MainTab, string> = {
+  library: "Biblioteca",
+  collections: "Col·leccions",
+  memories: "Records",
+  analytics: "Analítiques"
+};
 
 function HomeContent() {
   const { filters } = useFilters();
   const [view, setView] = useState<GalleryView>("masonry");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
+  const [mainTab, setMainTab] = useState<MainTab>("library");
+  const [slideshowItems, setSlideshowItems] = useState<Asset[] | null>(null);
   const [library, setLibrary] = useState<Asset[]>(assets);
   const [loadingLibrary, setLoadingLibrary] = useState(false);
   const [supabaseConfigured, setSupabaseConfigured] = useState<boolean | undefined>(undefined);
@@ -66,6 +80,33 @@ function HomeContent() {
     void refreshLibrary();
   }, [refreshLibrary]);
 
+  const openDetailsEditorFromViewer = useCallback((asset: Asset) => {
+    setSelectedId(null);
+    setSlideshowItems(null);
+    setSelectedAsset(asset);
+  }, []);
+
+  const handleMainTab = useCallback((tab: MainTab) => {
+    setMainTab(tab);
+  }, []);
+
+  const onMemoryView = useCallback((assets: Asset[]) => {
+    if (!assets.length) return;
+    setSlideshowItems(assets);
+    setSelectedId(assets[0]!.id);
+  }, []);
+
+  const onViewerClose = useCallback(() => {
+    setSelectedId(null);
+    setSlideshowItems(null);
+  }, []);
+
+  const onImageSaved = useCallback((updated: Asset) => {
+    setLibrary((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
+    setSelectedAsset(updated);
+    void refreshLibraryRef.current();
+  }, []);
+
   const onPhotoSave = useCallback(async (updated: Asset) => {
     if (!supabaseConfiguredRef.current) {
       setLibrary((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
@@ -95,50 +136,90 @@ function HomeContent() {
   }, []);
 
   const viewItems = useMemo(() => library, [library]);
+  const viewerItems = useMemo(() => slideshowItems ?? viewItems, [slideshowItems, viewItems]);
 
   return (
     <main className="app-shell">
       <header className="topbar">
-        <ViewSelector value={view} onChange={setView} />
+        <nav className="tab-nav" aria-label="Secció principal">
+          {(Object.keys(MAIN_TAB_LABELS) as MainTab[]).map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              className={mainTab === tab ? "active" : ""}
+              onClick={() => handleMainTab(tab)}
+            >
+              {MAIN_TAB_LABELS[tab]}
+            </button>
+          ))}
+        </nav>
+        {mainTab === "library" ? <ViewSelector value={view} onChange={setView} /> : null}
       </header>
 
       <section className="card" style={{ padding: 14 }}>
-        <FilterBar />
-        <UploadDropzone onUploaded={refreshLibrary} supabaseConfigured={supabaseConfigured} missingEnv={missingEnv} />
-        {loadingLibrary ? <p style={{ color: "var(--muted)" }}>Actualitzant biblioteca...</p> : null}
-        {view === "timeline" ? (
-          <TimelineView
-            items={viewItems}
-            onOpenModal={(asset) => setSelectedAsset(asset)}
-            onOpenViewer={(asset) => setSelectedId(asset.id)}
-          />
+        {mainTab === "library" ? (
+          <>
+            <FilterBar />
+            <UploadDropzone onUploaded={refreshLibrary} supabaseConfigured={supabaseConfigured} missingEnv={missingEnv} />
+            {loadingLibrary ? <p style={{ color: "var(--muted)" }}>Actualitzant biblioteca...</p> : null}
+            {view === "timeline" ? (
+              <TimelineView
+                items={viewItems}
+                onOpenModal={(asset) => setSelectedAsset(asset)}
+                onOpenViewer={(asset) => setSelectedId(asset.id)}
+              />
+            ) : null}
+            {view === "masonry" ? (
+              <LibraryGrid
+                items={viewItems}
+                onOpenModal={(asset) => setSelectedAsset(asset)}
+                onOpenViewer={(asset) => setSelectedId(asset.id)}
+              />
+            ) : null}
+            {view === "map" ? (
+              <MapView
+                items={viewItems}
+                onEditPhoto={(asset) => setSelectedAsset(asset)}
+                onOpenViewer={(asset) => setSelectedId(asset.id)}
+              />
+            ) : null}
+            {view === "colors" ? (
+              <ColorView
+                items={viewItems}
+                onEditPhoto={(asset) => setSelectedAsset(asset)}
+                onOpenViewer={(asset) => setSelectedId(asset.id)}
+              />
+            ) : null}
+            {view === "slider" ? (
+              <SliderView
+                items={viewItems}
+                onEditPhoto={(asset) => setSelectedAsset(asset)}
+                onOpenViewer={(asset) => setSelectedId(asset.id)}
+              />
+            ) : null}
+          </>
         ) : null}
-        {view === "masonry" ? (
-          <LibraryGrid
-            items={viewItems}
-            onOpenModal={(asset) => setSelectedAsset(asset)}
-            onOpenViewer={(asset) => setSelectedId(asset.id)}
-          />
-        ) : null}
-        {view === "map" ? (
-          <MapView items={viewItems} onEditPhoto={(asset) => setSelectedAsset(asset)} onOpenViewer={(asset) => setSelectedId(asset.id)} />
-        ) : null}
-        {view === "colors" ? (
-          <ColorView items={viewItems} onEditPhoto={(asset) => setSelectedAsset(asset)} onOpenViewer={(asset) => setSelectedId(asset.id)} />
-        ) : null}
-        {view === "slider" ? (
-          <SliderView
-            items={viewItems}
-            onEditPhoto={(asset) => setSelectedAsset(asset)}
-            onOpenViewer={(asset) => setSelectedId(asset.id)}
-          />
-        ) : null}
+        {mainTab === "collections" ? <Collections items={library} /> : null}
+        {mainTab === "memories" ? <Memories items={library} onView={onMemoryView} /> : null}
+        {mainTab === "analytics" ? <Analytics items={library} /> : null}
       </section>
 
-      <FullscreenViewer items={viewItems} selectedId={selectedId} onSelect={setSelectedId} onClose={() => setSelectedId(null)} />
+      <FullscreenViewer
+        items={viewerItems}
+        selectedId={selectedId}
+        onSelect={setSelectedId}
+        onClose={onViewerClose}
+        onEditDetails={openDetailsEditorFromViewer}
+      />
 
       {selectedAsset ? (
-        <PhotoModal key={selectedAsset.id} asset={selectedAsset} onClose={() => setSelectedAsset(null)} onSave={onPhotoSave} />
+        <PhotoModal
+          key={selectedAsset.id}
+          asset={selectedAsset}
+          onClose={() => setSelectedAsset(null)}
+          onSave={onPhotoSave}
+          onImageSaved={onImageSaved}
+        />
       ) : null}
     </main>
   );

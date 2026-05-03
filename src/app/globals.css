@@ -207,8 +207,12 @@ button.active {
 
 .modal-content {
   width: min(600px, 100%);
+  max-width: 600px;
   max-height: 80vh;
   overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
   background: var(--panel);
   border-radius: var(--radius);
   border: 1px solid #ebedf0;
@@ -242,9 +246,24 @@ button.active {
   margin-bottom: 12px;
 }
 
+.form-group input[type="text"],
+.form-group input[type="date"],
+.form-group textarea {
+  width: 100%;
+  max-width: 100%;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: #2f6fed;
+  box-shadow: 0 0 0 2px rgba(47, 111, 237, 0.2);
+}
+
 .form-group label {
   font-size: 13px;
   color: var(--muted);
+  font-weight: 500;
 }
 
 .form-row {
@@ -269,9 +288,16 @@ button.active {
 
 .modal-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 10px;
-  margin-top: 8px;
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid #ebedf0;
+}
+
+.modal-actions button {
+  min-width: 96px;
 }
 
 button.primary {

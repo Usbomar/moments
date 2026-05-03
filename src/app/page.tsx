@@ -21,12 +21,14 @@ function HomeContent() {
   const { filters } = useFilters();
   const [view, setView] = useState<GalleryView>("masonry");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [modalAsset, setModalAsset] = useState<Asset | null>(null);
+  const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [library, setLibrary] = useState<Asset[]>(assets);
   const [loadingLibrary, setLoadingLibrary] = useState(false);
   const [supabaseConfigured, setSupabaseConfigured] = useState<boolean | undefined>(undefined);
   const [missingEnv, setMissingEnv] = useState<string[]>([]);
   const refreshLibraryRef = useRef<() => Promise<void>>(async () => {});
+  const supabaseConfiguredRef = useRef(supabaseConfigured);
+  supabaseConfiguredRef.current = supabaseConfigured;
 
   const refreshLibrary = useCallback(async () => {
     setLoadingLibrary(true);
@@ -65,7 +67,7 @@ function HomeContent() {
   }, [refreshLibrary]);
 
   const onPhotoSave = useCallback(async (updated: Asset) => {
-    if (!supabaseConfigured) {
+    if (!supabaseConfiguredRef.current) {
       setLibrary((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
       return;
     }
@@ -90,7 +92,7 @@ function HomeContent() {
       setLibrary((prev) => prev.map((a) => (a.id === payload.asset!.id ? payload.asset! : a)));
     }
     await refreshLibraryRef.current();
-  }, [supabaseConfigured]);
+  }, []);
 
   const viewItems = useMemo(() => library, [library]);
 
@@ -107,32 +109,36 @@ function HomeContent() {
         {view === "timeline" ? (
           <TimelineView
             items={viewItems}
-            onOpenModal={(asset) => setModalAsset(asset)}
+            onOpenModal={(asset) => setSelectedAsset(asset)}
             onOpenViewer={(asset) => setSelectedId(asset.id)}
           />
         ) : null}
         {view === "masonry" ? (
           <LibraryGrid
             items={viewItems}
-            onOpenModal={(asset) => setModalAsset(asset)}
+            onOpenModal={(asset) => setSelectedAsset(asset)}
             onOpenViewer={(asset) => setSelectedId(asset.id)}
           />
         ) : null}
         {view === "map" ? (
-          <MapView items={viewItems} onEditPhoto={(asset) => setModalAsset(asset)} onOpenViewer={(asset) => setSelectedId(asset.id)} />
+          <MapView items={viewItems} onEditPhoto={(asset) => setSelectedAsset(asset)} onOpenViewer={(asset) => setSelectedId(asset.id)} />
         ) : null}
         {view === "colors" ? (
-          <ColorView items={viewItems} onEditPhoto={(asset) => setModalAsset(asset)} onOpenViewer={(asset) => setSelectedId(asset.id)} />
+          <ColorView items={viewItems} onEditPhoto={(asset) => setSelectedAsset(asset)} onOpenViewer={(asset) => setSelectedId(asset.id)} />
         ) : null}
-        {view === "slider" ? <SliderView items={viewItems} onEditPhoto={(asset) => setModalAsset(asset)} /> : null}
+        {view === "slider" ? (
+          <SliderView
+            items={viewItems}
+            onEditPhoto={(asset) => setSelectedAsset(asset)}
+            onOpenViewer={(asset) => setSelectedId(asset.id)}
+          />
+        ) : null}
       </section>
 
-      {view !== "slider" ? (
-        <FullscreenViewer items={viewItems} selectedId={selectedId} onSelect={setSelectedId} onClose={() => setSelectedId(null)} />
-      ) : null}
+      <FullscreenViewer items={viewItems} selectedId={selectedId} onSelect={setSelectedId} onClose={() => setSelectedId(null)} />
 
-      {modalAsset ? (
-        <PhotoModal key={modalAsset.id} asset={modalAsset} onClose={() => setModalAsset(null)} onSave={onPhotoSave} />
+      {selectedAsset ? (
+        <PhotoModal key={selectedAsset.id} asset={selectedAsset} onClose={() => setSelectedAsset(null)} onSave={onPhotoSave} />
       ) : null}
     </main>
   );

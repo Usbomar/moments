@@ -6,9 +6,11 @@ import type { Asset } from "@/lib/types";
 interface Props {
   items: Asset[];
   onEditPhoto: (asset: Asset) => void;
+  /** Obre el visor de pantalla completa amb aquest asset. */
+  onOpenViewer?: (asset: Asset) => void;
 }
 
-export function SliderView({ items, onEditPhoto }: Props) {
+export function SliderView({ items, onEditPhoto, onOpenViewer }: Props) {
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [speedMs, setSpeedMs] = useState(2400);
@@ -87,6 +89,11 @@ export function SliderView({ items, onEditPhoto }: Props) {
           <button type="button" onClick={() => setIndex((prev) => (prev + 1) % items.length)}>
             Next
           </button>
+          {onOpenViewer ? (
+            <button type="button" onClick={() => onOpenViewer(current)}>
+              Presentació
+            </button>
+          ) : null}
           <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
             Speed
             <select value={speedMs} onChange={(e) => setSpeedMs(Number(e.target.value))}>

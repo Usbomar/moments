@@ -66,6 +66,21 @@ export function PhotoModal({ asset, onClose, onSave }: Props) {
   const [mapReady, setMapReady] = useState(false);
   const [geocodeHint, setGeocodeHint] = useState<string | null>(null);
 
+  /** Reset local editor state when the opened asset changes (single dependency). */
+  useEffect(() => {
+    if (!asset) return;
+    setTitle(asset.title ?? "");
+    setDescription(asset.description ?? "");
+    setTagInput("");
+    setTags([...(asset.tags ?? [])]);
+    setDateValue(toDateInputValue(asset.takenAt));
+    setLocationText(formatLocationText(asset.location));
+    setPickedLocation(asset.location);
+    setFavorite(asset.favorite ?? false);
+    setError(null);
+    setGeocodeHint(null);
+  }, [asset]);
+
   const mapRootRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const markerRef = useRef<LeafletMarker | null>(null);
@@ -148,6 +163,8 @@ export function PhotoModal({ asset, onClose, onSave }: Props) {
     const root = mapRootRef.current;
     if (!root) return;
 
+    setMapReady(false);
+
     let cancelled = false;
     let createdMap: LeafletMap | null = null;
 
@@ -223,7 +240,6 @@ export function PhotoModal({ asset, onClose, onSave }: Props) {
 
     return () => {
       cancelled = true;
-      setMapReady(false);
       leafletRef.current = null;
       mapRef.current?.remove();
       mapRef.current = null;

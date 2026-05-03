@@ -6,7 +6,6 @@ import { assets } from "@/lib/mock-data";
 import { LibraryGrid } from "@/components/library-grid";
 import { TimelineView } from "@/components/timeline-view";
 import { FullscreenViewer } from "@/components/fullscreen-viewer";
-import { PhotoModal } from "@/components/PhotoModal";
 import type { Asset } from "@/lib/types";
 import { UploadDropzone } from "@/components/upload-dropzone";
 import { FilterBar } from "@/components/FilterBar";
@@ -16,6 +15,7 @@ import { ColorView } from "@/views/ColorView";
 import { SliderView } from "@/views/SliderView";
 
 const MapView = dynamic(() => import("@/views/MapView").then((mod) => mod.MapView), { ssr: false });
+const PhotoModal = dynamic(() => import("@/components/PhotoModal").then((mod) => mod.PhotoModal), { ssr: false });
 
 function HomeContent() {
   const { filters } = useFilters();

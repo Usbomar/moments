@@ -1,9 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { Map as LeafletMap, Marker as LeafletMarker } from "leaflet";
 import type { Asset, LocationInfo } from "@/lib/types";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
 
 interface Props {
   asset: Asset | null;
@@ -43,8 +42,8 @@ export function PhotoModal({ asset, onClose, onSave }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   const mapRootRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<L.Map | null>(null);
-  const markerRef = useRef<L.Marker | null>(null);
+  const mapRef = useRef<LeafletMap | null>(null);
+  const markerRef = useRef<LeafletMarker | null>(null);
   const locationTextRef = useRef(locationText);
 
   useEffect(() => {
@@ -103,60 +102,75 @@ export function PhotoModal({ asset, onClose, onSave }: Props) {
     const root = mapRootRef.current;
     if (!root) return;
 
-    if (mapRef.current) {
-      mapRef.current.remove();
-      mapRef.current = null;
-      markerRef.current = null;
-    }
+    let cancelled = false;
+    let createdMap: LeafletMap | null = null;
 
-    const center: L.LatLngExpression =
-      asset.location && asset.location.lat && asset.location.lng
-        ? [asset.location.lat, asset.location.lng]
-        : [41.3874, 2.1686];
+    void (async () => {
+      const leafletMod = await import("leaflet");
+      await import("leaflet/dist/leaflet.css");
+      const L = leafletMod.default;
 
-    const map = L.map(root).setView(center, asset.location?.lat ? 10 : 3);
-    mapRef.current = map;
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-    }).addTo(map);
+      if (cancelled) return;
 
-    const placeMarker = (latlng: L.LatLng) => {
-      if (!mapRef.current) return;
-      if (markerRef.current) {
-        markerRef.current.setLatLng(latlng);
-      } else {
-        markerRef.current = L.marker(latlng).addTo(mapRef.current);
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+        markerRef.current = null;
       }
-      setPickedLocation((prev) => {
-        const text = locationTextRef.current.trim();
-        if (text) {
-          const parts = text.split(",").map((p) => p.trim());
-          if (parts.length >= 2 && parts[0] && parts[1]) {
-            return { lat: latlng.lat, lng: latlng.lng, city: parts[0], country: parts[1] };
-          }
+
+      const center: [number, number] =
+        asset.location && asset.location.lat && asset.location.lng
+          ? [asset.location.lat, asset.location.lng]
+          : [41.3874, 2.1686];
+
+      createdMap = L.map(root).setView(center, asset.location?.lat ? 10 : 3);
+      if (cancelled) {
+        createdMap.remove();
+        createdMap = null;
+        return;
+      }
+      mapRef.current = createdMap;
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+      }).addTo(createdMap);
+
+      const placeMarker = (latlng: { lat: number; lng: number }) => {
+        if (!mapRef.current) return;
+        if (markerRef.current) {
+          markerRef.current.setLatLng(latlng);
+        } else {
+          markerRef.current = L.marker(latlng).addTo(mapRef.current);
         }
-        return {
-          lat: latlng.lat,
-          lng: latlng.lng,
-          city: prev?.city && prev.city !== "Unknown" ? prev.city : "Unknown",
-          country: prev?.country && prev.country !== "Unknown" ? prev.country : "Unknown"
-        };
+        setPickedLocation((prev) => {
+          const text = locationTextRef.current.trim();
+          if (text) {
+            const parts = text.split(",").map((p) => p.trim());
+            if (parts.length >= 2 && parts[0] && parts[1]) {
+              return { lat: latlng.lat, lng: latlng.lng, city: parts[0], country: parts[1] };
+            }
+          }
+          return {
+            lat: latlng.lat,
+            lng: latlng.lng,
+            city: prev?.city && prev.city !== "Unknown" ? prev.city : "Unknown",
+            country: prev?.country && prev.country !== "Unknown" ? prev.country : "Unknown"
+          };
+        });
+      };
+
+      if (asset.location?.lat && asset.location?.lng) {
+        placeMarker({ lat: asset.location.lat, lng: asset.location.lng });
+      }
+
+      createdMap.on("click", (e) => {
+        placeMarker({ lat: e.latlng.lat, lng: e.latlng.lng });
       });
-    };
-
-    if (asset.location?.lat && asset.location?.lng) {
-      placeMarker(L.latLng(asset.location.lat, asset.location.lng));
-    }
-
-    map.on("click", (e) => {
-      placeMarker(e.latlng);
-    });
+    })();
 
     return () => {
-      map.remove();
-      if (mapRef.current === map) {
-        mapRef.current = null;
-      }
+      cancelled = true;
+      mapRef.current?.remove();
+      mapRef.current = null;
       markerRef.current = null;
     };
   }, [asset]);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { Map as LeafletMap, Marker as LeafletMarker } from "leaflet";
 import { loadCollections, saveCollections } from "@/lib/collections-storage";
 import type { Asset, LocationInfo } from "@/lib/types";
@@ -9,6 +9,8 @@ interface Props {
   asset: Asset | null;
   onClose: () => void;
   onSave: (updated: Asset) => void | Promise<void>;
+  /** Tags ja usats en altres fotos (minúscules, únics); per suggerir mentre s’escriu. */
+  libraryTagSuggestions?: string[];
 }
 
 function toDateInputValue(iso: string): string {
@@ -54,7 +56,7 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
   return debounced;
 }
 
-export function PhotoModal({ asset, onClose, onSave }: Props) {
+export function PhotoModal({ asset, onClose, onSave, libraryTagSuggestions = [] }: Props) {
   const [title, setTitle] = useState(() => asset?.title ?? "");
   const [description, setDescription] = useState(() => asset?.description ?? "");
   const [tagInput, setTagInput] = useState("");
@@ -107,16 +109,50 @@ export function PhotoModal({ asset, onClose, onSave }: Props) {
     locationTextRef.current = locationText;
   }, [locationText]);
 
+  const tagComboboxRef = useRef<HTMLDivElement | null>(null);
+  const tagListId = useId();
+  const [tagSuggestionsOpen, setTagSuggestionsOpen] = useState(false);
+  const [tagHighlight, setTagHighlight] = useState(0);
+
+  const tagCandidates = useMemo(() => {
+    const q = tagInput.trim().toLowerCase();
+    const selected = new Set(tags);
+    return libraryTagSuggestions.filter((t) => !selected.has(t) && (q === "" || t.includes(q)));
+  }, [libraryTagSuggestions, tagInput, tags]);
+
+  useEffect(() => {
+    setTagHighlight(0);
+  }, [tagCandidates.length, tagInput]);
+
+  const pickTag = useCallback((t: string) => {
+    const n = t.trim().toLowerCase();
+    if (!n) return;
+    setTags((prev) => (prev.includes(n) ? prev : [...prev, n]));
+    setTagInput("");
+    setTagSuggestionsOpen(false);
+  }, []);
+
   const handleAddTag = useCallback(() => {
     const t = tagInput.trim().toLowerCase();
     if (!t) return;
-    setTags((prev) => (prev.includes(t) ? prev : [...prev, t]));
-    setTagInput("");
-  }, [tagInput]);
+    pickTag(t);
+  }, [pickTag, tagInput]);
 
   const handleRemoveTag = useCallback((tag: string) => {
     setTags((prev) => prev.filter((x) => x !== tag));
   }, []);
+
+  useEffect(() => {
+    if (!tagSuggestionsOpen) return;
+    const onDocMouseDown = (e: MouseEvent) => {
+      const el = tagComboboxRef.current;
+      if (el && !el.contains(e.target as Node)) {
+        setTagSuggestionsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDocMouseDown);
+    return () => document.removeEventListener("mousedown", onDocMouseDown);
+  }, [tagSuggestionsOpen]);
 
   const handleSave = useCallback(() => {
     void (async () => {
@@ -356,6 +392,8 @@ export function PhotoModal({ asset, onClose, onSave }: Props) {
 
   if (!asset) return null;
 
+  const tagListHighlight = tagCandidates.length ? Math.min(tagHighlight, tagCandidates.length - 1) : -1;
+
   const imageUrl = (asset.files.previewUrl || asset.files.originalUrl).trim();
 
   return (
@@ -415,27 +453,79 @@ export function PhotoModal({ asset, onClose, onSave }: Props) {
         <div className="form-group">
           <label htmlFor="photo-tags">Tags</label>
           <div className="photo-modal__row">
-            <input
-              id="photo-tags"
-              className="photo-modal__tag-input"
-              type="text"
-              value={tagInput}
-              onChange={(e) => setTagInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  handleAddTag();
-                }
-              }}
-              placeholder="Nou tag"
-              aria-describedby="photo-tags-hint"
-            />
+            <div ref={tagComboboxRef} className="photo-tag-combobox">
+              <input
+                id="photo-tags"
+                className="photo-modal__tag-input"
+                type="text"
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onFocus={() => setTagSuggestionsOpen(true)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape" && tagSuggestionsOpen) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setTagSuggestionsOpen(false);
+                    return;
+                  }
+                  const n = tagCandidates.length;
+                  if (e.key === "ArrowDown" && n > 0) {
+                    e.preventDefault();
+                    setTagHighlight((h) => Math.min(Math.min(h, n - 1) + 1, n - 1));
+                    return;
+                  }
+                  if (e.key === "ArrowUp" && n > 0) {
+                    e.preventDefault();
+                    setTagHighlight((h) => Math.max(Math.min(h, n - 1) - 1, 0));
+                    return;
+                  }
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleAddTag();
+                  }
+                }}
+                placeholder="Cerca o crea un tag"
+                autoComplete="off"
+                role="combobox"
+                aria-autocomplete="list"
+                aria-expanded={tagSuggestionsOpen}
+                aria-controls={tagListId}
+                aria-describedby="photo-tags-hint"
+              />
+              {tagSuggestionsOpen && libraryTagSuggestions.length > 0 ? (
+                <div id={tagListId} className="photo-tag-suggestions" role="listbox" aria-label="Tags existents a la biblioteca">
+                  {tagCandidates.length > 0 ? (
+                    tagCandidates.map((t, i) => (
+                      <button
+                        key={t}
+                        type="button"
+                        role="option"
+                        aria-selected={i === tagListHighlight}
+                        className={i === tagListHighlight ? "is-active" : undefined}
+                        onMouseDown={(ev) => {
+                          ev.preventDefault();
+                          pickTag(t);
+                        }}
+                      >
+                        #{t}
+                      </button>
+                    ))
+                  ) : (
+                    <div className="photo-tag-suggestions-hint">
+                      {tagInput.trim()
+                        ? `Cap coincidència a la biblioteca. Retorn o «Afegir» afegeix el tag «${tagInput.trim().toLowerCase()}».`
+                        : "Tots els tags de la biblioteca ja són a aquesta foto, o no n’hi ha cap encara. Escriu un nom nou i prem Retorn o «Afegir»."}
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </div>
             <button type="button" className="btn btn-sm" onClick={handleAddTag}>
               Afegir
             </button>
           </div>
           <p id="photo-tags-hint" className="modal-muted" style={{ marginTop: 6 }}>
-            Prem Retorn per afegir ràpidament.
+            Llista: tags de la biblioteca (filtre mentre escrius). Clic a una línia per afegir-la. Retorn o «Afegir» afegeixen sempre el text del camp (nou o existent).
           </p>
           <div className="tag-pills" style={{ marginTop: 8 }}>
             {tags.map((t) => (

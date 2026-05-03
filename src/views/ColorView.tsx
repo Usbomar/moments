@@ -55,16 +55,25 @@ export function ColorView({ items, onOpenViewer, onEditPhoto }: Props) {
 
   return (
     <div>
-      <div className="controls" style={{ marginBottom: 12 }}>
+      <div className="hue-filter-bar" role="toolbar" aria-label="Filtrar per to de color">
         {buckets.map((bucket) => (
           <button
             key={bucket.hue}
             type="button"
             className={activeHue === bucket.hue ? "active" : ""}
             onClick={() => setActiveHue((prev) => (prev === bucket.hue ? null : bucket.hue))}
-            style={{ display: "flex", alignItems: "center", gap: 8 }}
+            aria-pressed={activeHue === bucket.hue}
+            aria-label={`To ${bucket.hue}°, ${bucket.items.length} fotos`}
           >
-            <span style={{ width: 16, height: 16, borderRadius: 999, background: bucket.color, border: "1px solid rgba(0,0,0,.15)" }} />
+            <span
+              style={{
+                width: 16,
+                height: 16,
+                borderRadius: 0,
+                background: bucket.color,
+                border: "1px solid var(--border-dark)"
+              }}
+            />
             {bucket.items.length}
           </button>
         ))}

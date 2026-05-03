@@ -1,3 +1,11 @@
+/**
+ * POST /api/assets/[id]/edit
+ *
+ * Pipeline única amb Sharp (`applyImageOperationsToBuffer`), alineada amb la previsualització
+ * del client (`applyOperationsToCanvas` a canvas-image-ops.ts): mateix ordre d’operacions
+ * (crop, rotate, resize, filtres CSS-equivalents on calgui, blur, sharpen, autoEnhance).
+ * Validació: tipus d’operació permesos i màxim `MAX_EDIT_OPERATIONS` (vegeu `@/lib/image-edit-ops`).
+ */
 import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import sharp from "sharp";
@@ -31,12 +39,12 @@ function clamp(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, n));
 }
 
-async function resolveId(context: { params: Promise<{ id: string }> } | { params: { id: string } }) {
-  const params = await Promise.resolve(context.params);
+async function resolveId(context: { params: Promise<{ id: string }> }) {
+  const params = await context.params;
   return params.id;
 }
 
-export async function POST(request: Request, context: { params: Promise<{ id: string }> } | { params: { id: string } }) {
+export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   if (request.method !== "POST") {
     return NextResponse.json({ error: "Method not allowed" }, { status: 405 });
   }

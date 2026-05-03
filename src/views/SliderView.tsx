@@ -54,15 +54,14 @@ export function SliderView({ items, onEditPhoto, onOpenViewer }: Props) {
   }, [fullscreen, items.length]);
 
   if (!items.length) {
-    return <p style={{ color: "var(--muted)" }}>No hi ha elements per al mode slider.</p>;
+    return <p className="view-empty">No hi ha elements per al mode slider.</p>;
   }
 
   if (!current) return null;
 
   return (
     <section
-      className={fullscreen ? "viewer" : ""}
-      style={fullscreen ? undefined : { border: "1px solid #ebedf0", borderRadius: 12, padding: 12, background: "#fff" }}
+      className={fullscreen ? "viewer" : "view-panel"}
       onClick={() => setFullscreen(false)}
     >
       <div

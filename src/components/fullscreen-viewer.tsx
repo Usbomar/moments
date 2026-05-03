@@ -53,7 +53,7 @@ export function FullscreenViewer({ items, selectedId, onClose, onSelect, onEditD
   const previewUrl = (current.files.mediumUrl || current.files.previewUrl)?.trim() ?? "";
 
   return (
-    <div className="viewer" onClick={onClose}>
+    <div className="viewer" role="dialog" aria-modal="true" aria-label="Visor de fotos a pantalla completa" onClick={onClose}>
       <div className="viewer-inner" onClick={(e) => e.stopPropagation()}>
         {previewUrl ? (
           <img
@@ -72,7 +72,12 @@ export function FullscreenViewer({ items, selectedId, onClose, onSelect, onEditD
           </div>
         )}
         <div className="viewer-toolbar" role="toolbar" aria-label="Accions de la foto">
-          <button type="button" className="viewer-toolbar-btn viewer-toolbar-btn--primary" onClick={() => onEditDetails(current)}>
+          <button
+            type="button"
+            className="viewer-toolbar-btn viewer-toolbar-btn--primary"
+            onClick={() => onEditDetails(current)}
+            aria-label="Obrir l’editor de metadades"
+          >
             Editar dades
           </button>
           <button

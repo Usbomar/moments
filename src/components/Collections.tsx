@@ -88,7 +88,7 @@ export function Collections({ items }: Props) {
           placeholder="Nom de la col·lecció"
           aria-label="Nom de la col·lecció"
         />
-        <button type="button" className="primary" onClick={handleCreate}>
+        <button type="button" className="btn btn-primary" onClick={handleCreate}>
           Crear col·lecció
         </button>
       </div>
@@ -96,7 +96,7 @@ export function Collections({ items }: Props) {
       {viewId && activeCollection ? (
         <section className="collections-detail">
           <div className="collections-detail-head">
-            <button type="button" onClick={() => setViewId(null)}>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setViewId(null)}>
               ← Totes les col·leccions
             </button>
             <h2>{activeCollection.name}</h2>
@@ -134,7 +134,13 @@ export function Collections({ items }: Props) {
                 <button type="button" className="collection-card-hit" onClick={() => setViewId(c.id)} aria-label={`Obrir ${c.name}`}>
                   {coverUrl ? (
                     <div className="collection-card-media collection-card-media--hit">
-                      <LazyImage fill src={coverUrl} alt="" referrerPolicy="no-referrer" className="collection-card-hit-img" />
+                      <LazyImage
+                        fill
+                        src={coverUrl}
+                        alt={`Portada de la col·lecció ${c.name}`}
+                        referrerPolicy="no-referrer"
+                        className="collection-card-hit-img"
+                      />
                     </div>
                   ) : (
                     <div className="collection-card-placeholder">{c.name.slice(0, 1).toUpperCase()}</div>

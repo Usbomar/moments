@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { Range } from "react-range";
 import { useFilters } from "@/context/FilterContext";
 
@@ -14,7 +14,7 @@ interface LocationOption {
 }
 
 export function FilterBar() {
-  const { filters, setYear, addLocation, removeLocation, addTag, removeTag, setSearch, clearFilters } = useFilters();
+  const { filters, setYear, addLocation, removeLocation, addTag, removeTag, clearFilters } = useFilters();
   const [locations, setLocations] = useState<LocationOption[]>([]);
   const [selectedLocation, setSelectedLocation] = useState("");
   const [tagInput, setTagInput] = useState("");
@@ -28,16 +28,19 @@ export function FilterBar() {
 
   const yearValues = useMemo<[number, number]>(() => filters.year, [filters.year]);
 
-  function onTagSubmit(event: FormEvent) {
-    event.preventDefault();
-    if (!tagInput.trim()) return;
-    addTag(tagInput);
-    setTagInput("");
-  }
+  const onTagSubmit = useCallback(
+    (event: FormEvent) => {
+      event.preventDefault();
+      if (!tagInput.trim()) return;
+      addTag(tagInput);
+      setTagInput("");
+    },
+    [addTag, tagInput]
+  );
 
   return (
-    <section className="card" style={{ padding: 12, marginBottom: 12 }}>
-      <div className="controls" style={{ alignItems: "center" }}>
+    <section className="filter-bar-pro" aria-label="Filtres de biblioteca">
+      <div className="controls filter-bar-row" style={{ alignItems: "center" }}>
         <label style={{ minWidth: 220 }}>
           <small style={{ display: "block", color: "var(--muted)", marginBottom: 6 }}>
             Any: {yearValues[0]} - {yearValues[1]}
@@ -81,20 +84,14 @@ export function FilterBar() {
         </select>
 
         <form onSubmit={onTagSubmit} style={{ display: "flex", gap: 8 }}>
-          <input placeholder="Afegir tag..." value={tagInput} onChange={(e) => setTagInput(e.target.value)} />
-          <button type="submit">Afegir</button>
+          <input placeholder="Afegir tag…" value={tagInput} onChange={(e) => setTagInput(e.target.value)} aria-label="Nou tag" />
+          <button type="submit" className="btn btn-sm">
+            Afegir
+          </button>
         </form>
 
-        <input
-          aria-label="Search"
-          placeholder="Buscar..."
-          value={filters.searchQuery}
-          onChange={(e) => setSearch(e.target.value)}
-          style={{ minWidth: 220 }}
-        />
-
-        <button type="button" onClick={clearFilters}>
-          Clear filters
+        <button type="button" className="btn btn-sm" onClick={clearFilters}>
+          Netejar filtres
         </button>
       </div>
 

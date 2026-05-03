@@ -75,8 +75,8 @@ export function MapView({ items, onOpenViewer, onEditPhoto }: Props) {
     clusters.forEach((cluster) => {
       const marker = L.circleMarker([cluster.lat, cluster.lng], {
         radius: Math.min(24, Math.max(8, 4 + cluster.items.length)),
-        color: "#2f6fed",
-        fillColor: "#2f6fed",
+        color: "#3b82f6",
+        fillColor: "#3b82f6",
         fillOpacity: 0.35
       }).addTo(map);
       marker.bindPopup(`<strong>${cluster.city}</strong><div>${cluster.items.length} foto(s)</div>`);
@@ -85,16 +85,16 @@ export function MapView({ items, onOpenViewer, onEditPhoto }: Props) {
   }, [clusters]);
 
   if (!clusters.length) {
-    return <p style={{ color: "var(--muted)" }}>No hi ha fotos amb coordenades GPS.</p>;
+    return <p className="view-empty">No hi ha fotos amb coordenades GPS.</p>;
   }
 
   return (
     <div>
-      <div ref={mapRootRef} style={{ height: 420, borderRadius: 12, overflow: "hidden", marginBottom: 12 }} />
+      <div ref={mapRootRef} className="map-view-shell" />
 
       {selectedCluster ? (
         <section>
-          <h3>
+          <h3 className="view-section-title">
             {selectedCluster.city} · {selectedCluster.items.length} foto(s)
           </h3>
           <LibraryGrid
@@ -104,7 +104,7 @@ export function MapView({ items, onOpenViewer, onEditPhoto }: Props) {
           />
         </section>
       ) : (
-        <p style={{ color: "var(--muted)" }}>Selecciona un marcador per veure les fotos d&apos;aquella zona.</p>
+        <p className="view-empty">Selecciona un marcador per veure les fotos d&apos;aquella zona.</p>
       )}
     </div>
   );

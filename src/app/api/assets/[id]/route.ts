@@ -12,12 +12,12 @@ type PatchBody = {
   location?: { lat: number; lng: number; city: string; country: string } | null;
 };
 
-async function resolveParams(context: { params: Promise<{ id: string }> } | { params: { id: string } }) {
-  const params = await Promise.resolve(context.params);
+async function resolveParams(context: { params: Promise<{ id: string }> }) {
+  const params = await context.params;
   return params.id;
 }
 
-export async function PATCH(request: Request, context: { params: Promise<{ id: string }> } | { params: { id: string } }) {
+export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   if (request.method !== "PATCH") {
     return NextResponse.json({ error: "Method not allowed" }, { status: 405 });
   }

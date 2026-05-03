@@ -111,7 +111,13 @@ export function Memories({ items, onView }: Props) {
             <div className="memory-card-visual">
               {url ? (
                 <div className="memory-card-media">
-                  <LazyImage fill src={url} alt="" referrerPolicy="no-referrer" className="memory-card-img" />
+                  <LazyImage
+                    fill
+                    src={url}
+                    alt={m.preview ? `Vista prèvia del record: ${m.title}` : m.title}
+                    referrerPolicy="no-referrer"
+                    className="memory-card-img"
+                  />
                 </div>
               ) : (
                 <div className="memory-card-placeholder">—</div>
@@ -120,7 +126,7 @@ export function Memories({ items, onView }: Props) {
             <div className="memory-card-body">
               <h3>{m.title}</h3>
               <p className="modal-muted">{m.description}</p>
-              <button type="button" className="primary" onClick={() => handleView(m)}>
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => handleView(m)}>
                 Veure
               </button>
             </div>

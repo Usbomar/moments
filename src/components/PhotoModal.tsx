@@ -359,28 +359,33 @@ export function PhotoModal({ asset, onClose, onSave }: Props) {
   const imageUrl = (asset.files.previewUrl || asset.files.originalUrl).trim();
 
   return (
-    <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Editor de foto" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-          <h2 style={{ margin: 0, fontSize: 18 }}>Editar foto</h2>
-          <button type="button" className="modal-close" onClick={onClose} aria-label="Tancar">
+    <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="photo-modal-title" onClick={onClose}>
+      <div className="modal-content photo-modal" onClick={(e) => e.stopPropagation()}>
+        <header className="photo-modal__header">
+          <div>
+            <p className="photo-modal__section-title" style={{ marginBottom: 4 }}>
+              Metadades
+            </p>
+            <h2 id="photo-modal-title" className="photo-modal__title">
+              Editar foto
+            </h2>
+          </div>
+          <button type="button" className="modal-close btn btn-ghost btn-sm" onClick={onClose} aria-label="Tancar el diàleg">
             ×
           </button>
         </header>
 
         {imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- signed URLs / external storage
-          <img src={imageUrl} alt={asset.title} referrerPolicy="no-referrer" className="modal-photo" />
+          <img src={imageUrl} alt={`Vista prèvia: ${asset.title}`} referrerPolicy="no-referrer" className="modal-photo" />
         ) : (
           <p className="modal-muted">Sense imatge de previsualització.</p>
         )}
 
         {collections.length ? (
           <div className="form-group">
-            <span className="modal-muted" style={{ fontSize: 13 }}>
-              Col·leccions (local)
-            </span>
-            <div className="collection-check-list">
+            <p className="photo-modal__section-title">Col·leccions (local)</p>
+            <div className="collection-check-list" role="group" aria-label="Col·leccions on incloure la foto">
               {collections.map((c) => (
                 <label key={c.id} className="collection-check-row">
                   <input
@@ -399,7 +404,7 @@ export function PhotoModal({ asset, onClose, onSave }: Props) {
 
         <div className="form-group">
           <label htmlFor="photo-title">Títol</label>
-          <input id="photo-title" type="text" value={title} onChange={(e) => setTitle(e.target.value)} />
+          <input id="photo-title" type="text" value={title} onChange={(e) => setTitle(e.target.value)} autoComplete="off" />
         </div>
 
         <div className="form-group">
@@ -409,9 +414,10 @@ export function PhotoModal({ asset, onClose, onSave }: Props) {
 
         <div className="form-group">
           <label htmlFor="photo-tags">Tags</label>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <div className="photo-modal__row">
             <input
               id="photo-tags"
+              className="photo-modal__tag-input"
               type="text"
               value={tagInput}
               onChange={(e) => setTagInput(e.target.value)}
@@ -421,15 +427,25 @@ export function PhotoModal({ asset, onClose, onSave }: Props) {
                   handleAddTag();
                 }
               }}
-              placeholder="nou tag"
+              placeholder="Nou tag"
+              aria-describedby="photo-tags-hint"
             />
-            <button type="button" onClick={handleAddTag}>
+            <button type="button" className="btn btn-sm" onClick={handleAddTag}>
               Afegir
             </button>
           </div>
+          <p id="photo-tags-hint" className="modal-muted" style={{ marginTop: 6 }}>
+            Prem Retorn per afegir ràpidament.
+          </p>
           <div className="tag-pills" style={{ marginTop: 8 }}>
             {tags.map((t) => (
-              <button key={t} type="button" className="tag-pill" onClick={() => handleRemoveTag(t)}>
+              <button
+                key={t}
+                type="button"
+                className="tag-pill"
+                onClick={() => handleRemoveTag(t)}
+                aria-label={`Eliminar el tag ${t}`}
+              >
                 #{t} ×
               </button>
             ))}
@@ -449,26 +465,27 @@ export function PhotoModal({ asset, onClose, onSave }: Props) {
             value={locationText}
             onChange={(e) => setLocationText(e.target.value)}
             placeholder="Ciutat, país, adreça o negoci…"
+            autoComplete="street-address"
           />
           {geocodeHint ? <p className="modal-error" style={{ marginTop: 6 }}>{geocodeHint}</p> : null}
           <small className="modal-muted">
             El mapa segueix el text (cerca amb OpenStreetMap). També pots clicar al mapa per ajustar el punt.
           </small>
-          <div ref={mapRootRef} className="modal-map" />
+          <div ref={mapRootRef} className="modal-map" role="application" aria-label="Mapa per triar la ubicació" />
         </div>
 
         <div className="form-group form-row">
-          <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <input type="checkbox" checked={favorite} onChange={(e) => setFavorite(e.target.checked)} />
+          <label htmlFor="photo-fav" style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+            <input id="photo-fav" type="checkbox" checked={favorite} onChange={(e) => setFavorite(e.target.checked)} />
             Preferit
           </label>
         </div>
 
         <div className="modal-actions">
-          <button type="button" onClick={onClose}>
+          <button type="button" className="btn" onClick={onClose}>
             Cancel·lar
           </button>
-          <button type="button" className="primary" onClick={handleSave}>
+          <button type="button" className="btn btn-primary" onClick={handleSave}>
             Desar
           </button>
         </div>

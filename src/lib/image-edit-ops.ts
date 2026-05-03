@@ -31,7 +31,7 @@ export const EDIT_OPERATION_TYPES: EditOperation["type"][] = [
   "autoEnhance"
 ];
 
-export const MAX_EDIT_OPERATIONS = 100;
+export const MAX_EDIT_OPERATIONS = 20;
 export const MAX_EDIT_HISTORY_CLIENT = 10;
 
 export type ExportOptions = {

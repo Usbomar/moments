@@ -7,6 +7,8 @@ export type GalleryView = "masonry" | "map" | "timeline" | "colors" | "slider";
 interface Props {
   value: GalleryView;
   onChange: (view: GalleryView) => void;
+  /** Icones en fila (TopBar); per defecte menú desplegable. */
+  variant?: "default" | "compact";
 }
 
 const STORAGE_KEY = "moments-view-preference";
@@ -19,7 +21,7 @@ const OPTIONS: Array<{ id: GalleryView; label: string; icon: string }> = [
   { id: "slider", label: "Slider", icon: "▶️" }
 ];
 
-export function ViewSelector({ value, onChange }: Props) {
+export function ViewSelector({ value, onChange, variant = "default" }: Props) {
   const [open, setOpen] = useState(false);
   const hydratedRef = useRef(false);
 
@@ -35,6 +37,26 @@ export function ViewSelector({ value, onChange }: Props) {
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, value);
   }, [value]);
+
+  if (variant === "compact") {
+    return (
+      <div className="view-selector-compact" role="group" aria-label="Tipus de vista de biblioteca">
+        {OPTIONS.map((option) => (
+          <button
+            key={option.id}
+            type="button"
+            className={`btn btn-sm view-selector-compact-btn ${value === option.id ? "btn-primary" : ""}`}
+            title={option.label}
+            aria-pressed={value === option.id}
+            onClick={() => onChange(option.id)}
+          >
+            <span aria-hidden>{option.icon}</span>
+            <span className="sr-only">{option.label}</span>
+          </button>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div style={{ position: "relative" }}>

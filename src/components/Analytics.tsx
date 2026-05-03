@@ -18,8 +18,8 @@ interface Props {
   items: Asset[];
 }
 
-const CHART_COL = "#2f6fed";
-const HEAT = ["#e8eef8", "#c5d9f7", "#9bbcf3", "#6a9aed", "#2f6fed", "#1d4cb8"];
+const CHART_COL = "#3b82f6";
+const HEAT = ["#eff6ff", "#dbeafe", "#bfdbfe", "#93c5fd", "#3b82f6", "#1d4ed8"];
 
 export function Analytics({ items }: Props) {
   const stats = useMemo(() => {
@@ -136,7 +136,7 @@ export function Analytics({ items }: Props) {
                   <XAxis dataKey="year" tick={{ fontSize: 12 }} />
                   <YAxis allowDecimals={false} tick={{ fontSize: 12 }} width={36} />
                   <Tooltip />
-                  <Bar dataKey="count" fill={CHART_COL} radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="count" fill={CHART_COL} radius={[0, 0, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

@@ -5,13 +5,17 @@ import dynamic from "next/dynamic";
 import { assets } from "@/lib/mock-data";
 import { LibraryGrid } from "@/components/library-grid";
 import { FullscreenViewer } from "@/components/fullscreen-viewer";
+import type { MainNavTab } from "@/components/LeftNav";
 import type { Asset } from "@/lib/types";
 import { UploadDropzone } from "@/components/upload-dropzone";
 import { FilterBar } from "@/components/FilterBar";
-import { ViewSelector, type GalleryView } from "@/components/ViewSelector";
+import { type GalleryView } from "@/components/ViewSelector";
 import { FilterProvider, useFilters } from "@/context/FilterContext";
 import { ViewErrorBoundary } from "@/components/ViewErrorBoundary";
 import { clearCache, getCached, setCached } from "@/lib/cache";
+import type { EditOperation, ExportOptions } from "@/lib/image-edit-ops";
+import { MainLayout } from "@/layouts/MainLayout";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 
 const MapView = dynamic(() => import("@/views/MapView").then((mod) => mod.MapView), {
   ssr: false,
@@ -46,7 +50,7 @@ const PhotoModal = dynamic(() => import("@/components/PhotoModal").then((mod) =>
   loading: () => <TabLoadingHint label="editor de foto" />
 });
 
-const ImageEditor = dynamic(() => import("@/components/ImageEditor").then((mod) => mod.ImageEditor), {
+const ImageEditorV2 = dynamic(() => import("@/components/ImageEditor/ImageEditorV2").then((mod) => mod.ImageEditorV2), {
   loading: () => <TabLoadingHint label="editor d’imatge" />
 });
 
@@ -58,22 +62,14 @@ function TabLoadingHint({ label }: { label: string }) {
   );
 }
 
-type MainTab = "library" | "collections" | "memories" | "analytics";
-
-const MAIN_TAB_LABELS: Record<MainTab, string> = {
-  library: "Biblioteca",
-  collections: "Col·leccions",
-  memories: "Records",
-  analytics: "Analítiques"
-};
-
 function HomeContent() {
   const { filters } = useFilters();
+  const searchRef = useRef<HTMLInputElement>(null);
   const [view, setView] = useState<GalleryView>("masonry");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [imageEditorAsset, setImageEditorAsset] = useState<Asset | null>(null);
-  const [mainTab, setMainTab] = useState<MainTab>("library");
+  const [mainTab, setMainTab] = useState<MainNavTab>("library");
   const [slideshowItems, setSlideshowItems] = useState<Asset[] | null>(null);
   const [library, setLibrary] = useState<Asset[]>(assets);
   const [loadingLibrary, setLoadingLibrary] = useState(false);
@@ -145,14 +141,10 @@ function HomeContent() {
     setImageEditorAsset(asset);
   }, []);
 
-  const handleMainTab = useCallback((tab: MainTab) => {
-    setMainTab(tab);
-  }, []);
-
-  const onMemoryView = useCallback((assets: Asset[]) => {
-    if (!assets.length) return;
-    setSlideshowItems(assets);
-    setSelectedId(assets[0]!.id);
+  const onMemoryView = useCallback((memAssets: Asset[]) => {
+    if (!memAssets.length) return;
+    setSlideshowItems(memAssets);
+    setSelectedId(memAssets[0]!.id);
   }, []);
 
   const onViewerClose = useCallback(() => {
@@ -160,12 +152,52 @@ function HomeContent() {
     setSlideshowItems(null);
   }, []);
 
+  const modalOpen = !!(selectedAsset || imageEditorAsset || selectedId);
+
+  const onModalEscape = useCallback(() => {
+    if (imageEditorAsset) return;
+    if (selectedAsset) {
+      setSelectedAsset(null);
+      return;
+    }
+    if (selectedId) {
+      onViewerClose();
+    }
+  }, [imageEditorAsset, selectedAsset, selectedId, onViewerClose]);
+
+  useKeyboardShortcuts({
+    searchInputRef: searchRef,
+    isModalOpen: modalOpen,
+    onModalEscape
+  });
+
   const onImageSaved = useCallback((updated: Asset) => {
     setLibrary((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
     setSelectedAsset((prev) => (prev?.id === updated.id ? updated : prev));
     clearCache();
     void refreshLibraryRef.current();
   }, []);
+
+  const saveImageEdits = useCallback(
+    async (operations: EditOperation[], exportOpts: ExportOptions) => {
+      const id = imageEditorAsset?.id;
+      if (!id) {
+        throw new Error("Sense asset per desar.");
+      }
+      const res = await fetch(`/api/assets/${id}/edit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ operations, export: exportOpts })
+      });
+      const body = (await res.json()) as { asset?: Asset; error?: string };
+      if (!res.ok || !body.asset) {
+        throw new Error(body.error ?? "Error en desar");
+      }
+      onImageSaved(body.asset);
+      setImageEditorAsset(null);
+    },
+    [imageEditorAsset, onImageSaved]
+  );
 
   const onPhotoSave = useCallback(async (updated: Asset) => {
     if (!supabaseConfiguredRef.current) {
@@ -202,88 +234,82 @@ function HomeContent() {
   const viewerItems = useMemo(() => slideshowItems ?? viewItems, [slideshowItems, viewItems]);
 
   return (
-    <main className="app-shell">
-      <header className="topbar">
-        <nav className="tab-nav" aria-label="Secció principal">
-          {(Object.keys(MAIN_TAB_LABELS) as MainTab[]).map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              className={mainTab === tab ? "active" : ""}
-              onClick={() => handleMainTab(tab)}
-            >
-              {MAIN_TAB_LABELS[tab]}
-            </button>
-          ))}
-        </nav>
-        {mainTab === "library" ? <ViewSelector value={view} onChange={setView} /> : null}
-      </header>
-
-      <section className="card" style={{ padding: 14 }}>
-        {mainTab === "library" ? (
-          <>
-            <FilterBar />
-            <UploadDropzone
-              onUploaded={handleLibraryUploaded}
-              supabaseConfigured={supabaseConfigured}
-              missingEnv={missingEnv}
-            />
-            {loadingLibrary ? <p style={{ color: "var(--muted)" }}>Actualitzant biblioteca...</p> : null}
-            <ViewErrorBoundary label="Biblioteca">
-              {view === "timeline" ? (
-                <TimelineView
-                  items={viewItems}
-                  onOpenModal={(asset) => setSelectedAsset(asset)}
-                  onOpenViewer={(asset) => setSelectedId(asset.id)}
-                />
-              ) : null}
-              {view === "masonry" ? (
-                <LibraryGrid
-                  items={viewItems}
-                  onOpenModal={(asset) => setSelectedAsset(asset)}
-                  onOpenViewer={(asset) => setSelectedId(asset.id)}
-                />
-              ) : null}
-              {view === "map" ? (
-                <MapView
-                  items={viewItems}
-                  onEditPhoto={(asset) => setSelectedAsset(asset)}
-                  onOpenViewer={(asset) => setSelectedId(asset.id)}
-                />
-              ) : null}
-              {view === "colors" ? (
-                <ColorView
-                  items={viewItems}
-                  onEditPhoto={(asset) => setSelectedAsset(asset)}
-                  onOpenViewer={(asset) => setSelectedId(asset.id)}
-                />
-              ) : null}
-              {view === "slider" ? (
-                <SliderView
-                  items={viewItems}
-                  onEditPhoto={(asset) => setSelectedAsset(asset)}
-                  onOpenViewer={(asset) => setSelectedId(asset.id)}
-                />
-              ) : null}
+    <>
+      <MainLayout
+        activeNav={mainTab}
+        onNavChange={setMainTab}
+        libraryView={view}
+        onLibraryViewChange={setView}
+        searchInputRef={searchRef}
+      >
+        <div className="moments-card-inner">
+          {mainTab === "library" ? (
+            <>
+              <FilterBar />
+              <UploadDropzone
+                onUploaded={handleLibraryUploaded}
+                supabaseConfigured={supabaseConfigured}
+                missingEnv={missingEnv}
+              />
+              {loadingLibrary ? <p style={{ color: "var(--text-secondary)", marginTop: 12 }}>Actualitzant biblioteca…</p> : null}
+              <ViewErrorBoundary label="Biblioteca">
+                <div style={{ marginTop: 16 }}>
+                  {view === "timeline" ? (
+                    <TimelineView
+                      items={viewItems}
+                      onOpenModal={(asset) => setSelectedAsset(asset)}
+                      onOpenViewer={(asset) => setSelectedId(asset.id)}
+                    />
+                  ) : null}
+                  {view === "masonry" ? (
+                    <LibraryGrid
+                      items={viewItems}
+                      onOpenModal={(asset) => setSelectedAsset(asset)}
+                      onOpenViewer={(asset) => setSelectedId(asset.id)}
+                    />
+                  ) : null}
+                  {view === "map" ? (
+                    <MapView
+                      items={viewItems}
+                      onEditPhoto={(asset) => setSelectedAsset(asset)}
+                      onOpenViewer={(asset) => setSelectedId(asset.id)}
+                    />
+                  ) : null}
+                  {view === "colors" ? (
+                    <ColorView
+                      items={viewItems}
+                      onEditPhoto={(asset) => setSelectedAsset(asset)}
+                      onOpenViewer={(asset) => setSelectedId(asset.id)}
+                    />
+                  ) : null}
+                  {view === "slider" ? (
+                    <SliderView
+                      items={viewItems}
+                      onEditPhoto={(asset) => setSelectedAsset(asset)}
+                      onOpenViewer={(asset) => setSelectedId(asset.id)}
+                    />
+                  ) : null}
+                </div>
+              </ViewErrorBoundary>
+            </>
+          ) : null}
+          {mainTab === "collections" ? (
+            <ViewErrorBoundary label="Col·leccions">
+              <Collections items={library} />
             </ViewErrorBoundary>
-          </>
-        ) : null}
-        {mainTab === "collections" ? (
-          <ViewErrorBoundary label="Col·leccions">
-            <Collections items={library} />
-          </ViewErrorBoundary>
-        ) : null}
-        {mainTab === "memories" ? (
-          <ViewErrorBoundary label="Records">
-            <Memories items={library} onView={onMemoryView} />
-          </ViewErrorBoundary>
-        ) : null}
-        {mainTab === "analytics" ? (
-          <ViewErrorBoundary label="Analítiques">
-            <Analytics items={library} />
-          </ViewErrorBoundary>
-        ) : null}
-      </section>
+          ) : null}
+          {mainTab === "memories" ? (
+            <ViewErrorBoundary label="Records">
+              <Memories items={library} onView={onMemoryView} />
+            </ViewErrorBoundary>
+          ) : null}
+          {mainTab === "analytics" ? (
+            <ViewErrorBoundary label="Analítiques">
+              <Analytics items={library} />
+            </ViewErrorBoundary>
+          ) : null}
+        </div>
+      </MainLayout>
 
       <FullscreenViewer
         items={viewerItems}
@@ -307,19 +333,15 @@ function HomeContent() {
 
       {imageEditorAsset ? (
         <ViewErrorBoundary label="Editor d’imatge">
-          <ImageEditor
+          <ImageEditorV2
             key={imageEditorAsset.id}
             asset={imageEditorAsset}
-            onClose={() => setImageEditorAsset(null)}
             onDiscard={() => setImageEditorAsset(null)}
-            onSaveSuccess={(updated) => {
-              onImageSaved(updated);
-              setImageEditorAsset(null);
-            }}
+            onSave={saveImageEdits}
           />
         </ViewErrorBoundary>
       ) : null}
-    </main>
+    </>
   );
 }
 

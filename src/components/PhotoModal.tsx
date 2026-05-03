@@ -30,6 +30,29 @@ function formatLocationText(loc?: LocationInfo): string {
   return `${loc.city}, ${loc.country}`;
 }
 
+type GeocodeResponse = {
+  lat: number;
+  lng: number;
+  city: string;
+  country: string;
+  boundingbox?: [string, string, string, string] | null;
+};
+
+async function fetchGeocode(q: string, signal?: AbortSignal): Promise<GeocodeResponse | null> {
+  const res = await fetch(`/api/geocode?q=${encodeURIComponent(q)}`, { signal, cache: "no-store" });
+  if (!res.ok) return null;
+  return (await res.json()) as GeocodeResponse;
+}
+
+function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const id = window.setTimeout(() => setDebounced(value), delayMs);
+    return () => window.clearTimeout(id);
+  }, [value, delayMs]);
+  return debounced;
+}
+
 export function PhotoModal({ asset, onClose, onSave }: Props) {
   const [title, setTitle] = useState(() => asset?.title ?? "");
   const [description, setDescription] = useState(() => asset?.description ?? "");
@@ -40,11 +63,15 @@ export function PhotoModal({ asset, onClose, onSave }: Props) {
   const [pickedLocation, setPickedLocation] = useState<LocationInfo | undefined>(() => asset?.location);
   const [favorite, setFavorite] = useState(() => asset?.favorite ?? false);
   const [error, setError] = useState<string | null>(null);
+  const [mapReady, setMapReady] = useState(false);
+  const [geocodeHint, setGeocodeHint] = useState<string | null>(null);
 
   const mapRootRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const markerRef = useRef<LeafletMarker | null>(null);
+  const leafletRef = useRef<typeof import("leaflet") | null>(null);
   const locationTextRef = useRef(locationText);
+  const debouncedLocationText = useDebouncedValue(locationText, 650);
 
   useEffect(() => {
     locationTextRef.current = locationText;
@@ -64,25 +91,44 @@ export function PhotoModal({ asset, onClose, onSave }: Props) {
   const handleSave = useCallback(() => {
     void (async () => {
       if (!asset) return;
+      setError(null);
       const trimmed = title.trim();
       if (!trimmed) {
         setError("El títol no pot estar buit.");
         return;
       }
       const locFromText = locationText.trim();
-      let location: LocationInfo | undefined = pickedLocation;
-      if (locFromText) {
-        const parts = locFromText.split(",").map((p) => p.trim());
-        if (parts.length >= 2 && parts[0] && parts[1]) {
-          const city = parts[0];
-          const country = parts[1];
-          if (location) {
-            location = { ...location, city, country };
-          } else {
-            location = { city, country, lat: 0, lng: 0 };
+      let location: LocationInfo | undefined;
+
+      if (!locFromText) {
+        location = undefined;
+      } else {
+        const geo = await fetchGeocode(locFromText);
+        if (geo) {
+          location = { lat: geo.lat, lng: geo.lng, city: geo.city, country: geo.country };
+          const parts = locFromText.split(",").map((p) => p.trim());
+          if (parts.length >= 2 && parts[0] && parts[1]) {
+            location = { ...location, city: parts[0], country: parts[1] };
           }
+        } else if (
+          pickedLocation?.lat &&
+          pickedLocation?.lng &&
+          !(pickedLocation.lat === 0 && pickedLocation.lng === 0)
+        ) {
+          const parts = locFromText.split(",").map((p) => p.trim());
+          if (parts.length >= 2 && parts[0] && parts[1]) {
+            location = { ...pickedLocation, city: parts[0], country: parts[1] };
+          } else {
+            location = pickedLocation;
+          }
+        } else {
+          setError(
+            "No s'ha pogut determinar la ubicació. Escriu un lloc més concret o clica al mapa."
+          );
+          return;
         }
       }
+
       const updated: Asset = {
         ...asset,
         title: trimmed,
@@ -108,7 +154,8 @@ export function PhotoModal({ asset, onClose, onSave }: Props) {
     void (async () => {
       const leafletMod = await import("leaflet");
       await import("leaflet/dist/leaflet.css");
-      const L = leafletMod.default;
+      const L = leafletMod.default as typeof import("leaflet");
+      leafletRef.current = L;
 
       if (cancelled) return;
 
@@ -127,6 +174,7 @@ export function PhotoModal({ asset, onClose, onSave }: Props) {
       if (cancelled) {
         createdMap.remove();
         createdMap = null;
+        leafletRef.current = null;
         return;
       }
       mapRef.current = createdMap;
@@ -165,15 +213,80 @@ export function PhotoModal({ asset, onClose, onSave }: Props) {
       createdMap.on("click", (e) => {
         placeMarker({ lat: e.latlng.lat, lng: e.latlng.lng });
       });
+
+      requestAnimationFrame(() => {
+        if (cancelled || !createdMap) return;
+        createdMap.invalidateSize();
+        setMapReady(true);
+      });
     })();
 
     return () => {
       cancelled = true;
+      setMapReady(false);
+      leafletRef.current = null;
       mapRef.current?.remove();
       mapRef.current = null;
       markerRef.current = null;
     };
   }, [asset]);
+
+  useEffect(() => {
+    if (!asset || !mapReady) return;
+    const q = debouncedLocationText.trim();
+    if (!q) {
+      setGeocodeHint(null);
+      return;
+    }
+
+    const ctrl = new AbortController();
+    void (async () => {
+      try {
+        const data = await fetchGeocode(q, ctrl.signal);
+        if (ctrl.signal.aborted) return;
+        const L = leafletRef.current;
+        const map = mapRef.current;
+        if (!L || !map) return;
+
+        if (!data) {
+          setGeocodeHint("No s'ha trobat el lloc. Prova amb una altra cerca o clica al mapa.");
+          return;
+        }
+
+        setGeocodeHint(null);
+        const { lat, lng, city, country, boundingbox } = data;
+
+        if (boundingbox && boundingbox.length === 4) {
+          const [south, north, west, east] = boundingbox.map(Number);
+          if ([south, north, west, east].every(Number.isFinite)) {
+            map.fitBounds(L.latLngBounds(L.latLng(south, west), L.latLng(north, east)), {
+              padding: [24, 24],
+              maxZoom: 17
+            });
+          } else {
+            map.setView([lat, lng], 14);
+          }
+        } else {
+          map.setView([lat, lng], 14);
+        }
+
+        requestAnimationFrame(() => map.invalidateSize());
+
+        if (markerRef.current) {
+          markerRef.current.setLatLng([lat, lng]);
+        } else {
+          markerRef.current = L.marker([lat, lng]).addTo(map);
+        }
+        setPickedLocation({ lat, lng, city, country });
+      } catch {
+        if (!ctrl.signal.aborted) {
+          setGeocodeHint("Error en la cerca de la ubicació.");
+        }
+      }
+    })();
+
+    return () => ctrl.abort();
+  }, [asset, debouncedLocationText, mapReady]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -245,9 +358,12 @@ export function PhotoModal({ asset, onClose, onSave }: Props) {
             type="text"
             value={locationText}
             onChange={(e) => setLocationText(e.target.value)}
-            placeholder="Ciutat, País"
+            placeholder="Ciutat, país, adreça o negoci…"
           />
-          <small className="modal-muted">Opcional: clica el mapa per establir coordenades GPS.</small>
+          {geocodeHint ? <p className="modal-error" style={{ marginTop: 6 }}>{geocodeHint}</p> : null}
+          <small className="modal-muted">
+            El mapa segueix el text (cerca amb OpenStreetMap). També pots clicar al mapa per ajustar el punt.
+          </small>
           <div ref={mapRootRef} className="modal-map" />
         </div>
 

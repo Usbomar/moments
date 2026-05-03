@@ -6,7 +6,8 @@ import { LibraryGrid } from "@/components/library-grid";
 
 interface Props {
   items: Asset[];
-  onOpen: (asset: Asset) => void;
+  onOpenViewer: (asset: Asset) => void;
+  onEditPhoto: (asset: Asset) => void;
 }
 
 interface ColorBucket {
@@ -42,7 +43,7 @@ function buildBuckets(items: Asset[]): ColorBucket[] {
   return Array.from(buckets.values()).sort((a, b) => a.hue - b.hue);
 }
 
-export function ColorView({ items, onOpen }: Props) {
+export function ColorView({ items, onOpenViewer, onEditPhoto }: Props) {
   const buckets = useMemo(() => buildBuckets(items), [items]);
   const [activeHue, setActiveHue] = useState<number | null>(null);
 
@@ -69,7 +70,7 @@ export function ColorView({ items, onOpen }: Props) {
         ))}
       </div>
 
-      <LibraryGrid items={visible} onOpen={onOpen} />
+      <LibraryGrid items={visible} onOpenModal={onEditPhoto} onOpenViewer={onOpenViewer} />
     </div>
   );
 }

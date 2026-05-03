@@ -1,78 +1,7 @@
 import { NextResponse } from "next/server";
-import type { Asset } from "@/lib/types";
 import { getSupabaseAdmin } from "@/lib/server/supabase-admin";
 import { isSupabaseConfigured } from "@/lib/server/supabase-config";
-
-/** One row from `asset_files` as returned by PostgREST. */
-type AssetFileRow = {
-  original_url: string;
-  preview_url: string;
-  thumb_url: string;
-  checksum: string;
-  size: number;
-};
-
-/** Nested embed: Supabase/PostgREST may return one-to-one as object or as array of one. */
-type AssetFilesNested = AssetFileRow | AssetFileRow[] | null | undefined;
-type LocationNested =
-  | {
-      location_id: number;
-      locations: {
-        lat: number;
-        lng: number;
-        city: string | null;
-        country: string | null;
-      } | null;
-    }
-  | Array<{
-      location_id: number;
-      locations:
-        | {
-            lat: number;
-            lng: number;
-            city: string | null;
-            country: string | null;
-          }
-        | Array<{
-            lat: number;
-            lng: number;
-            city: string | null;
-            country: string | null;
-          }>
-        | null;
-    }>
-  | null
-  | undefined;
-
-type TagNested = { tag: string; origin: "manual" | "auto" }[] | null | undefined;
-
-function isAssetFileRow(value: unknown): value is AssetFileRow {
-  if (!value || typeof value !== "object") return false;
-  const row = value as Partial<AssetFileRow>;
-  return (
-    typeof row.original_url === "string" &&
-    typeof row.preview_url === "string" &&
-    typeof row.thumb_url === "string" &&
-    typeof row.checksum === "string" &&
-    typeof row.size === "number"
-  );
-}
-
-function pickFirstAssetFile(raw: AssetFilesNested): AssetFileRow | null {
-  if (raw == null) return null;
-  if (Array.isArray(raw)) {
-    const first = raw[0];
-    return isAssetFileRow(first) ? first : null;
-  }
-  return isAssetFileRow(raw) ? raw : null;
-}
-
-function pickFirstLocation(raw: LocationNested) {
-  if (raw == null) return null;
-  const first = Array.isArray(raw) ? (raw[0] ?? null) : raw;
-  if (!first?.locations) return null;
-  return Array.isArray(first.locations) ? (first.locations[0] ?? null) : first.locations;
-}
+import { toAsset } from "@/lib/server/asset-map";
 
 function parseYears(raw: string | null): [number, number] | null {
   if (!raw) return null;
@@ -86,66 +15,6 @@ function parseYears(raw: string | null): [number, number] | null {
   const single = Number.parseInt(raw, 10);
   if (!Number.isFinite(single)) return null;
   return [single, single];
-}
-
-function toAsset(row: {
-  id: string;
-  user_id: string;
-  type: "photo" | "video";
-  title: string;
-  taken_at: string;
-  uploaded_at: string;
-  width: number;
-  height: number;
-  duration: number | null;
-  favorite: boolean;
-  asset_files: AssetFilesNested;
-  asset_locations: LocationNested;
-  asset_tags: TagNested;
-}): Asset {
-  const file = pickFirstAssetFile(row.asset_files);
-  const location = pickFirstLocation(row.asset_locations);
-  const tags = (row.asset_tags ?? []).map((tag) => tag.tag);
-  const autoTags = (row.asset_tags ?? []).filter((tag) => tag.origin === "auto").map((tag) => tag.tag);
-  const resultFiles = {
-    originalUrl: file?.original_url ?? "",
-    previewUrl: file?.preview_url ?? "",
-    thumbUrl: file?.thumb_url ?? "",
-    checksum: file?.checksum ?? "",
-    size: file?.size ?? 0
-  };
-  console.log("toAsset processing:", {
-    raw_files: row.asset_files,
-    picked_file: file,
-    result_files: resultFiles
-  });
-
-  return {
-    id: row.id,
-    userId: row.user_id,
-    type: row.type,
-    title: row.title,
-    takenAt: row.taken_at,
-    uploadedAt: row.uploaded_at,
-    width: row.width,
-    height: row.height,
-    duration: row.duration ?? undefined,
-    favorite: row.favorite,
-    albumIds: [],
-    peopleIds: [],
-    tags,
-    autoTags,
-    location:
-      location && location.city && location.country
-        ? {
-            lat: location.lat,
-            lng: location.lng,
-            city: location.city,
-            country: location.country
-          }
-        : undefined,
-    files: resultFiles
-  };
 }
 
 export async function GET(request: Request) {
@@ -194,7 +63,7 @@ export async function GET(request: Request) {
     let query = supabase
       .from("assets")
       .select(
-        "id,user_id,type,title,taken_at,uploaded_at,width,height,duration,favorite,asset_files(original_url,preview_url,thumb_url,checksum,size),asset_locations(location_id,locations(lat,lng,city,country)),asset_tags(tag,origin)"
+        "id,user_id,type,title,description,taken_at,uploaded_at,width,height,duration,favorite,asset_files(original_url,preview_url,thumb_url,checksum,size),asset_locations(location_id,locations(lat,lng,city,country)),asset_tags(tag,origin)"
       )
       .order("taken_at", { ascending: false });
 
@@ -224,6 +93,8 @@ export async function GET(request: Request) {
         (asset) =>
           asset.title.toLowerCase().includes(lower) ||
           asset.tags.some((tag) => tag.toLowerCase().includes(lower)) ||
+          asset.autoTags.some((tag) => tag.toLowerCase().includes(lower)) ||
+          (asset.description?.toLowerCase().includes(lower) ?? false) ||
           asset.location?.city.toLowerCase().includes(lower)
       );
     }

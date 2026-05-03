@@ -25,6 +25,7 @@ export const assets: Asset[] = Array.from({ length: 120 }, (_, i) => {
     userId: "u-1",
     type: i % 8 === 0 ? "video" : "photo",
     title: `Moment ${i + 1}`,
+    description: i % 11 === 0 ? "Foto de mostra amb descripció curta." : undefined,
     takenAt,
     uploadedAt: new Date(Date.now() - dayShift * 24 * 60 * 60 * 1000 + 40000).toISOString(),
     width: 1600,

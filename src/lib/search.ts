@@ -16,7 +16,9 @@ export function filterAssets(input: Asset[], filters: SearchFilters): Asset[] {
     const q = filters.query.toLowerCase();
     return (
       asset.title.toLowerCase().includes(q) ||
+      (asset.description?.toLowerCase().includes(q) ?? false) ||
       asset.tags.some((t) => t.includes(q)) ||
+      asset.autoTags.some((t) => t.includes(q)) ||
       asset.location?.city.toLowerCase().includes(q) ||
       false
     );

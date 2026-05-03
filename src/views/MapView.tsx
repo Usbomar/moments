@@ -9,7 +9,8 @@ import { LibraryGrid } from "@/components/library-grid";
 
 interface Props {
   items: Asset[];
-  onOpen: (asset: Asset) => void;
+  onOpenViewer: (asset: Asset) => void;
+  onEditPhoto: (asset: Asset) => void;
 }
 
 interface Cluster {
@@ -43,7 +44,7 @@ function clusterByArea(items: Asset[]): Cluster[] {
   return Array.from(grouped.values());
 }
 
-export function MapView({ items, onOpen }: Props) {
+export function MapView({ items, onOpenViewer, onEditPhoto }: Props) {
   const clusters = useMemo(() => clusterByArea(items), [items]);
   const [selectedCluster, setSelectedCluster] = useState<Cluster | null>(null);
   const mapRootRef = useRef<HTMLDivElement | null>(null);
@@ -96,10 +97,14 @@ export function MapView({ items, onOpen }: Props) {
           <h3>
             {selectedCluster.city} · {selectedCluster.items.length} foto(s)
           </h3>
-          <LibraryGrid items={selectedCluster.items} onOpen={onOpen} />
+          <LibraryGrid
+            items={selectedCluster.items}
+            onOpenModal={onEditPhoto}
+            onOpenViewer={onOpenViewer}
+          />
         </section>
       ) : (
-        <p style={{ color: "var(--muted)" }}>Selecciona un marcador per veure les fotos d'aquella zona.</p>
+        <p style={{ color: "var(--muted)" }}>Selecciona un marcador per veure les fotos d&apos;aquella zona.</p>
       )}
     </div>
   );

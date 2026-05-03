@@ -20,6 +20,7 @@ export interface Asset {
   userId: string;
   type: MediaType;
   title: string;
+  description?: string;
   takenAt: string;
   uploadedAt: string;
   width: number;

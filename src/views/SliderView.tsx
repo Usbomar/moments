@@ -1,23 +1,29 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Asset } from "@/lib/types";
 
 interface Props {
   items: Asset[];
+  onEditPhoto: (asset: Asset) => void;
 }
 
-export function SliderView({ items }: Props) {
+export function SliderView({ items, onEditPhoto }: Props) {
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [speedMs, setSpeedMs] = useState(2400);
   const [fullscreen, setFullscreen] = useState(true);
+  const itemsKeyRef = useRef<string>("");
+
+  const itemsKey = useMemo(() => items.map((item) => item.id).join("|"), [items]);
 
   const current = useMemo(() => items[index] ?? null, [items, index]);
 
   useEffect(() => {
-    setIndex(0);
-  }, [items]);
+    if (itemsKeyRef.current === itemsKey) return;
+    itemsKeyRef.current = itemsKey;
+    queueMicrotask(() => setIndex(0));
+  }, [itemsKey]);
 
   useEffect(() => {
     if (!playing || !items.length) return;
@@ -62,7 +68,15 @@ export function SliderView({ items }: Props) {
         onClick={(e) => e.stopPropagation()}
         style={{ transition: "opacity 260ms ease, transform 260ms ease" }}
       >
-        <img className="viewer-media" src={current.files.previewUrl || current.files.originalUrl} alt={current.title} referrerPolicy="no-referrer" />
+        {/* eslint-disable-next-line @next/next/no-img-element -- signed URLs / external storage */}
+        <img
+          className="viewer-media"
+          src={current.files.previewUrl || current.files.originalUrl}
+          alt={current.title}
+          referrerPolicy="no-referrer"
+          style={{ cursor: "pointer" }}
+          onClick={() => onEditPhoto(current)}
+        />
         <div className="controls" style={{ marginTop: 12, justifyContent: "center" }}>
           <button type="button" onClick={() => setIndex((prev) => (prev - 1 + items.length) % items.length)}>
             Prev

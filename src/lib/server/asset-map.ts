@@ -1,0 +1,136 @@
+import type { Asset } from "@/lib/types";
+
+/** One row from `asset_files` as returned by PostgREST. */
+export type AssetFileRow = {
+  original_url: string;
+  preview_url: string;
+  thumb_url: string;
+  checksum: string;
+  size: number;
+};
+
+/** Nested embed: Supabase/PostgREST may return one-to-one as object or as array of one. */
+export type AssetFilesNested = AssetFileRow | AssetFileRow[] | null | undefined;
+
+export type LocationNested =
+  | {
+      location_id: number;
+      locations: {
+        lat: number;
+        lng: number;
+        city: string | null;
+        country: string | null;
+      } | null;
+    }
+  | Array<{
+      location_id: number;
+      locations:
+        | {
+            lat: number;
+            lng: number;
+            city: string | null;
+            country: string | null;
+          }
+        | Array<{
+            lat: number;
+            lng: number;
+            city: string | null;
+            country: string | null;
+          }>
+        | null;
+    }>
+  | null
+  | undefined;
+
+export type TagNested = { tag: string; origin: "manual" | "auto" }[] | null | undefined;
+
+export function isAssetFileRow(value: unknown): value is AssetFileRow {
+  if (!value || typeof value !== "object") return false;
+  const row = value as Partial<AssetFileRow>;
+  return (
+    typeof row.original_url === "string" &&
+    typeof row.preview_url === "string" &&
+    typeof row.thumb_url === "string" &&
+    typeof row.checksum === "string" &&
+    typeof row.size === "number"
+  );
+}
+
+export function pickFirstAssetFile(raw: AssetFilesNested): AssetFileRow | null {
+  if (raw == null) return null;
+  if (Array.isArray(raw)) {
+    const first = raw[0];
+    return isAssetFileRow(first) ? first : null;
+  }
+  return isAssetFileRow(raw) ? raw : null;
+}
+
+export function pickFirstLocation(raw: LocationNested) {
+  if (raw == null) return null;
+  const first = Array.isArray(raw) ? (raw[0] ?? null) : raw;
+  if (!first?.locations) return null;
+  return Array.isArray(first.locations) ? (first.locations[0] ?? null) : first.locations;
+}
+
+export function toAsset(row: {
+  id: string;
+  user_id: string;
+  type: "photo" | "video";
+  title: string;
+  description: string | null;
+  taken_at: string;
+  uploaded_at: string;
+  width: number;
+  height: number;
+  duration: number | null;
+  favorite: boolean;
+  asset_files: AssetFilesNested;
+  asset_locations: LocationNested;
+  asset_tags: TagNested;
+}): Asset {
+  const file = pickFirstAssetFile(row.asset_files);
+  const location = pickFirstLocation(row.asset_locations);
+  const tagRows = row.asset_tags ?? [];
+  const tags = tagRows.filter((tag) => tag.origin === "manual").map((tag) => tag.tag);
+  const autoTags = tagRows.filter((tag) => tag.origin === "auto").map((tag) => tag.tag);
+  const resultFiles = {
+    originalUrl: file?.original_url ?? "",
+    previewUrl: file?.preview_url ?? "",
+    thumbUrl: file?.thumb_url ?? "",
+    checksum: file?.checksum ?? "",
+    size: file?.size ?? 0
+  };
+  console.log("toAsset processing:", {
+    raw_files: row.asset_files,
+    picked_file: file,
+    result_files: resultFiles
+  });
+
+  return {
+    id: row.id,
+    userId: row.user_id,
+    type: row.type,
+    title: row.title,
+    description: row.description ?? undefined,
+    takenAt: row.taken_at,
+    uploadedAt: row.uploaded_at,
+    width: row.width,
+    height: row.height,
+    duration: row.duration ?? undefined,
+    favorite: row.favorite,
+    albumIds: [],
+    peopleIds: [],
+    tags,
+    autoTags,
+    location:
+      location && location.city && location.country
+        ? {
+            lat: location.lat,
+            lng: location.lng,
+            city: location.city,
+            country: location.country
+          }
+        : undefined,
+    files: resultFiles
+  };
+}

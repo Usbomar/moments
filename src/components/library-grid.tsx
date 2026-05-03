@@ -5,7 +5,12 @@ import type { Asset } from "@/lib/types";
 
 interface Props {
   items: Asset[];
-  onOpen: (asset: Asset) => void;
+  /** Obre el visor a pantalla completa (doble clic). */
+  onOpenViewer?: (asset: Asset) => void;
+  /** Obre el modal d'edició (clic simple). */
+  onOpenModal?: (asset: Asset) => void;
+  /** Compatibilitat enrere: si no hi ha onOpenModal/onOpenViewer, s'utilitza onOpen al clic simple. */
+  onOpen?: (asset: Asset) => void;
 }
 
 const placeholderStyle: CSSProperties = {
@@ -24,12 +29,38 @@ const placeholderStyle: CSSProperties = {
   borderRadius: "inherit"
 };
 
-function LibraryTile({ asset, onOpen }: { asset: Asset; onOpen: (a: Asset) => void }) {
+function LibraryTile({
+  asset,
+  onOpen,
+  onOpenModal,
+  onOpenViewer
+}: {
+  asset: Asset;
+  onOpen?: (a: Asset) => void;
+  onOpenModal?: (a: Asset) => void;
+  onOpenViewer?: (a: Asset) => void;
+}) {
   const thumbUrl = asset.files.thumbUrl?.trim() ?? "";
+
+  const handleClick = () => {
+    if (onOpenModal) {
+      onOpenModal(asset);
+      return;
+    }
+    onOpen?.(asset);
+  };
+
+  const handleDoubleClick = () => {
+    if (onOpenViewer) {
+      onOpenViewer(asset);
+      return;
+    }
+    onOpen?.(asset);
+  };
 
   if (!thumbUrl) {
     return (
-      <button type="button" className="tile" onClick={() => onOpen(asset)}>
+      <button type="button" className="tile" onClick={handleClick} onDoubleClick={handleDoubleClick}>
         <div style={placeholderStyle}>
           <span style={{ fontWeight: 600, color: "var(--text, #151719)" }}>No image</span>
           <span style={{ wordBreak: "break-word", maxWidth: "100%" }}>{asset.title}</span>
@@ -40,7 +71,7 @@ function LibraryTile({ asset, onOpen }: { asset: Asset; onOpen: (a: Asset) => vo
   }
 
   return (
-    <button type="button" className="tile" onClick={() => onOpen(asset)}>
+    <button type="button" className="tile" onClick={handleClick} onDoubleClick={handleDoubleClick}>
       <img
         src={thumbUrl}
         alt={asset.title}
@@ -71,11 +102,11 @@ function LibraryTile({ asset, onOpen }: { asset: Asset; onOpen: (a: Asset) => vo
 }
 
 /** Grid of thumbnails with loading gradient, empty URL guard, and onError fallback (soft boundary). */
-export function LibraryGrid({ items, onOpen }: Props) {
+export function LibraryGrid({ items, onOpen, onOpenModal, onOpenViewer }: Props) {
   return (
     <div className="grid">
       {items.map((asset) => (
-        <LibraryTile key={asset.id} asset={asset} onOpen={onOpen} />
+        <LibraryTile key={asset.id} asset={asset} onOpen={onOpen} onOpenModal={onOpenModal} onOpenViewer={onOpenViewer} />
       ))}
     </div>
   );

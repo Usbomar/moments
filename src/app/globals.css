@@ -192,3 +192,123 @@ button.active {
   padding: 2px 6px;
   border-radius: 6px;
 }
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 12, 16, 0.55);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 200;
+}
+
+.modal-content {
+  width: min(600px, 100%);
+  max-height: 80vh;
+  overflow: auto;
+  background: var(--panel);
+  border-radius: var(--radius);
+  border: 1px solid #ebedf0;
+  padding: 16px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.18);
+}
+
+.modal-photo {
+  width: 100%;
+  max-height: 42vh;
+  object-fit: contain;
+  border-radius: 12px;
+  border: 1px solid #ebedf0;
+  margin: 12px 0;
+  background: #f3f5f7;
+}
+
+.modal-close {
+  border: none;
+  background: transparent;
+  font-size: 22px;
+  line-height: 1;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.form-group label {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.form-row {
+  flex-direction: row;
+  align-items: center;
+}
+
+.tag-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tag-pill {
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 13px;
+  background: #eef1f5;
+  border: 1px solid #d8dde3;
+  cursor: pointer;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+button.primary {
+  background: #2f6fed;
+  color: #fff;
+  border-color: #2f6fed;
+}
+
+.modal-muted {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.modal-error {
+  color: #a02828;
+  font-size: 13px;
+  margin: 0 0 8px;
+}
+
+.modal-map {
+  height: 220px;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-top: 8px;
+  border: 1px solid #ebedf0;
+}
+
+@media (max-width: 640px) {
+  .modal-overlay {
+    padding: 0;
+    align-items: stretch;
+  }
+
+  .modal-content {
+    width: 100%;
+    max-height: 100vh;
+    border-radius: 0;
+    border: none;
+  }
+}

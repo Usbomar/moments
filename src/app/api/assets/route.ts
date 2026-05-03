@@ -63,7 +63,7 @@ export async function GET(request: Request) {
     let query = supabase
       .from("assets")
       .select(
-        "id,user_id,type,title,description,taken_at,uploaded_at,width,height,duration,favorite,color_hue,asset_files(original_url,preview_url,medium_url,thumb_url,checksum,size),asset_locations(location_id,locations(lat,lng,city,country)),asset_tags(tag,origin)"
+        "id,user_id,type,title,description,taken_at,uploaded_at,width,height,duration,favorite,asset_files(original_url,preview_url,medium_url,thumb_url,checksum,size),asset_locations(location_id,locations(lat,lng,city,country)),asset_tags(tag,origin)"
       )
       .order("taken_at", { ascending: false });
 
@@ -87,6 +87,19 @@ export async function GET(request: Request) {
 
     const rows = data ?? [];
     let mapped = rows.map(toAsset);
+    const ids = rows.map((r) => r.id).filter(Boolean);
+    if (ids.length) {
+      const { data: hueRows, error: hueErr } = await supabase.from("assets").select("id,color_hue").in("id", ids);
+      if (!hueErr && hueRows?.length) {
+        const byId = new Map(hueRows.map((h) => [String(h.id), h.color_hue]));
+        mapped = mapped.map((a) => {
+          const h = byId.get(a.id);
+          return typeof h === "number" && Number.isFinite(h)
+            ? { ...a, colorHue: Math.min(359, Math.max(0, Math.round(h))) }
+            : a;
+        });
+      }
+    }
     if (q) {
       const lower = q.toLowerCase();
       mapped = mapped.filter(

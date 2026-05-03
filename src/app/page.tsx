@@ -89,7 +89,7 @@ function HomeContent() {
       if (filters.tags.length) params.set("tags", filters.tags.join(","));
       if (filters.searchQuery.trim()) params.set("q", filters.searchQuery.trim());
 
-      const cacheKey = `assets:${params.toString()}`;
+      const cacheKey = `assets:v2:${params.toString()}`;
       const cached = getCached<Asset[]>(cacheKey);
       if (cached) {
         setLibrary(cached);

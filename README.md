@@ -35,7 +35,7 @@ Without `.env.local`, the app runs in **demo mode**: sample library only, upload
    npm run env:local
    ```
    Això crea `.env.local` (no es puja a Git) amb `NEXT_PUBLIC_SUPABASE_URL` i `SUPABASE_SERVICE_ROLE_KEY` del stack local.
-3. Les migracions de `supabase/migrations/` s’apliquen en arrencar el stack (taula + bucket `moments`).
+3. Les migracions de `supabase/migrations/` s’apliquen en arrencar el stack (taula + bucket `fotos`).
 4. Reinicia l’app: `npm run dev`.
 
 ### Opció B — Supabase al núvol (producció / sense Docker)
@@ -46,11 +46,11 @@ Without `.env.local`, the app runs in **demo mode**: sample library only, upload
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=eyJ...
-SUPABASE_STORAGE_BUCKET=moments
+SUPABASE_STORAGE_BUCKET=fotos
 ```
 
 4. Executa el SQL de `database/schema.sql` (o el de `supabase/migrations/`) a l’SQL editor de Supabase.
-5. A **Storage**, crea el bucket `moments` (o deixa que el SQL de `supabase/migrations` el creï si l’executes sencer).
+5. A **Storage**, crea el bucket `fotos` (o deixa que el SQL de `supabase/migrations` el creï si l’executes sencer).
 6. Reinicia `npm run dev`.
 
 The app now supports:

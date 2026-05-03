@@ -1,6 +1,6 @@
 /**
  * Extract Supabase Storage object path (within bucket) from a signed URL.
- * Example pathname: /storage/v1/object/sign/moments/original/abc...-file.jpg
+ * Example pathname: /storage/v1/object/sign/fotos/original/abc...-file.jpg
  */
 export function objectPathFromSignedUrl(signedUrl: string): string | null {
   const trimmed = signedUrl.trim();

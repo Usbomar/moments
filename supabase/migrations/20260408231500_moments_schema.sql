@@ -60,5 +60,5 @@ create index if not exists idx_assets_user_favorite on assets(user_id, favorite)
 create index if not exists idx_asset_tags_tag on asset_tags(tag);
 
 insert into storage.buckets (id, name, public)
-values ('moments', 'moments', true)
+values ('fotos', 'fotos', true)
 on conflict (id) do nothing;

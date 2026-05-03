@@ -55,7 +55,7 @@ function main() {
   const body = [
     `NEXT_PUBLIC_SUPABASE_URL=${apiUrl}`,
     `SUPABASE_SERVICE_ROLE_KEY=${serviceKey}`,
-    "SUPABASE_STORAGE_BUCKET=moments",
+    "SUPABASE_STORAGE_BUCKET=fotos",
     ""
   ].join("\n");
 

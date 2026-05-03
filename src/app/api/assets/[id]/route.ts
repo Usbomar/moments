@@ -68,7 +68,13 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       }
     }
 
-    const { error: updateErr } = await supabase.from("assets").update(patch).eq("id", id).eq("user_id", "u-1");
+    let { error: updateErr } = await supabase.from("assets").update(patch).eq("id", id).eq("user_id", "u-1");
+    if (updateErr && /color_hue/i.test(updateErr.message) && "color_hue" in patch) {
+      const rest = { ...patch };
+      delete rest.color_hue;
+      const retry = await supabase.from("assets").update(rest).eq("id", id).eq("user_id", "u-1");
+      updateErr = retry.error;
+    }
     if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
 
     const { error: delTagErr } = await supabase.from("asset_tags").delete().eq("asset_id", id).eq("origin", "manual");
@@ -102,7 +108,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const { data: row, error: fetchErr } = await supabase
       .from("assets")
       .select(
-        "id,user_id,type,title,description,taken_at,uploaded_at,width,height,duration,favorite,color_hue,asset_files(original_url,preview_url,medium_url,thumb_url,checksum,size),asset_locations(location_id,locations(lat,lng,city,country)),asset_tags(tag,origin)"
+        "id,user_id,type,title,description,taken_at,uploaded_at,width,height,duration,favorite,asset_files(original_url,preview_url,medium_url,thumb_url,checksum,size),asset_locations(location_id,locations(lat,lng,city,country)),asset_tags(tag,origin)"
       )
       .eq("id", id)
       .maybeSingle();

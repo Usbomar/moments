@@ -213,6 +213,7 @@ function HomeContent() {
         tags: updated.tags,
         taken_at: updated.takenAt,
         favorite: updated.favorite,
+        color_hue: updated.colorHue ?? null,
         location: updated.location ?? null
       })
     });
@@ -232,6 +233,17 @@ function HomeContent() {
 
   const viewItems = useMemo(() => library, [library]);
   const viewerItems = useMemo(() => slideshowItems ?? viewItems, [slideshowItems, viewItems]);
+
+  const libraryTagSuggestions = useMemo(() => {
+    const s = new Set<string>();
+    for (const a of library) {
+      for (const t of a.tags ?? []) {
+        const n = String(t).trim().toLowerCase();
+        if (n) s.add(n);
+      }
+    }
+    return [...s].sort((a, b) => a.localeCompare(b, "ca"));
+  }, [library]);
 
   return (
     <>
@@ -325,6 +337,7 @@ function HomeContent() {
           <PhotoModal
             key={selectedAsset.id}
             asset={selectedAsset}
+            libraryTagSuggestions={libraryTagSuggestions}
             onClose={() => setSelectedAsset(null)}
             onSave={onPhotoSave}
           />

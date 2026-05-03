@@ -33,6 +33,8 @@ export interface Asset {
   peopleIds: string[];
   tags: string[];
   autoTags: string[];
+  /** To 0–359 per la vista per colors; `null` vol dir esborrar assignació (només des de l’editor). */
+  colorHue?: number | null;
   location?: LocationInfo;
   files: AssetFile;
 }

@@ -44,11 +44,57 @@ function clusterByArea(items: Asset[]): Cluster[] {
   return Array.from(grouped.values());
 }
 
+function thumbUrl(asset: Asset): string {
+  return (asset.files.thumbUrl || asset.files.previewUrl || asset.files.originalUrl).trim();
+}
+
+function buildClusterPopupContent(cluster: Cluster, onOpen: (a: Asset) => void): HTMLDivElement {
+  const wrap = document.createElement("div");
+  wrap.className = "map-cluster-popup-inner";
+
+  const title = document.createElement("strong");
+  title.textContent = cluster.city;
+  wrap.appendChild(title);
+
+  const count = document.createElement("div");
+  count.className = "map-cluster-popup-count";
+  count.textContent = `${cluster.items.length} foto(s) — clic a una miniatura per obrir-la`;
+  wrap.appendChild(count);
+
+  const sorted = [...cluster.items].sort((a, b) => Number(b.favorite) - Number(a.favorite)).slice(0, 5);
+  const thumbs = document.createElement("div");
+  thumbs.className = "map-cluster-popup-thumbs";
+  thumbs.setAttribute("role", "group");
+  thumbs.setAttribute("aria-label", "Fins a 5 miniatures (preferides primer)");
+
+  for (const asset of sorted) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "map-cluster-popup-thumb";
+    btn.title = asset.title;
+    btn.setAttribute("aria-label", `Obrir ${asset.title}`);
+    const img = document.createElement("img");
+    img.src = thumbUrl(asset);
+    img.alt = asset.title;
+    img.loading = "lazy";
+    btn.appendChild(img);
+    btn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      onOpen(asset);
+    });
+    thumbs.appendChild(btn);
+  }
+  wrap.appendChild(thumbs);
+  return wrap;
+}
+
 export function MapView({ items, onOpenViewer, onEditPhoto }: Props) {
   const clusters = useMemo(() => clusterByArea(items), [items]);
   const [selectedCluster, setSelectedCluster] = useState<Cluster | null>(null);
   const mapRootRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<LeafletMap | null>(null);
+  const onOpenViewerRef = useRef(onOpenViewer);
+  onOpenViewerRef.current = onOpenViewer;
 
   useEffect(() => {
     const root = mapRootRef.current;
@@ -79,8 +125,19 @@ export function MapView({ items, onOpenViewer, onEditPhoto }: Props) {
         fillColor: "#3b82f6",
         fillOpacity: 0.35
       }).addTo(map);
-      marker.bindPopup(`<strong>${cluster.city}</strong><div>${cluster.items.length} foto(s)</div>`);
-      marker.on("click", () => setSelectedCluster(cluster));
+
+      const popupContent = buildClusterPopupContent(cluster, (a) => {
+        onOpenViewerRef.current(a);
+        map.closePopup();
+      });
+      marker.bindPopup(popupContent, {
+        maxWidth: 320,
+        className: "map-cluster-popup-wrap",
+        closeButton: true
+      });
+      marker.on("popupopen", () => {
+        setSelectedCluster(cluster);
+      });
     });
   }, [clusters]);
 
@@ -104,7 +161,7 @@ export function MapView({ items, onOpenViewer, onEditPhoto }: Props) {
           />
         </section>
       ) : (
-        <p className="view-empty">Selecciona un marcador per veure les fotos d&apos;aquella zona.</p>
+        <p className="view-empty">Clica un marcador al mapa per veure les fotos d&apos;aquella zona (i miniatures al popup).</p>
       )}
     </div>
   );

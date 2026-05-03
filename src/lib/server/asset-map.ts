@@ -85,6 +85,7 @@ export function toAsset(row: {
   height: number;
   duration: number | null;
   favorite: boolean;
+  color_hue?: number | null;
   asset_files: AssetFilesNested;
   asset_locations: LocationNested;
   asset_tags: TagNested;
@@ -103,6 +104,9 @@ export function toAsset(row: {
     checksum: file?.checksum ?? "",
     size: file?.size ?? 0
   };
+  const ch = row.color_hue;
+  const colorHueProp =
+    typeof ch === "number" && Number.isFinite(ch) ? { colorHue: Math.min(359, Math.max(0, Math.round(ch))) } : {};
   return {
     id: row.id,
     userId: row.user_id,
@@ -119,6 +123,7 @@ export function toAsset(row: {
     peopleIds: [],
     tags,
     autoTags,
+    ...colorHueProp,
     location:
       location && location.city && location.country
         ? {

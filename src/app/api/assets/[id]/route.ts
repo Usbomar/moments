@@ -9,6 +9,8 @@ type PatchBody = {
   tags?: string[];
   taken_at?: string;
   favorite?: boolean;
+  /** 0–359 o null per esborrar l’assignació manual. */
+  color_hue?: number | null;
   location?: { lat: number; lng: number; city: string; country: string } | null;
 };
 
@@ -56,6 +58,15 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     if (typeof body.favorite === "boolean") {
       patch.favorite = body.favorite;
     }
+    if (body.color_hue !== undefined) {
+      if (body.color_hue === null) {
+        patch.color_hue = null;
+      } else if (typeof body.color_hue === "number" && Number.isFinite(body.color_hue)) {
+        patch.color_hue = Math.min(359, Math.max(0, Math.round(body.color_hue)));
+      } else {
+        return NextResponse.json({ error: "color_hue must be null or an integer 0–359" }, { status: 400 });
+      }
+    }
 
     const { error: updateErr } = await supabase.from("assets").update(patch).eq("id", id).eq("user_id", "u-1");
     if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
@@ -91,7 +102,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const { data: row, error: fetchErr } = await supabase
       .from("assets")
       .select(
-        "id,user_id,type,title,description,taken_at,uploaded_at,width,height,duration,favorite,asset_files(original_url,preview_url,medium_url,thumb_url,checksum,size),asset_locations(location_id,locations(lat,lng,city,country)),asset_tags(tag,origin)"
+        "id,user_id,type,title,description,taken_at,uploaded_at,width,height,duration,favorite,color_hue,asset_files(original_url,preview_url,medium_url,thumb_url,checksum,size),asset_locations(location_id,locations(lat,lng,city,country)),asset_tags(tag,origin)"
       )
       .eq("id", id)
       .maybeSingle();

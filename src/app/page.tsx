@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { assets } from "@/lib/mock-data";
 import { LibraryGrid } from "@/components/library-grid";
 import { FullscreenViewer } from "@/components/fullscreen-viewer";
 import type { MainNavTab } from "@/components/LeftNav";
@@ -71,8 +70,9 @@ function HomeContent() {
   const [imageEditorAsset, setImageEditorAsset] = useState<Asset | null>(null);
   const [mainTab, setMainTab] = useState<MainNavTab>("library");
   const [slideshowItems, setSlideshowItems] = useState<Asset[] | null>(null);
-  const [library, setLibrary] = useState<Asset[]>(assets);
+  const [library, setLibrary] = useState<Asset[]>([]);
   const [loadingLibrary, setLoadingLibrary] = useState(false);
+  const [libraryLoadError, setLibraryLoadError] = useState<string | null>(null);
   const [supabaseConfigured, setSupabaseConfigured] = useState<boolean | undefined>(undefined);
   const [missingEnv, setMissingEnv] = useState<string[]>([]);
   const refreshLibraryRef = useRef<() => Promise<void>>(async () => {});
@@ -81,6 +81,7 @@ function HomeContent() {
 
   const refreshLibrary = useCallback(async () => {
     setLoadingLibrary(true);
+    setLibraryLoadError(null);
     try {
       const params = new URLSearchParams();
       params.set("years", `${filters.year[0]}-${filters.year[1]}`);
@@ -96,11 +97,23 @@ function HomeContent() {
       }
 
       const response = await fetch(`/api/assets?${params.toString()}`, { cache: "no-store" });
-      if (!response.ok) return;
-      const body = (await response.json()) as { assets?: Asset[]; supabaseConfigured?: boolean };
-      if (body.supabaseConfigured === false) {
+      const body = (await response.json().catch(() => ({}))) as {
+        assets?: Asset[];
+        supabaseConfigured?: boolean;
+        error?: string;
+      };
+
+      if (!response.ok) {
+        setLibrary([]);
+        setLibraryLoadError(typeof body.error === "string" ? body.error : `Error ${response.status} en carregar la biblioteca`);
         return;
       }
+
+      if (body.supabaseConfigured === false) {
+        setLibrary([]);
+        return;
+      }
+
       const next = body.assets ?? [];
       setCached(cacheKey, next, 5 * 60 * 1000);
       setLibrary(next);
@@ -264,6 +277,21 @@ function HomeContent() {
                 missingEnv={missingEnv}
               />
               {loadingLibrary ? <p style={{ color: "var(--text-secondary)", marginTop: 12 }}>Actualitzant biblioteca…</p> : null}
+              {libraryLoadError ? (
+                <p className="modal-error" style={{ marginTop: 12 }} role="alert">
+                  {libraryLoadError}
+                  {" "}
+                  <span className="modal-muted">
+                    Sovint passa si falta una migració SQL (p. ex. columna <code>color_hue</code>) o credencials incorrectes.
+                  </span>
+                </p>
+              ) : null}
+              {!loadingLibrary && library.length === 0 && supabaseConfigured === true && !libraryLoadError ? (
+                <p className="modal-muted" style={{ marginTop: 12 }}>
+                  No hi ha fotos que coincideixin amb els filtres (o la biblioteca és buida). Prova d’eixamplar l’interval d’anys o
+                  neteja filtres.
+                </p>
+              ) : null}
               <ViewErrorBoundary label="Biblioteca">
                 <div style={{ marginTop: 16 }}>
                   {view === "timeline" ? (

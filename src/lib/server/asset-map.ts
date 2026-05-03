@@ -4,6 +4,7 @@ import type { Asset } from "@/lib/types";
 export type AssetFileRow = {
   original_url: string;
   preview_url: string;
+  medium_url?: string | null;
   thumb_url: string;
   checksum: string;
   size: number;
@@ -93,9 +94,11 @@ export function toAsset(row: {
   const tagRows = row.asset_tags ?? [];
   const tags = tagRows.filter((tag) => tag.origin === "manual").map((tag) => tag.tag);
   const autoTags = tagRows.filter((tag) => tag.origin === "auto").map((tag) => tag.tag);
+  const mediumRaw = file?.medium_url;
   const resultFiles = {
     originalUrl: file?.original_url ?? "",
     previewUrl: file?.preview_url ?? "",
+    ...(typeof mediumRaw === "string" && mediumRaw.trim() ? { mediumUrl: mediumRaw.trim() } : {}),
     thumbUrl: file?.thumb_url ?? "",
     checksum: file?.checksum ?? "",
     size: file?.size ?? 0

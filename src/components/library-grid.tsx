@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import type { CSSProperties } from "react";
 import type { Asset } from "@/lib/types";
+import { LazyImage } from "@/components/LazyImage";
 
 interface Props {
   items: Asset[];
@@ -41,6 +43,7 @@ function LibraryTile({
   onOpenViewer?: (a: Asset) => void;
 }) {
   const thumbUrl = asset.files.thumbUrl?.trim() ?? "";
+  const [imgBroken, setImgBroken] = useState(false);
 
   const handleClick = () => {
     if (onOpenViewer) {
@@ -54,11 +57,11 @@ function LibraryTile({
     onOpen?.(asset);
   };
 
-  if (!thumbUrl) {
+  if (!thumbUrl || imgBroken) {
     return (
       <button type="button" className="tile" onClick={handleClick}>
         <div style={placeholderStyle}>
-          <span style={{ fontWeight: 600, color: "var(--text, #151719)" }}>No image</span>
+          <span style={{ fontWeight: 600, color: "var(--text, #151719)" }}>{imgBroken ? "Could not load" : "No image"}</span>
           <span style={{ wordBreak: "break-word", maxWidth: "100%" }}>{asset.title}</span>
         </div>
         {asset.favorite ? <span className="badge">Favorite</span> : null}
@@ -68,41 +71,33 @@ function LibraryTile({
 
   return (
     <button type="button" className="tile" onClick={handleClick}>
-      <img
+      <LazyImage
+        fill
         src={thumbUrl}
         alt={asset.title}
-        loading="lazy"
-        decoding="async"
         referrerPolicy="no-referrer"
-        onError={(event) => {
-          event.currentTarget.style.display = "none";
-          const fallback = event.currentTarget.nextElementSibling as HTMLElement | null;
-          if (fallback) fallback.style.display = "flex";
-        }}
+        onError={() => setImgBroken(true)}
         style={{
-          position: "absolute",
-          inset: 0,
-          width: "100%",
-          height: "100%",
-          objectFit: "cover",
           transition: "opacity 180ms ease"
         }}
       />
-      <div style={{ ...placeholderStyle, display: "none" }}>
-        <span style={{ fontWeight: 600, color: "var(--text, #151719)" }}>Could not load</span>
-        <span style={{ wordBreak: "break-word", maxWidth: "100%" }}>{asset.title}</span>
-      </div>
       {asset.favorite ? <span className="badge">Favorite</span> : null}
     </button>
   );
 }
 
-/** Grid of thumbnails with loading gradient, empty URL guard, and onError fallback (soft boundary). */
+/** Grid of thumbnails with lazy viewport loading, gradient fallback, and onError soft boundary. */
 export function LibraryGrid({ items, onOpen, onOpenModal, onOpenViewer }: Props) {
   return (
     <div className="grid">
       {items.map((asset) => (
-        <LibraryTile key={asset.id} asset={asset} onOpen={onOpen} onOpenModal={onOpenModal} onOpenViewer={onOpenViewer} />
+        <LibraryTile
+          key={`${asset.id}:${asset.files.thumbUrl ?? ""}`}
+          asset={asset}
+          onOpen={onOpen}
+          onOpenModal={onOpenModal}
+          onOpenViewer={onOpenViewer}
+        />
       ))}
     </div>
   );

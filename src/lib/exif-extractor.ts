@@ -1,5 +1,11 @@
 import piexif from "piexifjs";
 
+/**
+ * Les dades EXIF es llegeixen del buffer original abans de la pujada.
+ * A `/api/upload`, les imatges es re-codifiquen a WebP amb Sharp (per defecte sense EXIF als derivats);
+ * la data i GPS es poden persistir a la base de dades via aquest extractor abans de la pèrdua als píxels.
+ */
+
 /** Shape returned by `piexif.load` (JPEG). */
 type LoadedExif = ReturnType<typeof piexif.load>;
 

@@ -115,6 +115,11 @@ export async function makePreviewWebp(buffer: Buffer, maxEdge: number, quality: 
     .toBuffer();
 }
 
+/** Derivada ~800px per visors / zoom (mateix pipeline que preview amb altre costat). */
+export async function makeMediumWebp(buffer: Buffer, maxEdge: number, quality: number): Promise<Buffer> {
+  return makePreviewWebp(buffer, maxEdge, quality);
+}
+
 export async function makeThumbWebp(buffer: Buffer, edge: number, quality: number): Promise<Buffer> {
   return sharp(buffer, { failOn: "none" })
     .resize({ width: edge, height: edge, fit: "cover" })

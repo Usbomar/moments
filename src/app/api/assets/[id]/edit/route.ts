@@ -8,7 +8,12 @@ import {
   type EditOperation,
   type ExportOptions
 } from "@/lib/image-edit-ops";
-import { applyImageOperationsToBuffer, makePreviewWebp, makeThumbWebp } from "@/lib/server/apply-image-operations";
+import {
+  applyImageOperationsToBuffer,
+  makeMediumWebp,
+  makePreviewWebp,
+  makeThumbWebp
+} from "@/lib/server/apply-image-operations";
 import { pickFirstAssetFile, toAsset } from "@/lib/server/asset-map";
 import { extractStoragePath, generateSignedUrls } from "@/lib/server/storage-utils";
 import { objectPathFromSignedUrl } from "@/lib/server/signed-url-path";
@@ -83,7 +88,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const { data: row, error: rowErr } = await supabase
       .from("assets")
       .select(
-        "id,user_id,type,title,description,taken_at,uploaded_at,width,height,duration,favorite,asset_files(original_url,preview_url,thumb_url,checksum,size),asset_locations(location_id,locations(lat,lng,city,country)),asset_tags(tag,origin)"
+        "id,user_id,type,title,description,taken_at,uploaded_at,width,height,duration,favorite,asset_files(original_url,preview_url,medium_url,thumb_url,checksum,size),asset_locations(location_id,locations(lat,lng,city,country)),asset_tags(tag,origin)"
       )
       .eq("id", id)
       .maybeSingle();
@@ -104,22 +109,25 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 
     const originalUrl = fileRow.original_url.trim();
     const previewUrl = typeof fileRow.preview_url === "string" ? fileRow.preview_url.trim() : "";
+    const mediumUrlStr = typeof fileRow.medium_url === "string" ? fileRow.medium_url.trim() : "";
     const thumbUrl = typeof fileRow.thumb_url === "string" ? fileRow.thumb_url.trim() : "";
 
     let originalPath = objectPathFromSignedUrl(originalUrl);
     let previewPath = objectPathFromSignedUrl(previewUrl);
+    let mediumPath = mediumUrlStr ? objectPathFromSignedUrl(mediumUrlStr) : null;
     let thumbPath = objectPathFromSignedUrl(thumbUrl);
-    if (!originalPath || !previewPath || !thumbPath) {
+    if (!originalPath || !previewPath || !thumbPath || !mediumPath) {
       try {
         const paths = extractStoragePath(row.title || "photo.jpg", fileRow.checksum);
         originalPath = originalPath ?? paths.original;
         previewPath = previewPath ?? paths.preview;
+        mediumPath = mediumPath ?? paths.medium;
         thumbPath = thumbPath ?? paths.thumb;
       } catch {
         /* ignore */
       }
     }
-    if (!originalPath || !previewPath || !thumbPath) {
+    if (!originalPath || !previewPath || !thumbPath || !mediumPath) {
       return NextResponse.json({ error: "Could not resolve storage paths from URLs" }, { status: 500 });
     }
 
@@ -153,6 +161,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     }
     const originalWebp = await outSharp.webp({ quality: exportOpts.webpQuality }).toBuffer();
     const previewBuf = await makePreviewWebp(originalWebp, 1600, 80);
+    const mediumBuf = await makeMediumWebp(originalWebp, 800, 78);
     const thumbBuf = await makeThumbWebp(originalWebp, 480, 72);
 
     const checksum = crypto.createHash("sha256").update(originalWebp).digest("hex");
@@ -170,6 +179,12 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     });
     if (upPrev) return NextResponse.json({ error: upPrev.message }, { status: 500 });
 
+    const { error: upMed } = await supabase.storage.from(bucket).upload(mediumPath, mediumBuf, {
+      contentType: "image/webp",
+      upsert: true
+    });
+    if (upMed) return NextResponse.json({ error: upMed.message }, { status: 500 });
+
     const { error: upThumb } = await supabase.storage.from(bucket).upload(thumbPath, thumbBuf, {
       contentType: "image/webp",
       upsert: true
@@ -178,7 +193,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 
     const signed = await generateSignedUrls(
       bucket,
-      { original: originalPath, preview: previewPath, thumb: thumbPath },
+      { original: originalPath, preview: previewPath, medium: mediumPath, thumb: thumbPath },
       SIGNED_URL_TTL
     );
 
@@ -199,6 +214,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       .update({
         original_url: signed.originalUrl,
         preview_url: signed.previewUrl,
+        medium_url: signed.mediumUrl,
         thumb_url: signed.thumbUrl,
         checksum,
         size
@@ -209,7 +225,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const { data: fresh, error: freshErr } = await supabase
       .from("assets")
       .select(
-        "id,user_id,type,title,description,taken_at,uploaded_at,width,height,duration,favorite,asset_files(original_url,preview_url,thumb_url,checksum,size),asset_locations(location_id,locations(lat,lng,city,country)),asset_tags(tag,origin)"
+        "id,user_id,type,title,description,taken_at,uploaded_at,width,height,duration,favorite,asset_files(original_url,preview_url,medium_url,thumb_url,checksum,size),asset_locations(location_id,locations(lat,lng,city,country)),asset_tags(tag,origin)"
       )
       .eq("id", id)
       .maybeSingle();

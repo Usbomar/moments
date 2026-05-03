@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Asset } from "@/lib/types";
 import { loadCollections, saveCollections, type StoredCollection } from "@/lib/collections-storage";
+import { LazyImage } from "@/components/LazyImage";
 
 function newId(): string {
   return typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `c-${Date.now()}`;
@@ -104,12 +105,13 @@ export function Collections({ items }: Props) {
           {visibleAssets.length ? (
             <div className="collections-grid">
               {visibleAssets.map((a) => {
-                const url = (a.files.previewUrl || a.files.originalUrl).trim();
+                const url = (a.files.thumbUrl || a.files.previewUrl || a.files.originalUrl).trim();
                 return (
                   <figure key={a.id} className="collection-card">
                     {url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={url} alt={a.title} referrerPolicy="no-referrer" />
+                      <div className="collection-card-media">
+                        <LazyImage fill src={url} alt={a.title} referrerPolicy="no-referrer" className="collection-card-img" />
+                      </div>
                     ) : (
                       <div className="collection-card-placeholder">Sense imatge</div>
                     )}
@@ -126,13 +128,14 @@ export function Collections({ items }: Props) {
         <div className="collections-grid">
           {collections.map((c) => {
             const cover = c.coverAssetId ? assetById.get(c.coverAssetId) : null;
-            const coverUrl = cover ? (cover.files.previewUrl || cover.files.originalUrl).trim() : "";
+            const coverUrl = cover ? (cover.files.thumbUrl || cover.files.previewUrl || cover.files.originalUrl).trim() : "";
             return (
               <article key={c.id} className="collection-card collection-card--interactive">
                 <button type="button" className="collection-card-hit" onClick={() => setViewId(c.id)} aria-label={`Obrir ${c.name}`}>
                   {coverUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={coverUrl} alt="" referrerPolicy="no-referrer" />
+                    <div className="collection-card-media collection-card-media--hit">
+                      <LazyImage fill src={coverUrl} alt="" referrerPolicy="no-referrer" className="collection-card-hit-img" />
+                    </div>
                   ) : (
                     <div className="collection-card-placeholder">{c.name.slice(0, 1).toUpperCase()}</div>
                   )}

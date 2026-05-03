@@ -164,6 +164,19 @@ button.active {
   border-color: #2563d4;
 }
 
+.tab-async-loading {
+  padding: 20px 8px;
+  color: var(--muted);
+}
+
+.view-error-fallback {
+  padding: 20px 16px;
+  border: 1px solid #e8c4c4;
+  border-radius: 12px;
+  background: #fff8f8;
+  max-width: 520px;
+}
+
 .timeline-group {
   margin-bottom: 22px;
 }
@@ -548,6 +561,10 @@ button.danger {
   background: #fff;
 }
 
+.collection-card figure {
+  margin: 0;
+}
+
 .collection-card--interactive {
   padding: 0;
 }
@@ -561,11 +578,20 @@ button.danger {
   background: #f3f5f7;
 }
 
-.collection-card img {
+.collection-card-media {
+  position: relative;
   width: 100%;
   aspect-ratio: 4 / 3;
-  object-fit: cover;
+  background: #eef1f5;
+}
+
+.collection-card-media--hit {
   display: block;
+}
+
+.collection-card .collection-card-img img,
+.collection-card .collection-card-hit-img img {
+  object-fit: cover;
 }
 
 .collection-card-placeholder {
@@ -638,11 +664,15 @@ button.danger {
   background: #f3f5f7;
 }
 
-.memory-card-visual img {
+.memory-card-media {
+  position: relative;
   width: 100%;
   aspect-ratio: 16 / 10;
+  background: #eef1f5;
+}
+
+.memory-card-visual .memory-card-img img {
   object-fit: cover;
-  display: block;
 }
 
 .memory-card-placeholder {

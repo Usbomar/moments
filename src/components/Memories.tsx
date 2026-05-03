@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo } from "react";
 import type { Asset } from "@/lib/types";
+import { LazyImage } from "@/components/LazyImage";
 
 export type MemoryCard = {
   id: string;
@@ -102,13 +103,16 @@ export function Memories({ items, onView }: Props) {
   return (
     <div className="memories-grid">
       {memories.map((m) => {
-        const url = m.preview ? (m.preview.files.previewUrl || m.preview.files.originalUrl).trim() : "";
+        const url = m.preview
+          ? (m.preview.files.thumbUrl || m.preview.files.mediumUrl || m.preview.files.previewUrl || m.preview.files.originalUrl).trim()
+          : "";
         return (
           <article key={m.id} className="memory-card">
             <div className="memory-card-visual">
               {url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={url} alt="" referrerPolicy="no-referrer" />
+                <div className="memory-card-media">
+                  <LazyImage fill src={url} alt="" referrerPolicy="no-referrer" className="memory-card-img" />
+                </div>
               ) : (
                 <div className="memory-card-placeholder">—</div>
               )}

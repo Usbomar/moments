@@ -91,7 +91,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const { data: row, error: fetchErr } = await supabase
       .from("assets")
       .select(
-        "id,user_id,type,title,description,taken_at,uploaded_at,width,height,duration,favorite,asset_files(original_url,preview_url,thumb_url,checksum,size),asset_locations(location_id,locations(lat,lng,city,country)),asset_tags(tag,origin)"
+        "id,user_id,type,title,description,taken_at,uploaded_at,width,height,duration,favorite,asset_files(original_url,preview_url,medium_url,thumb_url,checksum,size),asset_locations(location_id,locations(lat,lng,city,country)),asset_tags(tag,origin)"
       )
       .eq("id", id)
       .maybeSingle();

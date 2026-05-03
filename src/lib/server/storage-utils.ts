@@ -9,17 +9,19 @@ const MIN_SIGNED_URL_LENGTH = 120;
 export type StoragePaths = {
   original: string;
   preview: string;
+  medium: string;
   thumb: string;
 };
 
 export type SignedUrls = {
   originalUrl: string;
   previewUrl: string;
+  mediumUrl: string;
   thumbUrl: string;
 };
 
 /**
- * Creates signed URLs for three object keys in the same bucket.
+ * Creates signed URLs for object keys in the same bucket.
  * Throws if any signing step fails (caller maps to HTTP 500).
  */
 export async function generateSignedUrls(
@@ -32,6 +34,7 @@ export async function generateSignedUrls(
   const tasks = [
     { key: "original" as const, objectPath: paths.original },
     { key: "preview" as const, objectPath: paths.preview },
+    { key: "medium" as const, objectPath: paths.medium },
     { key: "thumb" as const, objectPath: paths.thumb }
   ];
 
@@ -49,13 +52,14 @@ export async function generateSignedUrls(
   );
 
   const byKey = Object.fromEntries(signed.map((s) => [s.key, s.url])) as Record<
-    "original" | "preview" | "thumb",
+    "original" | "preview" | "medium" | "thumb",
     string
   >;
 
   return {
     originalUrl: byKey.original,
     previewUrl: byKey.preview,
+    mediumUrl: byKey.medium,
     thumbUrl: byKey.thumb
   };
 }
@@ -99,6 +103,7 @@ export function extractStoragePath(fileName: string, checksum: string): StorageP
   return {
     original: `original/${hash}-${safeName}`,
     preview: `preview/${hash}.webp`,
+    medium: `medium/${hash}.webp`,
     thumb: `thumb/${hash}.webp`
   };
 }

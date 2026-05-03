@@ -40,6 +40,7 @@ export const assets: Asset[] = Array.from({ length: 120 }, (_, i) => {
     files: {
       originalUrl: `https://picsum.photos/id/${(i % 90) + 10}/2000/1400`,
       previewUrl: `https://picsum.photos/id/${(i % 90) + 10}/1200/800`,
+      mediumUrl: `https://picsum.photos/id/${(i % 90) + 10}/800/600`,
       thumbUrl: `https://picsum.photos/id/${(i % 90) + 10}/500/500`,
       size: 200_000,
       checksum: `chk-${id}`

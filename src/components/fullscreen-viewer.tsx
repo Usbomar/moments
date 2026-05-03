@@ -50,7 +50,7 @@ export function FullscreenViewer({ items, selectedId, onClose, onSelect, onEditD
 
   if (!current) return null;
 
-  const previewUrl = current.files.previewUrl?.trim() ?? "";
+  const previewUrl = (current.files.mediumUrl || current.files.previewUrl)?.trim() ?? "";
 
   return (
     <div className="viewer" onClick={onClose}>

@@ -70,12 +70,15 @@ export function SliderView({ items, onEditPhoto, onOpenViewer }: Props) {
         onClick={(e) => e.stopPropagation()}
         style={{ transition: "opacity 260ms ease, transform 260ms ease" }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element -- signed URLs / external storage */}
+        {/* eslint-disable-next-line @next/next/no-img-element -- URL signades / emmagatzematge */}
         <img
           className="viewer-media"
-          src={current.files.previewUrl || current.files.originalUrl}
+          src={(current.files.mediumUrl || current.files.previewUrl || current.files.originalUrl).trim()}
           alt={current.title}
           referrerPolicy="no-referrer"
+          loading="eager"
+          decoding="async"
+          fetchPriority="high"
           style={{ cursor: "pointer" }}
           onClick={() => onEditPhoto(current)}
         />

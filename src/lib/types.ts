@@ -3,6 +3,8 @@ export type MediaType = "photo" | "video";
 export interface AssetFile {
   originalUrl: string;
   previewUrl: string;
+  /** ~800px WebP per visors; buit en assets antics sense migració. */
+  mediumUrl?: string;
   thumbUrl: string;
   size: number;
   checksum: string;

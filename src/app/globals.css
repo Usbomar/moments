@@ -152,6 +152,44 @@ button.active {
   width: min(95vw, 1100px);
 }
 
+/* Slider: imatge i barra de controls en blocs separats (res de controls sobre la foto) */
+.slider-view-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+}
+
+.slider-view-stack.viewer-inner {
+  width: min(95vw, 1100px);
+}
+
+.slider-view-media-box {
+  width: 100%;
+  flex: 0 0 auto;
+}
+
+.slider-view-toolbar {
+  flex-shrink: 0;
+}
+
+.slider-view-speed {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.slider-view-speed--fs {
+  color: #e6eaf0;
+  font-size: 14px;
+}
+
+.slider-view-speed--fs select {
+  background: rgba(255, 255, 255, 0.1);
+  color: #f0f3f8;
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
 .viewer-media {
   width: 100%;
   border-radius: 0;
@@ -812,6 +850,8 @@ button.danger {
 
 .collection-card--interactive {
   padding: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .collection-card-media-wrap {
@@ -856,8 +896,6 @@ button.danger {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  /* espai per al ▶ inferior dreta sense tapar el títol */
-  padding-right: 40px;
 }
 
 .collection-card-title {
@@ -876,65 +914,38 @@ button.danger {
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
 }
 
-.collection-card-tools {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  z-index: 4;
+.collection-card-bar {
+  flex-shrink: 0;
+  padding: 8px 10px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+
+.collection-card-bar-actions {
   display: flex;
-  gap: 4px;
+  align-items: center;
+  gap: 6px;
 }
 
-.collection-card-play {
-  position: absolute;
-  right: 8px;
-  bottom: 8px;
-  z-index: 4;
+.collection-card-bar-fill {
+  flex: 1;
+  min-width: 4px;
 }
 
-.collection-card-play-btn {
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
-  background: rgba(0, 0, 0, 0.45) !important;
-  color: #fff !important;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-}
-
-.collection-card-play-btn:hover:not(:disabled) {
-  background: rgba(0, 0, 0, 0.65) !important;
-  color: #fff !important;
-}
-
-.collection-card-play-btn:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-
-.collection-card-rename {
-  position: absolute;
-  inset: 0;
-  z-index: 5;
+.collection-card-edit-row {
   display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: 10px;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(4px);
+  align-items: center;
+  gap: 8px;
 }
 
 .collection-card-rename-input {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   padding: 8px 10px;
   font-size: 15px;
   border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--bg-primary);
-}
-
-.collection-card-rename-tools {
-  display: flex;
-  gap: 6px;
-  margin-top: 8px;
-  justify-content: flex-end;
 }
 
 .btn.btn-icon.btn-sm {

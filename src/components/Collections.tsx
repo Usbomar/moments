@@ -185,8 +185,20 @@ export function Collections({ items, onPlaySlideshow }: Props) {
                     )}
                   </button>
 
+                  {!isEditing ? (
+                    <>
+                      <div className="collection-card-vignette" aria-hidden />
+                      <div className="collection-card-label">
+                        <span className="collection-card-title">{c.name}</span>
+                        <span className="collection-card-count">{c.assetIds.length} fotos</span>
+                      </div>
+                    </>
+                  ) : null}
+                </div>
+
+                <div className="collection-card-bar">
                   {isEditing ? (
-                    <div className="collection-card-rename" onMouseDown={(e) => e.stopPropagation()}>
+                    <div className="collection-card-edit-row">
                       <input
                         value={editingName}
                         onChange={(e) => setEditingName(e.target.value)}
@@ -198,58 +210,44 @@ export function Collections({ items, onPlaySlideshow }: Props) {
                         aria-label="Nou nom de la col·lecció"
                         autoFocus
                       />
-                      <div className="collection-card-rename-tools">
-                        <button
-                          type="button"
-                          className="btn btn-icon btn-sm"
-                          aria-label="Desar nom"
-                          title="Desar"
-                          onClick={handleRenameCommit}
-                        >
-                          <span aria-hidden>✓</span>
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-icon btn-sm"
-                          aria-label="Cancel·lar"
-                          title="Cancel·lar"
-                          onClick={() => setEditingId(null)}
-                        >
-                          <span aria-hidden>×</span>
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="collection-card-vignette" aria-hidden />
-                      <div className="collection-card-label">
-                        <span className="collection-card-title">{c.name}</span>
-                        <span className="collection-card-count">{c.assetIds.length} fotos</span>
-                      </div>
-                    </>
-                  )}
-
-                  {!isEditing && onPlaySlideshow ? (
-                    <div className="collection-card-play">
                       <button
                         type="button"
-                        className="btn btn-icon btn-sm collection-card-play-btn"
-                        aria-label={`Presentació: ${c.name}`}
-                        title="Presentació d’aquesta col·lecció"
-                        disabled={slideAssets.length === 0}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          onPlaySlideshow(slideAssets);
-                        }}
+                        className="btn btn-icon btn-sm"
+                        aria-label="Desar nom"
+                        title="Desar"
+                        onClick={handleRenameCommit}
                       >
-                        <span aria-hidden>▶</span>
+                        <span aria-hidden>✓</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-icon btn-sm"
+                        aria-label="Cancel·lar"
+                        title="Cancel·lar"
+                        onClick={() => setEditingId(null)}
+                      >
+                        <span aria-hidden>×</span>
                       </button>
                     </div>
-                  ) : null}
-
-                  {!isEditing ? (
-                    <div className="collection-card-tools">
+                  ) : (
+                    <div className="collection-card-bar-actions">
+                      {onPlaySlideshow ? (
+                        <button
+                          type="button"
+                          className="btn btn-icon btn-sm"
+                          aria-label={`Presentació: ${c.name}`}
+                          title="Presentació d’aquesta col·lecció"
+                          disabled={slideAssets.length === 0}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onPlaySlideshow(slideAssets);
+                          }}
+                        >
+                          <span aria-hidden>▶</span>
+                        </button>
+                      ) : null}
+                      <span className="collection-card-bar-fill" aria-hidden />
                       <button
                         type="button"
                         className="btn btn-icon btn-sm"
@@ -269,7 +267,7 @@ export function Collections({ items, onPlaySlideshow }: Props) {
                         <span aria-hidden>🗑</span>
                       </button>
                     </div>
-                  ) : null}
+                  )}
                 </div>
               </article>
             );

@@ -59,55 +59,64 @@ export function SliderView({ items, onEditPhoto, onOpenViewer }: Props) {
 
   if (!current) return null;
 
+  const btnClass = fullscreen ? "viewer-toolbar-btn" : undefined;
+  const toolbarClass = fullscreen ? "viewer-toolbar slider-view-toolbar" : "controls slider-view-toolbar";
+
   return (
     <section
       className={fullscreen ? "viewer" : "view-panel"}
       onClick={() => setFullscreen(false)}
     >
       <div
-        className={fullscreen ? "viewer-inner" : ""}
+        className={`slider-view-stack ${fullscreen ? "viewer-inner" : ""}`}
         onClick={(e) => e.stopPropagation()}
         style={{ transition: "opacity 260ms ease, transform 260ms ease" }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element -- URL signades / emmagatzematge */}
-        <img
-          className="viewer-media"
-          src={(current.files.mediumUrl || current.files.previewUrl || current.files.originalUrl).trim()}
-          alt={current.title}
-          referrerPolicy="no-referrer"
-          loading="eager"
-          decoding="async"
-          fetchPriority="high"
-          style={{ cursor: "pointer" }}
-          onClick={() => onEditPhoto(current)}
-        />
-        <div className="controls" style={{ marginTop: 12, justifyContent: "center" }}>
-          <button type="button" onClick={() => setIndex((prev) => (prev - 1 + items.length) % items.length)}>
-            Prev
+        <div className="slider-view-media-box">
+          {/* eslint-disable-next-line @next/next/no-img-element -- URL signades / emmagatzematge */}
+          <img
+            className="viewer-media"
+            src={(current.files.mediumUrl || current.files.previewUrl || current.files.originalUrl).trim()}
+            alt={current.title}
+            referrerPolicy="no-referrer"
+            loading="eager"
+            decoding="async"
+            fetchPriority="high"
+            style={{ cursor: "pointer", display: "block" }}
+            onClick={() => onEditPhoto(current)}
+          />
+        </div>
+        <div className={toolbarClass} role="toolbar" aria-label="Controls del slider">
+          <button
+            type="button"
+            className={btnClass}
+            onClick={() => setIndex((prev) => (prev - 1 + items.length) % items.length)}
+          >
+            Anterior
           </button>
-          <button type="button" onClick={() => setPlaying((prev) => !prev)}>
-            {playing ? "Pause" : "Play"}
+          <button type="button" className={btnClass} onClick={() => setPlaying((prev) => !prev)}>
+            {playing ? "Pausa" : "Reprodueix"}
           </button>
-          <button type="button" onClick={() => setIndex((prev) => (prev + 1) % items.length)}>
-            Next
+          <button type="button" className={btnClass} onClick={() => setIndex((prev) => (prev + 1) % items.length)}>
+            Següent
           </button>
           {onOpenViewer ? (
-            <button type="button" onClick={() => onOpenViewer(current)}>
+            <button type="button" className={btnClass} onClick={() => onOpenViewer(current)}>
               Presentació
             </button>
           ) : null}
-          <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            Speed
+          <label className={fullscreen ? "slider-view-speed slider-view-speed--fs" : "slider-view-speed"}>
+            <span>Interval</span>
             <select value={speedMs} onChange={(e) => setSpeedMs(Number(e.target.value))}>
-              <option value={1500}>1.5s</option>
-              <option value={2400}>2.4s</option>
-              <option value={4000}>4s</option>
-              <option value={6000}>6s</option>
+              <option value={1500}>1,5 s</option>
+              <option value={2400}>2,4 s</option>
+              <option value={4000}>4 s</option>
+              <option value={6000}>6 s</option>
             </select>
           </label>
           {!fullscreen ? (
-            <button type="button" onClick={() => setFullscreen(true)}>
-              Fullscreen
+            <button type="button" className={btnClass} onClick={() => setFullscreen(true)}>
+              Pantalla completa
             </button>
           ) : null}
         </div>

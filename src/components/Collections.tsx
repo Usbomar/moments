@@ -157,6 +157,7 @@ export function Collections({ items, onPlaySlideshow }: Props) {
             const cover = c.coverAssetId ? assetById.get(c.coverAssetId) : null;
             const coverUrl = cover ? (cover.files.thumbUrl || cover.files.previewUrl || cover.files.originalUrl).trim() : "";
             const isEditing = editingId === c.id;
+            const slideAssets = c.assetIds.map((id) => assetById.get(id)).filter((a): a is Asset => a != null);
 
             return (
               <article key={c.id} className="collection-card collection-card--interactive">
@@ -227,6 +228,25 @@ export function Collections({ items, onPlaySlideshow }: Props) {
                       </div>
                     </>
                   )}
+
+                  {!isEditing && onPlaySlideshow ? (
+                    <div className="collection-card-play">
+                      <button
+                        type="button"
+                        className="btn btn-icon btn-sm collection-card-play-btn"
+                        aria-label={`Presentació: ${c.name}`}
+                        title="Presentació d’aquesta col·lecció"
+                        disabled={slideAssets.length === 0}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onPlaySlideshow(slideAssets);
+                        }}
+                      >
+                        <span aria-hidden>▶</span>
+                      </button>
+                    </div>
+                  ) : null}
 
                   {!isEditing ? (
                     <div className="collection-card-tools">

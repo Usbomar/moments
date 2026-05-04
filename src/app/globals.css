@@ -856,6 +856,8 @@ button.danger {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  /* espai per al ▶ inferior dreta sense tapar el títol */
+  padding-right: 40px;
 }
 
 .collection-card-title {
@@ -881,6 +883,30 @@ button.danger {
   z-index: 4;
   display: flex;
   gap: 4px;
+}
+
+.collection-card-play {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 4;
+}
+
+.collection-card-play-btn {
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+  background: rgba(0, 0, 0, 0.45) !important;
+  color: #fff !important;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.collection-card-play-btn:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.65) !important;
+  color: #fff !important;
+}
+
+.collection-card-play-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
 .collection-card-rename {

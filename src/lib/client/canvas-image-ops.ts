@@ -193,6 +193,22 @@ export function applyOperationsToCanvas(source: CanvasPipelineSource, ops: EditO
         ctx = c2;
         break;
       }
+      case "adjustmentBatch": {
+        const sub: EditOperation[] = [];
+        if (op.brightness !== 0) sub.push({ type: "brightness", value: op.brightness });
+        if (op.contrast !== 0) sub.push({ type: "contrast", value: op.contrast });
+        if (op.saturation !== 0) sub.push({ type: "saturation", value: op.saturation });
+        if (op.blur !== 0) sub.push({ type: "blur", value: op.blur });
+        if (op.sharpen !== 0) sub.push({ type: "sharpen", value: op.sharpen });
+        if (sub.length === 0) break;
+        const merged = applyOperationsToCanvas(canvas, sub);
+        canvas = merged;
+        w = merged.width;
+        h = merged.height;
+        ctx = merged.getContext("2d");
+        if (!ctx) throw new Error("Canvas 2D no disponible");
+        break;
+      }
       case "autoEnhance": {
         let work = canvas;
         let sw = w;

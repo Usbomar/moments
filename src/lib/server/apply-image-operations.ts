@@ -80,6 +80,35 @@ export async function applyImageOperationsToBuffer(input: Buffer, operations: Ed
         }
         break;
       }
+      case "adjustmentBatch": {
+        if (op.brightness !== 0) {
+          const b = clamp(1 + op.brightness / 100, 0.2, 2.5);
+          pipeline = pipeline.modulate({ brightness: b });
+        }
+        if (op.contrast !== 0) {
+          const c = clamp(op.contrast / 100, -0.95, 0.95);
+          const a = 1 + c;
+          const bLin = 128 * (1 - a);
+          pipeline = pipeline.linear(a, bLin);
+        }
+        if (op.saturation !== 0) {
+          const s = clamp(1 + op.saturation / 100, 0, 3);
+          pipeline = pipeline.modulate({ saturation: s });
+        }
+        if (op.blur !== 0) {
+          const sigma = clamp(op.blur / 3, 0, 6.5);
+          if (sigma > 0.01) {
+            pipeline = pipeline.blur(sigma);
+          }
+        }
+        if (op.sharpen !== 0) {
+          const sigma = clamp(op.sharpen / 80, 0, 3);
+          if (sigma > 0.01) {
+            pipeline = pipeline.sharpen({ sigma, m1: 1, m2: 2, x1: 2, y2: 10, y3: 20 });
+          }
+        }
+        break;
+      }
       case "autoEnhance": {
         const meta = await pipeline.metadata();
         const mw = meta.width ?? 0;

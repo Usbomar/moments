@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { LibraryGrid } from "@/components/library-grid";
 import { FullscreenViewer } from "@/components/fullscreen-viewer";
+import { FadingSlideshow } from "@/components/FadingSlideshow";
 import type { MainNavTab } from "@/components/LeftNav";
 import type { Asset } from "@/lib/types";
 import { UploadDropzone } from "@/components/upload-dropzone";
@@ -70,6 +71,7 @@ function HomeContent() {
   const [imageEditorAsset, setImageEditorAsset] = useState<Asset | null>(null);
   const [mainTab, setMainTab] = useState<MainNavTab>("library");
   const [slideshowItems, setSlideshowItems] = useState<Asset[] | null>(null);
+  const [collectionSlideshow, setCollectionSlideshow] = useState<Asset[] | null>(null);
   const [library, setLibrary] = useState<Asset[]>([]);
   const [loadingLibrary, setLoadingLibrary] = useState(false);
   const [libraryLoadError, setLibraryLoadError] = useState<string | null>(null);
@@ -162,8 +164,16 @@ function HomeContent() {
 
   const onCollectionSlideshow = useCallback((assets: Asset[]) => {
     if (!assets.length) return;
-    setSlideshowItems(assets);
-    setSelectedId(assets[0]!.id);
+    setSelectedId(null);
+    setSlideshowItems(null);
+    setCollectionSlideshow(assets);
+  }, []);
+
+  const openDetailsFromCollectionSlideshow = useCallback((asset: Asset) => {
+    setCollectionSlideshow(null);
+    setSelectedId(null);
+    setSlideshowItems(null);
+    setSelectedAsset(asset);
   }, []);
 
   const onViewerClose = useCallback(() => {
@@ -171,7 +181,7 @@ function HomeContent() {
     setSlideshowItems(null);
   }, []);
 
-  const modalOpen = !!(selectedAsset || imageEditorAsset || selectedId);
+  const modalOpen = !!(selectedAsset || imageEditorAsset || selectedId || (collectionSlideshow?.length ?? 0) > 0);
 
   const onModalEscape = useCallback(() => {
     if (imageEditorAsset) return;
@@ -179,10 +189,14 @@ function HomeContent() {
       setSelectedAsset(null);
       return;
     }
+    if (collectionSlideshow?.length) {
+      setCollectionSlideshow(null);
+      return;
+    }
     if (selectedId) {
       onViewerClose();
     }
-  }, [imageEditorAsset, selectedAsset, selectedId, onViewerClose]);
+  }, [imageEditorAsset, selectedAsset, selectedId, collectionSlideshow, onViewerClose]);
 
   useKeyboardShortcuts({
     searchInputRef: searchRef,
@@ -369,6 +383,16 @@ function HomeContent() {
         onEditDetails={openDetailsEditorFromViewer}
         onEditImage={openImageEditorFromViewer}
       />
+
+      {collectionSlideshow?.length ? (
+        <ViewErrorBoundary label="Presentació col·lecció">
+          <FadingSlideshow
+            items={collectionSlideshow}
+            onClose={() => setCollectionSlideshow(null)}
+            onEditDetails={openDetailsFromCollectionSlideshow}
+          />
+        </ViewErrorBoundary>
+      ) : null}
 
       {selectedAsset ? (
         <ViewErrorBoundary label="Editor de dades">

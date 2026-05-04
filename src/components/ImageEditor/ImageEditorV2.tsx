@@ -6,7 +6,6 @@ import {
   type ReactNode,
   useCallback,
   useEffect,
-  useId,
   useMemo,
   useReducer,
   useRef,
@@ -15,6 +14,38 @@ import {
 import type { Asset } from "@/lib/types";
 import { analyzeHistogram, applyOperationsToCanvas } from "@/lib/client/canvas-image-ops";
 import { MAX_EDIT_HISTORY_CLIENT, type EditOperation, type ExportOptions } from "@/lib/image-edit-ops";
+
+type AdjustmentDraft = {
+  brightness: number;
+  contrast: number;
+  saturation: number;
+  blur: number;
+  sharpen: number;
+};
+
+const INITIAL_ADJUSTMENT_DRAFT: AdjustmentDraft = {
+  brightness: 0,
+  contrast: 0,
+  saturation: 0,
+  blur: 0,
+  sharpen: 0
+};
+
+function draftHasValues(d: AdjustmentDraft): boolean {
+  return d.brightness !== 0 || d.contrast !== 0 || d.saturation !== 0 || d.blur !== 0 || d.sharpen !== 0;
+}
+
+function draftToPreviewOp(d: AdjustmentDraft): EditOperation | null {
+  if (!draftHasValues(d)) return null;
+  return {
+    type: "adjustmentBatch",
+    brightness: d.brightness,
+    contrast: d.contrast,
+    saturation: d.saturation,
+    blur: d.blur,
+    sharpen: d.sharpen
+  };
+}
 import { Histogram } from "@/components/ImageEditor/Histogram";
 import { CropEditor } from "@/components/ImageEditor/CropEditor";
 
@@ -137,7 +168,8 @@ export function ImageEditorV2({ asset, onDiscard, onSave }: Props) {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [panMode, setPanMode] = useState(false);
   const [dragPan, setDragPan] = useState<{ active: boolean; sx: number; sy: number; ox: number; oy: number } | null>(null);
-  const [openSection, setOpenSection] = useState({ adjustments: true, detail: true, geometry: true, export: true });
+  const [toolTab, setToolTab] = useState<"adjust" | "detail" | "geometry" | "export">("adjust");
+  const [draftAdjust, setDraftAdjust] = useState<AdjustmentDraft>(INITIAL_ADJUSTMENT_DRAFT);
   const [histData, setHistData] = useState<ImageData | null>(null);
   const [cropOpen, setCropOpen] = useState(false);
   const cropSnapshotRef = useRef<HTMLCanvasElement | null>(null);
@@ -146,14 +178,15 @@ export function ImageEditorV2({ asset, onDiscard, onSave }: Props) {
   const zKeyRef = useRef(false);
 
   const appliedOps = useMemo(() => model.operations.slice(0, model.cursor), [model.operations, model.cursor]);
+  const previewOps = useMemo(() => {
+    const tail = draftToPreviewOp(draftAdjust);
+    return tail ? [...appliedOps, tail] : appliedOps;
+  }, [appliedOps, draftAdjust]);
   const imageUrl = (asset.files.originalUrl || asset.files.previewUrl).trim();
-
-  const toggleSection = useCallback((key: keyof typeof openSection) => {
-    setOpenSection((s) => ({ ...s, [key]: !s[key] }));
-  }, []);
 
   useEffect(() => {
     dispatch({ type: "RESET" });
+    setDraftAdjust(INITIAL_ADJUSTMENT_DRAFT);
     queueMicrotask(() => setPreviewDims({ w: asset.width, h: asset.height }));
     if (!imageUrl || asset.type !== "photo") {
       dispatch({ type: "SET_LOAD_ERROR", message: "No hi ha imatge editable." });
@@ -191,7 +224,7 @@ export function ImageEditorV2({ asset, onDiscard, onSave }: Props) {
         ctx.drawImage(src, 0, 0);
         queueMicrotask(() => setPreviewDims({ w: src.naturalWidth, h: src.naturalHeight }));
       } else {
-        const out = applyOperationsToCanvas(src, appliedOps);
+        const out = applyOperationsToCanvas(src, previewOps);
         canvas.width = out.width;
         canvas.height = out.height;
         ctx.filter = "none";
@@ -203,7 +236,7 @@ export function ImageEditorV2({ asset, onDiscard, onSave }: Props) {
     } catch {
       /* evita loop */
     }
-  }, [appliedOps, model.compareOriginal, sourceEpoch]);
+  }, [previewOps, model.compareOriginal, sourceEpoch]);
 
   const origW = naturalSize.w;
   const origH = naturalSize.h;
@@ -226,16 +259,23 @@ export function ImageEditorV2({ asset, onDiscard, onSave }: Props) {
     dispatch({ type: "ADD_OP", op });
   }, []);
 
+  const commitDraftAdjustments = useCallback(() => {
+    const op = draftToPreviewOp(draftAdjust);
+    if (!op) return;
+    dispatch({ type: "ADD_OP", op });
+    setDraftAdjust(INITIAL_ADJUSTMENT_DRAFT);
+  }, [draftAdjust]);
+
   const beginCrop = useCallback(() => {
     const src = sourceRef.current;
     if (!src?.complete || src.naturalWidth === 0) return;
     try {
-      cropSnapshotRef.current = applyOperationsToCanvas(src, appliedOps);
+      cropSnapshotRef.current = applyOperationsToCanvas(src, previewOps);
       setCropOpen(true);
     } catch {
       dispatch({ type: "SET_LOAD_ERROR", message: "No s’ha pogut preparar el retall." });
     }
-  }, [appliedOps]);
+  }, [previewOps]);
 
   const endCrop = useCallback(() => {
     cropSnapshotRef.current = null;
@@ -262,9 +302,9 @@ export function ImageEditorV2({ asset, onDiscard, onSave }: Props) {
       sharpen: adj.sharpen,
       ...(targetMaxEdge != null ? { targetMaxEdge } : {})
     };
-    const out = applyOperationsToCanvas(src, [...appliedOps, op]);
+    const out = applyOperationsToCanvas(src, [...previewOps, op]);
     setAiPreview({ dataUrl: out.toDataURL("image/jpeg", 0.82), op });
-  }, [appliedOps]);
+  }, [previewOps]);
 
   const handleSave = useCallback(async () => {
     const exportPayload: ExportOptions = { webpQuality: exportQuality, maxLongEdge: exportMaxEdge };
@@ -427,8 +467,8 @@ export function ImageEditorV2({ asset, onDiscard, onSave }: Props) {
               <input type="checkbox" checked={model.compareOriginal} onChange={(e) => dispatch({ type: "SET_COMPARE", value: e.target.checked })} />
               Abans / després
             </label>
-            <p className="modal-muted" style={{ fontSize: 12, marginTop: 8 }}>
-              Z + rodeta: zoom · M: pan · Ctrl+Z / Ctrl+Y: desfer / refer
+            <p className="modal-muted editor-v2-shortcuts">
+              Z + rodeta: zoom · M: pan · Ctrl+Z / Ctrl+⇧+Z o Ctrl+Y: desfer / refer · Esc: tancar
             </p>
             <div className={`file-size-indicator ${estMb > 2 ? "file-size-indicator--warn" : ""}`}>
               Original: {origMb.toFixed(2)} MB → Estimat: ~{estMb.toFixed(2)} MB · {curW}×{curH} px
@@ -448,38 +488,106 @@ export function ImageEditorV2({ asset, onDiscard, onSave }: Props) {
               </span>
             </div>
 
-            <section className="editor-v2-section">
-              <button type="button" className="editor-v2-section-toggle" onClick={() => toggleSection("adjustments")}>
-                Ajustos {openSection.adjustments ? "−" : "+"}
-              </button>
-              {openSection.adjustments ? (
-                <div className="editor-v2-section-body">
-                  <AdjSlider label="Lluminositat" min={-100} max={100} onCommit={(v) => addOp({ type: "brightness", value: v })} />
-                  <AdjSlider label="Contrast" min={-100} max={100} onCommit={(v) => addOp({ type: "contrast", value: v })} />
-                  <AdjSlider label="Saturació" min={-100} max={100} onCommit={(v) => addOp({ type: "saturation", value: v })} />
+            <div className="editor-v2-tabs" role="tablist" aria-label="Panells d’edició">
+              {(
+                [
+                  ["adjust", "Llum i color"],
+                  ["detail", "Detall"],
+                  ["geometry", "Geometria"],
+                  ["export", "Export"]
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="tab"
+                  aria-selected={toolTab === id}
+                  className={`editor-v2-tab ${toolTab === id ? "editor-v2-tab--active" : ""}`}
+                  onClick={() => setToolTab(id)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <div className="editor-v2-tab-panel" role="tabpanel">
+              {toolTab === "adjust" ? (
+                <div className="editor-v2-panel-stack">
+                  <p className="editor-v2-panel-hint">
+                    Mou els controls: la vista prèvia s’actualitza al moment. Quan tinguis el resultat desitjat, aplica al document per registrar un sol pas a l’historial.
+                  </p>
+                  {draftHasValues(draftAdjust) ? (
+                    <p className="editor-v2-panel-warn">Canvis sense aplicar a l’historial.</p>
+                  ) : null}
+                  <EditorSliderRow
+                    id="v2-br"
+                    label="Lluminositat"
+                    min={-100}
+                    max={100}
+                    value={draftAdjust.brightness}
+                    onChange={(v) => setDraftAdjust((d) => ({ ...d, brightness: v }))}
+                  />
+                  <EditorSliderRow
+                    id="v2-ct"
+                    label="Contrast"
+                    min={-100}
+                    max={100}
+                    value={draftAdjust.contrast}
+                    onChange={(v) => setDraftAdjust((d) => ({ ...d, contrast: v }))}
+                  />
+                  <EditorSliderRow
+                    id="v2-sat"
+                    label="Saturació"
+                    min={-100}
+                    max={100}
+                    value={draftAdjust.saturation}
+                    onChange={(v) => setDraftAdjust((d) => ({ ...d, saturation: v }))}
+                  />
+                  <div className="editor-v2-draft-actions">
+                    <button type="button" className="btn btn-sm btn-ghost" disabled={!draftHasValues(draftAdjust)} onClick={() => setDraftAdjust(INITIAL_ADJUSTMENT_DRAFT)}>
+                      Reinicia previsualització
+                    </button>
+                    <button type="button" className="btn btn-sm btn-primary" disabled={!draftHasValues(draftAdjust)} onClick={commitDraftAdjustments}>
+                      Aplica al document
+                    </button>
+                  </div>
                 </div>
               ) : null}
-            </section>
 
-            <section className="editor-v2-section">
-              <button type="button" className="editor-v2-section-toggle" onClick={() => toggleSection("detail")}>
-                Detall {openSection.detail ? "−" : "+"}
-              </button>
-              {openSection.detail ? (
-                <div className="editor-v2-section-body">
-                  <AdjSlider label="Enfoc" min={0} max={100} onCommit={(v) => addOp({ type: "sharpen", value: v })} />
-                  <AdjSlider label="Desenfoc" min={0} max={20} onCommit={(v) => addOp({ type: "blur", value: v })} />
+              {toolTab === "detail" ? (
+                <div className="editor-v2-panel-stack">
+                  <p className="editor-v2-panel-hint">Enfoc i desenfoc formen part del mateix pas d’ajust quan apliquis al document.</p>
+                  <EditorSliderRow
+                    id="v2-sh"
+                    label="Enfoc"
+                    min={0}
+                    max={100}
+                    value={draftAdjust.sharpen}
+                    onChange={(v) => setDraftAdjust((d) => ({ ...d, sharpen: v }))}
+                  />
+                  <EditorSliderRow
+                    id="v2-bl"
+                    label="Desenfoc"
+                    min={0}
+                    max={20}
+                    value={draftAdjust.blur}
+                    onChange={(v) => setDraftAdjust((d) => ({ ...d, blur: v }))}
+                  />
+                  <div className="editor-v2-draft-actions">
+                    <button type="button" className="btn btn-sm btn-ghost" disabled={!draftHasValues(draftAdjust)} onClick={() => setDraftAdjust(INITIAL_ADJUSTMENT_DRAFT)}>
+                      Reinicia previsualització
+                    </button>
+                    <button type="button" className="btn btn-sm btn-primary" disabled={!draftHasValues(draftAdjust)} onClick={commitDraftAdjustments}>
+                      Aplica al document
+                    </button>
+                  </div>
                 </div>
               ) : null}
-            </section>
 
-            <section className="editor-v2-section">
-              <button type="button" className="editor-v2-section-toggle" onClick={() => toggleSection("geometry")}>
-                Geometria {openSection.geometry ? "−" : "+"}
-              </button>
-              {openSection.geometry ? (
-                <div className="editor-v2-section-body">
-                  <div className="editor-v2-btn-row">
+              {toolTab === "geometry" ? (
+                <div className="editor-v2-panel-stack">
+                  <p className="editor-v2-panel-hint">Gira la imatge o retalla amb rectangle tipus Photoshop (vores, cantonades, moure dins l’àrea).</p>
+                  <div className="editor-v2-btn-row editor-v2-btn-row--seg">
                     <button type="button" className="btn btn-sm" onClick={() => addOp({ type: "rotate", angle: 90 })}>
                       90°
                     </button>
@@ -490,41 +598,58 @@ export function ImageEditorV2({ asset, onDiscard, onSave }: Props) {
                       270°
                     </button>
                   </div>
-                  <label className="modal-muted" style={{ fontSize: 12 }}>
-                    Proporció retall visual
-                    <select className="editor-v2-select" value={cropAspectKey} onChange={(e) => setCropAspectKey(e.target.value as typeof cropAspectKey)}>
+                  <div className="editor-v2-field">
+                    <label htmlFor="v2-crop-aspect">Proporció del retall</label>
+                    <select
+                      id="v2-crop-aspect"
+                      className="editor-v2-select editor-v2-select--inline"
+                      value={cropAspectKey}
+                      onChange={(e) => setCropAspectKey(e.target.value as typeof cropAspectKey)}
+                    >
                       <option value="free">Lliure</option>
                       <option value="1">1:1</option>
                       <option value="4:3">4:3</option>
                       <option value="16:9">16:9</option>
                       <option value="3:2">3:2</option>
                     </select>
-                  </label>
-                  <button type="button" className="btn btn-sm" onClick={beginCrop}>
-                    Retall visual
+                  </div>
+                  <button type="button" className="btn btn-primary editor-v2-full-btn" onClick={beginCrop}>
+                    Retallar…
                   </button>
                 </div>
               ) : null}
-            </section>
 
-            <section className="editor-v2-section">
-              <button type="button" className="editor-v2-section-toggle" onClick={() => toggleSection("export")}>
-                Export / pes {openSection.export ? "−" : "+"}
-              </button>
-              {openSection.export ? (
-                <div className="editor-v2-section-body">
-                  <label>Qualitat WebP: {exportQuality}</label>
-                  <input type="range" min={40} max={98} value={exportQuality} onChange={(e) => setExportQuality(Number.parseInt(e.target.value, 10))} />
-                  <label htmlFor="v2-max-edge">Costat llarg màx. (px)</label>
-                  <input id="v2-max-edge" type="number" min={0} max={8192} step={64} value={exportMaxEdge} onChange={(e) => setExportMaxEdge(Math.max(0, Number.parseInt(e.target.value, 10) || 0))} />
+              {toolTab === "export" ? (
+                <div className="editor-v2-panel-stack">
+                  <div className="editor-v2-field">
+                    <label htmlFor="v2-webp-q">Qualitat WebP: {exportQuality}</label>
+                    <input
+                      id="v2-webp-q"
+                      type="range"
+                      min={40}
+                      max={98}
+                      value={exportQuality}
+                      onChange={(e) => setExportQuality(Number.parseInt(e.target.value, 10))}
+                    />
+                  </div>
+                  <div className="editor-v2-field">
+                    <label htmlFor="v2-max-edge">Costat llarg màxim (px)</label>
+                    <input
+                      id="v2-max-edge"
+                      type="number"
+                      min={0}
+                      max={8192}
+                      step={64}
+                      value={exportMaxEdge}
+                      onChange={(e) => setExportMaxEdge(Math.max(0, Number.parseInt(e.target.value, 10) || 0))}
+                    />
+                  </div>
                 </div>
               ) : null}
-            </section>
+            </div>
 
             <div className="editor-v2-histogram-block">
-              <span className="editor-v2-section-toggle" style={{ cursor: "default" }}>
-                Histograma
-              </span>
+              <span className="editor-v2-histogram-label">Histograma</span>
               <Histogram imageData={histData} width={200} height={100} />
             </div>
           </aside>
@@ -582,30 +707,30 @@ export function ImageEditorV2({ asset, onDiscard, onSave }: Props) {
   );
 }
 
-function AdjSlider({
+function EditorSliderRow({
+  id,
   label,
   min,
   max,
-  onCommit
+  value,
+  onChange
 }: {
+  id: string;
   label: string;
   min: number;
   max: number;
-  onCommit: (v: number) => void;
+  value: number;
+  onChange: (v: number) => void;
 }) {
-  const id = useId();
-  const rangeId = `${id}-range`;
   return (
-    <div className="slider-group">
-      <label htmlFor={rangeId}>{label}</label>
-      <input
-        id={rangeId}
-        type="range"
-        min={min}
-        max={max}
-        defaultValue={0}
-        onPointerUp={(e) => onCommit(Number.parseInt((e.target as HTMLInputElement).value, 10))}
-      />
+    <div className="editor-v2-slider-row">
+      <div className="editor-v2-slider-head">
+        <label htmlFor={id}>{label}</label>
+        <span className="editor-v2-slider-value" aria-live="polite">
+          {value}
+        </span>
+      </div>
+      <input id={id} type="range" min={min} max={max} value={value} onChange={(e) => onChange(Number.parseInt(e.target.value, 10))} />
     </div>
   );
 }

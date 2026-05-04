@@ -9,6 +9,15 @@ export type EditOperation =
   | { type: "saturation"; value: number }
   | { type: "blur"; value: number }
   | { type: "sharpen"; value: number }
+  /** Paquet d’ajustos en un sol pas d’historial (mateix ordre que ops individuals). */
+  | {
+      type: "adjustmentBatch";
+      brightness: number;
+      contrast: number;
+      saturation: number;
+      blur: number;
+      sharpen: number;
+    }
   | {
       type: "autoEnhance";
       brightness: number;
@@ -28,6 +37,7 @@ export const EDIT_OPERATION_TYPES: EditOperation["type"][] = [
   "saturation",
   "blur",
   "sharpen",
+  "adjustmentBatch",
   "autoEnhance"
 ];
 
@@ -66,6 +76,27 @@ export function isEditOperation(value: unknown): value is EditOperation {
       return typeof o.value === "number" && o.value >= 0 && o.value <= 20;
     case "sharpen":
       return typeof o.value === "number" && o.value >= 0 && o.value <= 100;
+    case "adjustmentBatch": {
+      const nums = ["brightness", "contrast", "saturation", "blur", "sharpen"] as const;
+      if (!nums.every((k) => typeof o[k] === "number" && Number.isFinite(o[k] as number))) return false;
+      const b = o.brightness as number;
+      const c = o.contrast as number;
+      const s = o.saturation as number;
+      const blur = o.blur as number;
+      const sharpen = o.sharpen as number;
+      return (
+        b >= -100 &&
+        b <= 100 &&
+        c >= -100 &&
+        c <= 100 &&
+        s >= -100 &&
+        s <= 100 &&
+        blur >= 0 &&
+        blur <= 20 &&
+        sharpen >= 0 &&
+        sharpen <= 100
+      );
+    }
     case "autoEnhance": {
       const base = ["brightness", "contrast", "saturation", "sharpen"].every(
         (k) => typeof o[k] === "number" && Number.isFinite(o[k] as number)

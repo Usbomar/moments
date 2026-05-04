@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
 
 interface Props {
   onUploaded: () => Promise<void>;
@@ -115,6 +115,11 @@ export function UploadDropzone({ onUploaded, supabaseConfigured, missingEnv = []
   const [status, setStatus] = useState<string>("");
   const [fileRows, setFileRows] = useState<FileRowState[]>([]);
   const [etaText, setEtaText] = useState<string | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
+
+  useEffect(() => {
+    if (supabaseConfigured === true) setHelpOpen(false);
+  }, [supabaseConfigured]);
 
   const ready = supabaseConfigured === true;
   const checking = supabaseConfigured === undefined;
@@ -247,61 +252,42 @@ export function UploadDropzone({ onUploaded, supabaseConfigured, missingEnv = []
     [onUploaded, ready, waitDuplicateChoice]
   );
 
-  if (checking) {
-    return (
-      <div className="dropzone dropzone--disabled">
-        <p>Comprovant configuració de Supabase…</p>
-        <button type="button" disabled>
-          Seleccionar fitxers
-        </button>
-      </div>
-    );
-  }
-
-  if (!ready) {
-    return (
-      <div className="dropzone dropzone--disabled">
-        <p>
-          <strong>Mode demo</strong> — la biblioteca de sota és de mostra. Per desar fotos reals al núvol, configura
-          Supabase.
-        </p>
-        <p className="dropzone-hint">
-          Crea <code>.env.local</code> (pots copiar <code>.env.example</code>) i reinicia <code>npm run dev</code>.
-        </p>
-        {missingEnv.length ? (
-          <p className="dropzone-hint">
-            Variables pendents:{" "}
-            {missingEnv.map((name, idx) => (
-              <span key={name}>
-                <code>{name}</code>
-                {idx < missingEnv.length - 1 ? ", " : ""}
-              </span>
-            ))}
-          </p>
-        ) : null}
-        <button type="button" disabled>
-          Pujada desactivada
-        </button>
-      </div>
-    );
-  }
-
   const listMaxHeight = fileRows.length > 10 ? 320 : undefined;
 
+  const dismissPanel = useCallback(() => {
+    setHelpOpen(false);
+    if (!busy) {
+      setStatus("");
+      setFileRows([]);
+      setEtaText(null);
+    }
+  }, [busy]);
+
+  const showHelpPanel = helpOpen && !ready && !checking;
+  const showProgressPanel = ready && (busy || fileRows.length > 0 || Boolean(status));
+  const panelOpen = showHelpPanel || showProgressPanel;
+
+  const onHitDragOver = useCallback(
+    (e: DragEvent) => {
+      if (!ready) return;
+      e.preventDefault();
+      setDragging(true);
+    },
+    [ready]
+  );
+
+  const onHitDrop = useCallback(
+    (e: DragEvent) => {
+      if (!ready) return;
+      e.preventDefault();
+      setDragging(false);
+      void uploadFiles(e.dataTransfer.files);
+    },
+    [ready, uploadFiles]
+  );
+
   return (
-    <div
-      className={`dropzone ${dragging ? "dragging" : ""}`}
-      onDragOver={(e) => {
-        e.preventDefault();
-        setDragging(true);
-      }}
-      onDragLeave={() => setDragging(false)}
-      onDrop={(e) => {
-        e.preventDefault();
-        setDragging(false);
-        void uploadFiles(e.dataTransfer.files);
-      }}
-    >
+    <div className="upload-toolbar">
       <input
         hidden
         ref={inputRef}
@@ -310,98 +296,182 @@ export function UploadDropzone({ onUploaded, supabaseConfigured, missingEnv = []
         accept="image/*,video/*"
         onChange={(e) => void uploadFiles(e.target.files)}
       />
-      <p>Arrossega fotos o vídeos aquí o selecciona fitxers</p>
-      <button disabled={busy} type="button" onClick={() => inputRef.current?.click()}>
-        {busy ? "Pujant…" : "Seleccionar fitxers"}
-      </button>
-      {status ? (
-        <small className={status.includes("completada") ? "status-ok" : "status-err"} style={{ display: "block", width: "100%" }}>
-          {status}
-          {etaText && busy ? ` · Temps estimat: ${etaText}` : null}
-        </small>
-      ) : null}
-      {fileRows.length > 0 ? (
-        <ul
-          style={{
-            listStyle: "none",
-            margin: "10px 0 0",
-            padding: 8,
-            width: "100%",
-            maxHeight: listMaxHeight,
-            overflowY: fileRows.length > 10 ? "auto" : "visible",
-            border: "1px solid #e2e6eb",
-            borderRadius: 10,
-            background: "#fafbfc",
-            fontSize: 13
-          }}
-        >
-          {fileRows.map((row) => (
-            <li
-              key={row.id}
-              style={{
-                display: "flex",
-                alignItems: "flex-start",
-                gap: 8,
-                padding: "6px 4px",
-                borderBottom: "1px solid #eef0f3"
-              }}
+      <div
+        className={`upload-toolbar-hit ${dragging && ready ? "upload-toolbar-hit--drag" : ""}`}
+        onDragOver={onHitDragOver}
+        onDragLeave={() => setDragging(false)}
+        onDrop={onHitDrop}
+      >
+        {checking ? (
+          <button
+            type="button"
+            className="btn btn-sm view-selector-compact-btn"
+            disabled
+            aria-busy
+            aria-label="Comprovant configuració de Supabase"
+            title="Comprovant configuració…"
+          >
+            <span aria-hidden>…</span>
+            <span className="sr-only">Comprovant Supabase…</span>
+          </button>
+        ) : !ready ? (
+          <button
+            type="button"
+            className="btn btn-sm view-selector-compact-btn"
+            onClick={() => setHelpOpen((v) => !v)}
+            aria-expanded={helpOpen}
+            aria-label="Com configurar la pujada de fotos"
+            title="Mode demo — fes clic per veure com activar Supabase"
+          >
+            <span aria-hidden>➕</span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            className={`btn btn-sm view-selector-compact-btn${dragging ? " btn-primary" : ""}`}
+            disabled={busy}
+            onClick={() => {
+              if (!busy) inputRef.current?.click();
+            }}
+            aria-label={busy ? "Pujant fitxers" : "Afegir fotos o vídeos"}
+            title={busy ? "Pujant…" : "Afegir fotos o vídeos (clic o arrossega aquí)"}
+          >
+            <span aria-hidden>{busy ? "…" : "➕"}</span>
+          </button>
+        )}
+      </div>
+
+      {panelOpen ? (
+        <div className="upload-toolbar-panel card" role="dialog" aria-label={showHelpPanel ? "Ajuda Supabase" : "Estat de la pujada"}>
+          <div className="upload-toolbar-panel-head">
+            <span className="upload-toolbar-panel-title">{showHelpPanel ? "Pujada de fotos" : "Pujada"}</span>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm upload-toolbar-panel-close"
+              disabled={busy && showProgressPanel}
+              onClick={dismissPanel}
             >
-              <span style={{ flexShrink: 0, width: 22, textAlign: "center" }} aria-hidden>
-                {row.status === "ok"
-                  ? "✓"
-                  : row.status === "error"
-                    ? "✗"
-                    : row.status === "duplicate"
-                      ? "⚠"
-                      : row.status === "skipped"
-                        ? "−"
-                        : row.status === "uploading"
-                          ? "…"
-                          : "○"}
-              </span>
-              <span style={{ flex: 1, minWidth: 0, wordBreak: "break-word" }}>
-                <strong>{row.name}</strong>
-                <span style={{ color: "var(--muted)" }}> · {formatBytes(row.size)}</span>
-                {row.error ? (
-                  <span
-                    style={{
-                      display: "block",
-                      color: row.status === "duplicate" ? "#8a5a00" : "#a02828",
-                      fontSize: 12
-                    }}
-                  >
-                    {row.error}
-                    {row.duplicateAssetId ? (
-                      <span style={{ color: "var(--muted)" }}> ({row.duplicateAssetId})</span>
-                    ) : null}
-                  </span>
-                ) : null}
-                {row.status === "duplicate" ? (
-                  <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
-                    <button
-                      type="button"
-                      className="dup-btn"
-                      disabled={!busy}
-                      onClick={() => resolveDuplicateChoice(row.index, "skip")}
-                      style={{ fontSize: 12, padding: "4px 10px", borderRadius: 8 }}
+              Tancar
+            </button>
+          </div>
+          {showHelpPanel ? (
+            <div className="upload-toolbar-help">
+              <p>
+                <strong>Mode demo</strong> — la biblioteca és de mostra. Per desar fotos reals, configura Supabase.
+              </p>
+              <p className="dropzone-hint">
+                Crea <code>.env.local</code> (pots copiar <code>.env.example</code>) i reinicia <code>npm run dev</code>.
+              </p>
+              {missingEnv.length ? (
+                <p className="dropzone-hint">
+                  Variables pendents:{" "}
+                  {missingEnv.map((name, idx) => (
+                    <span key={name}>
+                      <code>{name}</code>
+                      {idx < missingEnv.length - 1 ? ", " : ""}
+                    </span>
+                  ))}
+                </p>
+              ) : null}
+            </div>
+          ) : (
+            <>
+              {status ? (
+                <small
+                  className={status.includes("completada") ? "status-ok" : "status-err"}
+                  style={{ display: "block", width: "100%", marginBottom: 8 }}
+                >
+                  {status}
+                  {etaText && busy ? ` · Temps estimat: ${etaText}` : null}
+                </small>
+              ) : null}
+              {fileRows.length > 0 ? (
+                <ul
+                  className="upload-toolbar-filelist"
+                  style={{
+                    listStyle: "none",
+                    margin: 0,
+                    padding: 8,
+                    width: "100%",
+                    maxHeight: listMaxHeight,
+                    overflowY: fileRows.length > 10 ? "auto" : "visible",
+                    border: "1px solid var(--border)",
+                    borderRadius: 10,
+                    background: "var(--bg-secondary)",
+                    fontSize: 13
+                  }}
+                >
+                  {fileRows.map((row) => (
+                    <li
+                      key={row.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: 8,
+                        padding: "6px 4px",
+                        borderBottom: "1px solid var(--border)"
+                      }}
                     >
-                      Ometre
-                    </button>
-                    <button
-                      type="button"
-                      className="dup-btn"
-                      disabled={!busy}
-                      onClick={() => resolveDuplicateChoice(row.index, "force")}
-                      style={{ fontSize: 12, padding: "4px 10px", borderRadius: 8 }}
-                    >
-                      Pujar igualment
-                    </button>
-                  </div>
-                ) : null}
-              </span>
-            </li>
-          ))}
-        </ul>
+                      <span style={{ flexShrink: 0, width: 22, textAlign: "center" }} aria-hidden>
+                        {row.status === "ok"
+                          ? "✓"
+                          : row.status === "error"
+                            ? "✗"
+                            : row.status === "duplicate"
+                              ? "⚠"
+                              : row.status === "skipped"
+                                ? "−"
+                                : row.status === "uploading"
+                                  ? "…"
+                                  : "○"}
+                      </span>
+                      <span style={{ flex: 1, minWidth: 0, wordBreak: "break-word" }}>
+                        <strong>{row.name}</strong>
+                        <span style={{ color: "var(--muted)" }}> · {formatBytes(row.size)}</span>
+                        {row.error ? (
+                          <span
+                            style={{
+                              display: "block",
+                              color: row.status === "duplicate" ? "#8a5a00" : "#a02828",
+                              fontSize: 12
+                            }}
+                          >
+                            {row.error}
+                            {row.duplicateAssetId ? (
+                              <span style={{ color: "var(--muted)" }}> ({row.duplicateAssetId})</span>
+                            ) : null}
+                          </span>
+                        ) : null}
+                        {row.status === "duplicate" ? (
+                          <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+                            <button
+                              type="button"
+                              className="dup-btn"
+                              disabled={!busy}
+                              onClick={() => resolveDuplicateChoice(row.index, "skip")}
+                              style={{ fontSize: 12, padding: "4px 10px", borderRadius: 8 }}
+                            >
+                              Ometre
+                            </button>
+                            <button
+                              type="button"
+                              className="dup-btn"
+                              disabled={!busy}
+                              onClick={() => resolveDuplicateChoice(row.index, "force")}
+                              style={{ fontSize: 12, padding: "4px 10px", borderRadius: 8 }}
+                            >
+                              Pujar igualment
+                            </button>
+                          </div>
+                        ) : null}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </>
+          )}
+        </div>
       ) : null}
     </div>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, type RefObject } from "react";
+import { useCallback, useEffect, type ReactNode, type RefObject } from "react";
 import { useFilters } from "@/context/FilterContext";
 import { ViewSelector, type GalleryView } from "@/components/ViewSelector";
 
@@ -9,10 +9,18 @@ type Props = {
   libraryView: GalleryView;
   onLibraryViewChange: (view: GalleryView) => void;
   showLibraryViewSelector: boolean;
+  libraryUploadSlot?: ReactNode;
   onMenuClick: () => void;
 };
 
-export function TopBar({ searchInputRef, libraryView, onLibraryViewChange, showLibraryViewSelector, onMenuClick }: Props) {
+export function TopBar({
+  searchInputRef,
+  libraryView,
+  onLibraryViewChange,
+  showLibraryViewSelector,
+  libraryUploadSlot,
+  onMenuClick
+}: Props) {
   const { filters, setSearch } = useFilters();
 
   const onSearchChange = useCallback(
@@ -57,7 +65,12 @@ export function TopBar({ searchInputRef, libraryView, onLibraryViewChange, showL
         </label>
       </div>
       <div className="moments-topbar-right">
-        {showLibraryViewSelector ? <ViewSelector variant="compact" value={libraryView} onChange={onLibraryViewChange} /> : null}
+        {libraryUploadSlot || showLibraryViewSelector ? (
+          <div className="moments-topbar-toolbar">
+            {libraryUploadSlot}
+            {showLibraryViewSelector ? <ViewSelector variant="compact" value={libraryView} onChange={onLibraryViewChange} /> : null}
+          </div>
+        ) : null}
         <button type="button" className="btn btn-ghost" aria-label="Configuració (properament)" disabled title="Properament">
           ⚙
         </button>

@@ -146,6 +146,16 @@ export function PhotoModal({ asset, onClose, onSave, libraryTagSuggestions = [] 
     pickTag(t);
   }, [pickTag, tagInput]);
 
+  const commitTagInput = useCallback(() => {
+    const n = tagCandidates.length;
+    if (tagSuggestionsOpen && n > 0) {
+      const hi = Math.min(Math.max(0, tagHighlight), n - 1);
+      pickTag(tagCandidates[hi]!);
+    } else {
+      handleAddTag();
+    }
+  }, [tagCandidates, tagHighlight, tagSuggestionsOpen, pickTag, handleAddTag]);
+
   const handleRemoveTag = useCallback((tag: string) => {
     setTags((prev) => prev.filter((x) => x !== tag));
   }, []);
@@ -246,6 +256,8 @@ export function PhotoModal({ asset, onClose, onSave, libraryTagSuggestions = [] 
     [asset]
   );
 
+  /* Només re-muntar el mapa si canvia la foto o el punt (evita parpelleigs i pèrdua de focus quan el pare passa un nou objecte asset amb el mateix id). */
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- deps intencionalment estretes a id + coordenades
   useEffect(() => {
     if (!asset) return;
     const root = mapRootRef.current;
@@ -333,7 +345,7 @@ export function PhotoModal({ asset, onClose, onSave, libraryTagSuggestions = [] 
       mapRef.current = null;
       markerRef.current = null;
     };
-  }, [asset]);
+  }, [asset?.id, asset?.location?.lat, asset?.location?.lng]);
 
   useEffect(() => {
     if (!asset || !mapReady) return;
@@ -390,15 +402,7 @@ export function PhotoModal({ asset, onClose, onSave, libraryTagSuggestions = [] 
     })();
 
     return () => ctrl.abort();
-  }, [asset, debouncedLocationText, mapReady]);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [asset?.id, debouncedLocationText, mapReady]);
 
   if (!asset) return null;
 
@@ -407,8 +411,17 @@ export function PhotoModal({ asset, onClose, onSave, libraryTagSuggestions = [] 
   const imageUrl = (asset.files.previewUrl || asset.files.originalUrl).trim();
 
   return (
-    <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="photo-modal-title" onClick={onClose}>
-      <div className="modal-content photo-modal" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="photo-modal-title"
+      onMouseDown={(e) => {
+        /* No tancar amb clic al fons: evita pèrdua d’edits per clics accidentals. Tancar: ×, Cancel·lar, Escape (global). */
+        if (e.target === e.currentTarget) e.preventDefault();
+      }}
+    >
+      <div className="modal-content photo-modal" onMouseDown={(e) => e.stopPropagation()}>
         <header className="photo-modal__header">
           <div>
             <p className="photo-modal__section-title" style={{ marginBottom: 4 }}>
@@ -540,7 +553,8 @@ export function PhotoModal({ asset, onClose, onSave, libraryTagSuggestions = [] 
                   }
                   if (e.key === "Enter") {
                     e.preventDefault();
-                    handleAddTag();
+                    e.stopPropagation();
+                    commitTagInput();
                   }
                 }}
                 placeholder="Cerca o crea un tag"
@@ -551,8 +565,8 @@ export function PhotoModal({ asset, onClose, onSave, libraryTagSuggestions = [] 
                 aria-controls={tagListId}
                 aria-describedby="photo-tags-hint"
               />
-              {tagSuggestionsOpen && libraryTagSuggestions.length > 0 ? (
-                <div id={tagListId} className="photo-tag-suggestions" role="listbox" aria-label="Tags existents a la biblioteca">
+              {tagSuggestionsOpen ? (
+                <div id={tagListId} className="photo-tag-suggestions" role="listbox" aria-label="Tags de la biblioteca i nous">
                   {tagCandidates.length > 0 ? (
                     tagCandidates.map((t, i) => (
                       <button
@@ -572,19 +586,23 @@ export function PhotoModal({ asset, onClose, onSave, libraryTagSuggestions = [] 
                   ) : (
                     <div className="photo-tag-suggestions-hint">
                       {tagInput.trim()
-                        ? `Cap coincidència a la biblioteca. Retorn o «Afegir» afegeix el tag «${tagInput.trim().toLowerCase()}».`
-                        : "Tots els tags de la biblioteca ja són a aquesta foto, o no n’hi ha cap encara. Escriu un nom nou i prem Retorn o «Afegir»."}
+                        ? libraryTagSuggestions.length > 0
+                          ? `Cap coincidència als tags existents. Retorn o «Afegir» crea «${tagInput.trim().toLowerCase()}».`
+                          : `Retorn o «Afegir» afegeix el tag «${tagInput.trim().toLowerCase()}».`
+                        : libraryTagSuggestions.length > 0
+                          ? "Escriu per filtrar tags existents o crea’n un de nou amb Retorn / «Afegir»."
+                          : "Encara no hi ha altres tags a la biblioteca. Escriu un nom i prem Retorn o «Afegir»."}
                     </div>
                   )}
                 </div>
               ) : null}
             </div>
-            <button type="button" className="btn btn-sm" onClick={handleAddTag}>
+            <button type="button" className="btn btn-sm" onClick={() => commitTagInput()}>
               Afegir
             </button>
           </div>
           <p id="photo-tags-hint" className="modal-muted" style={{ marginTop: 6 }}>
-            Llista: tags de la biblioteca (filtre mentre escrius). Clic a una línia per afegir-la. Retorn o «Afegir» afegeixen sempre el text del camp (nou o existent).
+            Llista desplegable amb tags de la biblioteca (es filtra mentre escrius). Clic o Retorn tria la línia ressaltada; si no n’hi ha cap, Retorn / «Afegir» afegeix el text del camp com a tag nou.
           </p>
           <div className="tag-pills" style={{ marginTop: 8 }}>
             {tags.map((t) => (

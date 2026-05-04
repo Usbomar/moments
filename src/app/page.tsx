@@ -160,6 +160,12 @@ function HomeContent() {
     setSelectedId(memAssets[0]!.id);
   }, []);
 
+  const onCollectionSlideshow = useCallback((assets: Asset[]) => {
+    if (!assets.length) return;
+    setSlideshowItems(assets);
+    setSelectedId(assets[0]!.id);
+  }, []);
+
   const onViewerClose = useCallback(() => {
     setSelectedId(null);
     setSlideshowItems(null);
@@ -266,16 +272,20 @@ function HomeContent() {
         libraryView={view}
         onLibraryViewChange={setView}
         searchInputRef={searchRef}
+        libraryUploadSlot={
+          mainTab === "library" ? (
+            <UploadDropzone
+              onUploaded={handleLibraryUploaded}
+              supabaseConfigured={supabaseConfigured}
+              missingEnv={missingEnv}
+            />
+          ) : undefined
+        }
       >
         <div className="moments-card-inner">
           {mainTab === "library" ? (
             <>
               <FilterBar />
-              <UploadDropzone
-                onUploaded={handleLibraryUploaded}
-                supabaseConfigured={supabaseConfigured}
-                missingEnv={missingEnv}
-              />
               {loadingLibrary ? <p style={{ color: "var(--text-secondary)", marginTop: 12 }}>Actualitzant biblioteca…</p> : null}
               {libraryLoadError ? (
                 <p className="modal-error" style={{ marginTop: 12 }} role="alert">
@@ -335,7 +345,7 @@ function HomeContent() {
           ) : null}
           {mainTab === "collections" ? (
             <ViewErrorBoundary label="Col·leccions">
-              <Collections items={library} />
+              <Collections items={library} onPlaySlideshow={onCollectionSlideshow} />
             </ViewErrorBoundary>
           ) : null}
           {mainTab === "memories" ? (

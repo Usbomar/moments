@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type RefObject } from "react";
+import { useCallback, useEffect, useState, type ReactNode, type RefObject } from "react";
 import { LeftNav, type MainNavTab } from "@/components/LeftNav";
 import { TopBar } from "@/components/TopBar";
 import type { GalleryView } from "@/components/ViewSelector";
@@ -8,12 +8,14 @@ import type { GalleryView } from "@/components/ViewSelector";
 const SIDEBAR_KEY = "moments-sidebar-collapsed";
 
 type Props = {
-  children: React.ReactNode;
+  children: ReactNode;
   activeNav: MainNavTab;
   onNavChange: (tab: MainNavTab) => void;
   libraryView: GalleryView;
   onLibraryViewChange: (view: GalleryView) => void;
   searchInputRef: RefObject<HTMLInputElement | null>;
+  /** P. ex. pujada de fotos (TopBar, cluster amb les vistes) */
+  libraryUploadSlot?: ReactNode;
 };
 
 export function MainLayout({
@@ -22,7 +24,8 @@ export function MainLayout({
   onNavChange,
   libraryView,
   onLibraryViewChange,
-  searchInputRef
+  searchInputRef,
+  libraryUploadSlot
 }: Props) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
@@ -63,6 +66,7 @@ export function MainLayout({
         libraryView={libraryView}
         onLibraryViewChange={onLibraryViewChange}
         showLibraryViewSelector={activeNav === "library"}
+        libraryUploadSlot={activeNav === "library" ? libraryUploadSlot : null}
         onMenuClick={openMobileDrawer}
       />
       <div className="moments-body">

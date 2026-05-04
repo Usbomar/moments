@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type MouseEvent } from "react";
 import type { Asset } from "@/lib/types";
 import { loadCollections, saveCollections, type StoredCollection } from "@/lib/collections-storage";
 import { LazyImage } from "@/components/LazyImage";
@@ -11,9 +11,11 @@ function newId(): string {
 
 interface Props {
   items: Asset[];
+  /** Obre el visor a pantalla completa només amb els assets d’aquesta col·lecció */
+  onPlaySlideshow?: (assets: Asset[]) => void;
 }
 
-export function Collections({ items }: Props) {
+export function Collections({ items, onPlaySlideshow }: Props) {
   const [collections, setCollections] = useState<StoredCollection[]>(() => loadCollections());
   const [nameInput, setNameInput] = useState("");
   const [viewId, setViewId] = useState<string | null>(null);
@@ -78,6 +80,19 @@ export function Collections({ items }: Props) {
     return activeCollection.assetIds.map((id) => assetById.get(id)).filter((a): a is Asset => a != null);
   }, [activeCollection, assetById]);
 
+  const startRename = useCallback((e: MouseEvent, c: StoredCollection) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setEditingId(c.id);
+    setEditingName(c.name);
+  }, []);
+
+  const askDelete = useCallback((e: MouseEvent, id: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDeleteId(id);
+  }, []);
+
   return (
     <div className="collections-root">
       <div className="collections-toolbar">
@@ -99,8 +114,20 @@ export function Collections({ items }: Props) {
             <button type="button" className="btn btn-ghost btn-sm" onClick={() => setViewId(null)}>
               ← Totes les col·leccions
             </button>
-            <h2>{activeCollection.name}</h2>
-            <p className="modal-muted">{visibleAssets.length} foto(s)</p>
+            <div className="collections-detail-head-main">
+              <h2>{activeCollection.name}</h2>
+              <p className="modal-muted">{visibleAssets.length} foto(s)</p>
+            </div>
+            <button
+              type="button"
+              className="btn btn-icon btn-sm"
+              aria-label="Presentació només d’aquesta col·lecció"
+              title="Presentació"
+              disabled={!visibleAssets.length}
+              onClick={() => onPlaySlideshow?.(visibleAssets)}
+            >
+              <span aria-hidden>▶</span>
+            </button>
           </div>
           {visibleAssets.length ? (
             <div className="collections-grid">
@@ -129,26 +156,36 @@ export function Collections({ items }: Props) {
           {collections.map((c) => {
             const cover = c.coverAssetId ? assetById.get(c.coverAssetId) : null;
             const coverUrl = cover ? (cover.files.thumbUrl || cover.files.previewUrl || cover.files.originalUrl).trim() : "";
+            const isEditing = editingId === c.id;
+
             return (
               <article key={c.id} className="collection-card collection-card--interactive">
-                <button type="button" className="collection-card-hit" onClick={() => setViewId(c.id)} aria-label={`Obrir ${c.name}`}>
-                  {coverUrl ? (
-                    <div className="collection-card-media collection-card-media--hit">
-                      <LazyImage
-                        fill
-                        src={coverUrl}
-                        alt={`Portada de la col·lecció ${c.name}`}
-                        referrerPolicy="no-referrer"
-                        className="collection-card-hit-img"
-                      />
-                    </div>
-                  ) : (
-                    <div className="collection-card-placeholder">{c.name.slice(0, 1).toUpperCase()}</div>
-                  )}
-                </button>
-                <div className="collection-card-meta">
-                  {editingId === c.id ? (
-                    <>
+                <div className="collection-card-media-wrap">
+                  <button
+                    type="button"
+                    className="collection-card-hit"
+                    onClick={() => {
+                      if (!isEditing) setViewId(c.id);
+                    }}
+                    aria-label={`Obrir la col·lecció ${c.name}`}
+                  >
+                    {coverUrl ? (
+                      <div className="collection-card-media collection-card-media--hit">
+                        <LazyImage
+                          fill
+                          src={coverUrl}
+                          alt={`Portada: ${c.name}`}
+                          referrerPolicy="no-referrer"
+                          className="collection-card-hit-img"
+                        />
+                      </div>
+                    ) : (
+                      <div className="collection-card-placeholder">{c.name.slice(0, 1).toUpperCase()}</div>
+                    )}
+                  </button>
+
+                  {isEditing ? (
+                    <div className="collection-card-rename" onMouseDown={(e) => e.stopPropagation()}>
                       <input
                         value={editingName}
                         onChange={(e) => setEditingName(e.target.value)}
@@ -156,35 +193,63 @@ export function Collections({ items }: Props) {
                           if (e.key === "Enter") handleRenameCommit();
                           if (e.key === "Escape") setEditingId(null);
                         }}
-                        aria-label="Editar nom"
+                        className="collection-card-rename-input"
+                        aria-label="Nou nom de la col·lecció"
+                        autoFocus
                       />
-                      <button type="button" onClick={handleRenameCommit}>
-                        Desar
-                      </button>
-                      <button type="button" onClick={() => setEditingId(null)}>
-                        Cancel·lar
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <h3>{c.name}</h3>
-                      <p className="modal-muted">{c.assetIds.length} elements</p>
-                      <div className="collection-card-actions">
+                      <div className="collection-card-rename-tools">
                         <button
                           type="button"
-                          onClick={() => {
-                            setEditingId(c.id);
-                            setEditingName(c.name);
-                          }}
+                          className="btn btn-icon btn-sm"
+                          aria-label="Desar nom"
+                          title="Desar"
+                          onClick={handleRenameCommit}
                         >
-                          Renombrar
+                          <span aria-hidden>✓</span>
                         </button>
-                        <button type="button" className="danger" onClick={() => setDeleteId(c.id)}>
-                          Eliminar
+                        <button
+                          type="button"
+                          className="btn btn-icon btn-sm"
+                          aria-label="Cancel·lar"
+                          title="Cancel·lar"
+                          onClick={() => setEditingId(null)}
+                        >
+                          <span aria-hidden>×</span>
                         </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="collection-card-vignette" aria-hidden />
+                      <div className="collection-card-label">
+                        <span className="collection-card-title">{c.name}</span>
+                        <span className="collection-card-count">{c.assetIds.length} fotos</span>
                       </div>
                     </>
                   )}
+
+                  {!isEditing ? (
+                    <div className="collection-card-tools">
+                      <button
+                        type="button"
+                        className="btn btn-icon btn-sm"
+                        aria-label={`Renombrar ${c.name}`}
+                        title="Renombrar"
+                        onClick={(e) => startRename(e, c)}
+                      >
+                        <span aria-hidden>✎</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-icon btn-sm btn-icon--danger"
+                        aria-label={`Eliminar la col·lecció ${c.name}`}
+                        title="Eliminar"
+                        onClick={(e) => askDelete(e, c.id)}
+                      >
+                        <span aria-hidden>🗑</span>
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
               </article>
             );

@@ -76,6 +76,7 @@ function HomeContent() {
   const [slideshowItems, setSlideshowItems] = useState<Asset[] | null>(null);
   const [collectionSlideshow, setCollectionSlideshow] = useState<Asset[] | null>(null);
   const [adminOpen, setAdminOpen] = useState(false);
+  const [photoModalFront, setPhotoModalFront] = useState(false);
   const [adminCollections, setAdminCollections] = useState<AppCollection[]>([]);
   const [library, setLibrary] = useState<Asset[]>([]);
   const [loadingLibrary, setLoadingLibrary] = useState(false);
@@ -443,7 +444,11 @@ function HomeContent() {
             key={selectedAsset.id}
             asset={selectedAsset}
             libraryTagSuggestions={libraryTagSuggestions}
-            onClose={() => setSelectedAsset(null)}
+            front={photoModalFront}
+            onClose={() => {
+              setSelectedAsset(null);
+              setPhotoModalFront(false);
+            }}
             onSave={onPhotoSave}
           />
         </ViewErrorBoundary>
@@ -466,8 +471,17 @@ function HomeContent() {
         collections={adminCollections}
         onClose={() => setAdminOpen(false)}
         onEdit={(asset) => {
-          setAdminOpen(false);
+          setPhotoModalFront(true);
           setSelectedAsset(asset);
+        }}
+        onQuickUpdate={async (asset, patch) => {
+          const merged: Asset = {
+            ...asset,
+            ...patch,
+            location: patch.location === undefined ? undefined : patch.location
+          };
+          setLibrary((prev) => prev.map((a) => (a.id === asset.id ? merged : a)));
+          await onPhotoSave(merged);
         }}
         onDelete={async (asset) => {
           const res = await fetch(`/api/assets/${asset.id}`, { method: "DELETE" });
@@ -477,15 +491,6 @@ function HomeContent() {
           if (selectedId === asset.id) setSelectedId(null);
           clearCache();
           await refreshLibraryRef.current();
-          await refreshAdminCollections();
-        }}
-        onMoveToCollection={async (asset, collectionId) => {
-          const res = await fetch(`/api/collections/${collectionId}/assets`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ assetId: asset.id, include: true })
-          });
-          if (!res.ok) return;
           await refreshAdminCollections();
         }}
       />

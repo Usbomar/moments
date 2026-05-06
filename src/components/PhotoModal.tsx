@@ -9,6 +9,7 @@ interface Props {
   asset: Asset | null;
   onClose: () => void;
   onSave: (updated: Asset) => void | Promise<void>;
+  front?: boolean;
   /** Tags ja usats en altres fotos (minúscules, únics); per suggerir mentre s’escriu. */
   libraryTagSuggestions?: string[];
 }
@@ -56,7 +57,7 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
   return debounced;
 }
 
-export function PhotoModal({ asset, onClose, onSave, libraryTagSuggestions = [] }: Props) {
+export function PhotoModal({ asset, onClose, onSave, libraryTagSuggestions = [], front = false }: Props) {
   const [title, setTitle] = useState(() => asset?.title ?? "");
   const [description, setDescription] = useState(() => asset?.description ?? "");
   const [tagInput, setTagInput] = useState("");
@@ -410,7 +411,7 @@ export function PhotoModal({ asset, onClose, onSave, libraryTagSuggestions = [] 
 
   return (
     <div
-      className="modal-overlay"
+      className={`modal-overlay${front ? " modal-overlay--front" : ""}`}
       role="dialog"
       aria-modal="true"
       aria-labelledby="photo-modal-title"

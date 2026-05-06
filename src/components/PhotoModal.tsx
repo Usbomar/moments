@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { Map as LeafletMap, Marker as LeafletMarker } from "leaflet";
-import { loadCollections, saveCollections } from "@/lib/collections-storage";
 import type { Asset, LocationInfo } from "@/lib/types";
+import type { AppCollection } from "@/lib/collections";
 
 interface Props {
   asset: Asset | null;
@@ -71,13 +71,23 @@ export function PhotoModal({ asset, onClose, onSave, libraryTagSuggestions = [] 
   const [error, setError] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const [geocodeHint, setGeocodeHint] = useState<string | null>(null);
-  const [collections, setCollections] = useState(() => loadCollections());
+  const [collections, setCollections] = useState<AppCollection[]>([]);
+  const [collectionsError, setCollectionsError] = useState<string | null>(null);
+
+  const refreshCollections = useCallback(async () => {
+    setCollectionsError(null);
+    const res = await fetch("/api/collections", { cache: "no-store" });
+    const body = (await res.json().catch(() => ({}))) as { collections?: AppCollection[]; error?: string };
+    if (!res.ok) {
+      setCollectionsError(body.error ?? "No s'han pogut carregar les col·leccions.");
+      return;
+    }
+    setCollections(body.collections ?? []);
+  }, []);
 
   useEffect(() => {
-    const onCol = () => setCollections(loadCollections());
-    window.addEventListener("moments:collections-changed", onCol);
-    return () => window.removeEventListener("moments:collections-changed", onCol);
-  }, []);
+    void refreshCollections();
+  }, [refreshCollections]);
 
   const syncedAssetIdRef = useRef<string | null>(null);
 
@@ -231,29 +241,17 @@ export function PhotoModal({ asset, onClose, onSave, libraryTagSuggestions = [] 
   }, [asset, colorHue, dateValue, description, favorite, locationText, onClose, onSave, pickedLocation, tags, title]);
 
   const toggleCollectionMembership = useCallback(
-    (collectionId: string, checked: boolean) => {
+    async (collectionId: string, checked: boolean) => {
       if (!asset) return;
-      const all = loadCollections();
-      const idx = all.findIndex((c) => c.id === collectionId);
-      if (idx === -1) return;
-      const c = { ...all[idx] };
-      if (checked) {
-        if (!c.assetIds.includes(asset.id)) {
-          c.assetIds = [...c.assetIds, asset.id];
-          if (!c.coverAssetId) c.coverAssetId = asset.id;
-        }
-      } else {
-        c.assetIds = c.assetIds.filter((id) => id !== asset.id);
-        if (c.coverAssetId === asset.id) {
-          c.coverAssetId = c.assetIds[0] ?? null;
-        }
-      }
-      const next = [...all];
-      next[idx] = c;
-      saveCollections(next);
-      setCollections(loadCollections());
+      const res = await fetch(`/api/collections/${collectionId}/assets`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assetId: asset.id, include: checked })
+      });
+      if (!res.ok) return;
+      await refreshCollections();
     },
-    [asset]
+    [asset, refreshCollections]
   );
 
   /* Només re-muntar el mapa si canvia la foto o el punt (evita parpelleigs i pèrdua de focus quan el pare passa un nou objecte asset amb el mateix id). */
@@ -445,7 +443,7 @@ export function PhotoModal({ asset, onClose, onSave, libraryTagSuggestions = [] 
 
         {collections.length ? (
           <div className="form-group">
-            <p className="photo-modal__section-title">Col·leccions (local)</p>
+            <p className="photo-modal__section-title">Col·leccions</p>
             <div className="collection-check-list" role="group" aria-label="Col·leccions on incloure la foto">
               {collections.map((c) => (
                 <label key={c.id} className="collection-check-row">
@@ -460,6 +458,7 @@ export function PhotoModal({ asset, onClose, onSave, libraryTagSuggestions = [] 
             </div>
           </div>
         ) : null}
+        {collectionsError ? <p className="modal-error">{collectionsError}</p> : null}
 
         {error ? <p className="modal-error">{error}</p> : null}
 
@@ -531,7 +530,10 @@ export function PhotoModal({ asset, onClose, onSave, libraryTagSuggestions = [] 
                 className="photo-modal__tag-input"
                 type="text"
                 value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
+                onChange={(e) => {
+                  setTagInput(e.target.value);
+                  setTagSuggestionsOpen(true);
+                }}
                 onFocus={() => setTagSuggestionsOpen(true)}
                 onKeyDown={(e) => {
                   if (e.key === "Escape" && tagSuggestionsOpen) {
@@ -543,11 +545,13 @@ export function PhotoModal({ asset, onClose, onSave, libraryTagSuggestions = [] 
                   const n = tagCandidates.length;
                   if (e.key === "ArrowDown" && n > 0) {
                     e.preventDefault();
+                    if (!tagSuggestionsOpen) setTagSuggestionsOpen(true);
                     setTagHighlight((h) => Math.min(Math.min(h, n - 1) + 1, n - 1));
                     return;
                   }
                   if (e.key === "ArrowUp" && n > 0) {
                     e.preventDefault();
+                    if (!tagSuggestionsOpen) setTagSuggestionsOpen(true);
                     setTagHighlight((h) => Math.max(Math.min(h, n - 1) - 1, 0));
                     return;
                   }

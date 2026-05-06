@@ -233,7 +233,9 @@ function HomeContent() {
   );
 
   const onPhotoSave = useCallback(async (updated: Asset) => {
-    if (!supabaseConfiguredRef.current) {
+    // Fallback local només quan sabem segur que Supabase NO està configurat.
+    // Si l'estat encara és "undefined" (càrrega inicial), intentem persistir al servidor.
+    if (supabaseConfiguredRef.current === false) {
       setLibrary((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
       return;
     }

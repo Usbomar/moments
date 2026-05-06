@@ -55,6 +55,15 @@ export function FullscreenViewer({ items, selectedId, onClose, onSelect, onEditD
   return (
     <div className="viewer" role="dialog" aria-modal="true" aria-label="Visor de fotos a pantalla completa" onClick={onClose}>
       <div className="viewer-inner" onClick={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          className="viewer-close"
+          onClick={onClose}
+          aria-label="Tancar visor"
+          title="Tancar"
+        >
+          ×
+        </button>
         {previewUrl ? (
           <img
             className="viewer-media"

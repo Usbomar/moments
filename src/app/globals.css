@@ -145,11 +145,32 @@ button.active {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  z-index: 260;
 }
 
 .viewer-inner {
+  position: relative;
   width: min(95vw, 1100px);
+}
+
+.viewer-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.viewer-close:hover {
+  background: rgba(0, 0, 0, 0.72);
 }
 
 /* Slider: imatge i barra de controls en blocs separats (res de controls sobre la foto) */

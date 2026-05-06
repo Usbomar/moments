@@ -1,4 +1,5 @@
 export const COLLECTIONS_STORAGE_KEY = "moments_collections_v1";
+const COLLECTIONS_STORAGE_LEGACY_KEYS = ["moments_collections", "collections"] as const;
 
 export type StoredCollection = {
   id: string;
@@ -10,7 +11,10 @@ export type StoredCollection = {
 export function loadCollections(): StoredCollection[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = window.localStorage.getItem(COLLECTIONS_STORAGE_KEY);
+    const raw =
+      window.localStorage.getItem(COLLECTIONS_STORAGE_KEY) ??
+      COLLECTIONS_STORAGE_LEGACY_KEYS.map((k) => window.localStorage.getItem(k)).find((v) => !!v) ??
+      null;
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
@@ -34,7 +38,12 @@ export function loadCollections(): StoredCollection[] {
 export function saveCollections(collections: StoredCollection[]): void {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(COLLECTIONS_STORAGE_KEY, JSON.stringify(collections));
+    const payload = JSON.stringify(collections);
+    window.localStorage.setItem(COLLECTIONS_STORAGE_KEY, payload);
+    // Mirror en claus antigues per resistir canvis de versió/deploy.
+    for (const key of COLLECTIONS_STORAGE_LEGACY_KEYS) {
+      window.localStorage.setItem(key, payload);
+    }
     window.dispatchEvent(new CustomEvent("moments:collections-changed"));
   } catch {
     /* ignore quota */

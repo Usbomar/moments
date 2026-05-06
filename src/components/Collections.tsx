@@ -2,12 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState, type MouseEvent } from "react";
 import type { Asset } from "@/lib/types";
-import { loadCollections, saveCollections, type StoredCollection } from "@/lib/collections-storage";
+import type { AppCollection } from "@/lib/collections";
 import { LazyImage } from "@/components/LazyImage";
-
-function newId(): string {
-  return typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `c-${Date.now()}`;
-}
 
 interface Props {
   items: Asset[];
@@ -16,22 +12,28 @@ interface Props {
 }
 
 export function Collections({ items, onPlaySlideshow }: Props) {
-  const [collections, setCollections] = useState<StoredCollection[]>(() => loadCollections());
+  const [collections, setCollections] = useState<AppCollection[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [nameInput, setNameInput] = useState("");
   const [viewId, setViewId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  useEffect(() => {
-    const onChange = () => setCollections(loadCollections());
-    window.addEventListener("moments:collections-changed", onChange);
-    window.addEventListener("storage", onChange);
-    return () => {
-      window.removeEventListener("moments:collections-changed", onChange);
-      window.removeEventListener("storage", onChange);
-    };
+  const refreshCollections = useCallback(async () => {
+    setLoadError(null);
+    const res = await fetch("/api/collections", { cache: "no-store" });
+    const body = (await res.json().catch(() => ({}))) as { collections?: AppCollection[]; error?: string };
+    if (!res.ok) {
+      setLoadError(body.error ?? "No s'han pogut carregar les col·leccions.");
+      return;
+    }
+    setCollections(body.collections ?? []);
   }, []);
+
+  useEffect(() => {
+    void refreshCollections();
+  }, [refreshCollections]);
 
   const assetById = useMemo(() => {
     const m = new Map<string, Asset>();
@@ -39,39 +41,41 @@ export function Collections({ items, onPlaySlideshow }: Props) {
     return m;
   }, [items]);
 
-  const handleCreate = useCallback(() => {
+  const handleCreate = useCallback(async () => {
     const name = nameInput.trim();
     if (!name) return;
-    const next: StoredCollection = {
-      id: newId(),
-      name,
-      coverAssetId: null,
-      assetIds: []
-    };
-    const merged = [...collections, next];
-    saveCollections(merged);
-    setCollections(merged);
+    const res = await fetch("/api/collections", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name })
+    });
+    if (!res.ok) return;
     setNameInput("");
-  }, [collections, nameInput]);
+    await refreshCollections();
+  }, [nameInput, refreshCollections]);
 
-  const handleRenameCommit = useCallback(() => {
+  const handleRenameCommit = useCallback(async () => {
     if (!editingId) return;
     const name = editingName.trim();
     if (!name) return;
-    const merged = collections.map((c) => (c.id === editingId ? { ...c, name } : c));
-    saveCollections(merged);
-    setCollections(merged);
+    const res = await fetch(`/api/collections/${editingId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name })
+    });
+    if (!res.ok) return;
     setEditingId(null);
-  }, [collections, editingId, editingName]);
+    await refreshCollections();
+  }, [editingId, editingName, refreshCollections]);
 
-  const handleDeleteConfirm = useCallback(() => {
+  const handleDeleteConfirm = useCallback(async () => {
     if (!deleteId) return;
-    const merged = collections.filter((c) => c.id !== deleteId);
-    saveCollections(merged);
-    setCollections(merged);
+    const res = await fetch(`/api/collections/${deleteId}`, { method: "DELETE" });
+    if (!res.ok) return;
     setDeleteId(null);
     if (viewId === deleteId) setViewId(null);
-  }, [collections, deleteId, viewId]);
+    await refreshCollections();
+  }, [deleteId, viewId, refreshCollections]);
 
   const activeCollection = useMemo(() => collections.find((c) => c.id === viewId) ?? null, [collections, viewId]);
 
@@ -80,7 +84,7 @@ export function Collections({ items, onPlaySlideshow }: Props) {
     return activeCollection.assetIds.map((id) => assetById.get(id)).filter((a): a is Asset => a != null);
   }, [activeCollection, assetById]);
 
-  const startRename = useCallback((e: MouseEvent, c: StoredCollection) => {
+  const startRename = useCallback((e: MouseEvent, c: AppCollection) => {
     e.preventDefault();
     e.stopPropagation();
     setEditingId(c.id);
@@ -107,6 +111,7 @@ export function Collections({ items, onPlaySlideshow }: Props) {
           Crear col·lecció
         </button>
       </div>
+      {loadError ? <p className="modal-error">{loadError}</p> : null}
 
       {viewId && activeCollection ? (
         <section className="collections-detail">

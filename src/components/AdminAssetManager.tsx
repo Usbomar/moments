@@ -68,11 +68,11 @@ function parseLocationText(value: string) {
   return { city, country };
 }
 
-function colorHueToPreset(hue?: number | null): string {
+function colorHueToPreset(hue: number | null | undefined, options: Array<{ label: string; hue: number }>): string {
   if (typeof hue !== "number") return "";
-  let closest = COLOR_PRESETS[0]!;
+  let closest = options[0] ?? COLOR_PRESETS[0]!;
   let bestDistance = Number.POSITIVE_INFINITY;
-  for (const preset of COLOR_PRESETS) {
+  for (const preset of options) {
     const direct = Math.abs(preset.hue - hue);
     const wrapped = 360 - direct;
     const distance = Math.min(direct, wrapped);
@@ -113,6 +113,8 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
   const [draftById, setDraftById] = useState<Record<string, DraftPatch>>({});
   const [customColors, setCustomColors] = useState<Array<{ label: string; hue: number }>>([]);
   const [newColorHex, setNewColorHex] = useState("#ff7a00");
+  const [newColorName, setNewColorName] = useState("");
+  const [previewAsset, setPreviewAsset] = useState<{ src: string; title: string } | null>(null);
   const saveTimersRef = useRef<Record<string, number>>({});
   const allColorOptions = useMemo(() => [...COLOR_PRESETS, ...customColors], [customColors]);
 
@@ -232,7 +234,9 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
     const hue = hexToHue(newColorHex);
     if (hue === null) return;
     if (allColorOptions.some((c) => Math.abs(c.hue - hue) <= 1)) return;
-    setCustomColors((prev) => [...prev, { label: `Personalizado ${prev.length + 1}`, hue }]);
+    const label = newColorName.trim() || `Personalizado ${customColors.length + 1}`;
+    setCustomColors((prev) => [...prev, { label, hue }]);
+    setNewColorName("");
   };
 
   return (
@@ -243,6 +247,13 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
           <div className="admin-assets-head-actions">
             <div className="admin-assets-custom-color">
               <input type="color" value={newColorHex} onChange={(e) => setNewColorHex(e.target.value)} aria-label="Escoger color personalizado" />
+              <input
+                type="text"
+                value={newColorName}
+                onChange={(e) => setNewColorName(e.target.value)}
+                placeholder="Nombre color"
+                aria-label="Nombre del color personalizado"
+              />
               <button type="button" className="btn btn-sm" onClick={addCustomColor}>
                 + Color
               </button>
@@ -295,14 +306,30 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
                 return (
                 <tr key={a.id}>
                   <td className="admin-assets-col-thumb">
-                    <button type="button" className="admin-assets-thumb-btn" onClick={() => onEdit(a)} aria-label={`Editar ${a.title}`}>
+                    <div className="admin-assets-thumb-wrap">
+                      <button
+                        type="button"
+                        className="admin-assets-thumb-btn"
+                        onClick={() => {
+                          if (!thumb) return;
+                          setPreviewAsset({ src: a.files.previewUrl || a.files.originalUrl || thumb, title: a.title });
+                        }}
+                        aria-label={`Ampliar ${a.title}`}
+                      >
+                        {thumb ? (
+                          // eslint-disable-next-line @next/next/no-img-element -- remote storage image
+                          <img src={thumb} alt={a.title} className="admin-assets-thumb" referrerPolicy="no-referrer" />
+                        ) : (
+                          <span className="admin-assets-thumb admin-assets-thumb--empty">·</span>
+                        )}
+                      </button>
                       {thumb ? (
-                        // eslint-disable-next-line @next/next/no-img-element -- remote storage image
-                        <img src={thumb} alt={a.title} className="admin-assets-thumb" referrerPolicy="no-referrer" />
-                      ) : (
-                        <span className="admin-assets-thumb admin-assets-thumb--empty">·</span>
-                      )}
-                    </button>
+                        <div className="admin-assets-hover-preview" aria-hidden>
+                          {/* eslint-disable-next-line @next/next/no-img-element -- remote storage image */}
+                          <img src={thumb} alt="" referrerPolicy="no-referrer" />
+                        </div>
+                      ) : null}
+                    </div>
                   </td>
                   <td>
                     <input
@@ -329,7 +356,7 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
                         aria-hidden
                       />
                     <select
-                      value={colorHueToPreset(draftById[a.id]?.colorHue ?? a.colorHue)}
+                      value={colorHueToPreset(draftById[a.id]?.colorHue ?? a.colorHue, allColorOptions)}
                       onChange={(e) => updateDraft(a, { colorHue: e.target.value ? Number(e.target.value) : null })}
                     >
                       <option value="">Sin color</option>
@@ -399,6 +426,18 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
           ) : null}
         </div>
       </div>
+      {previewAsset ? (
+        <div className="admin-assets-preview-overlay" role="dialog" aria-modal="true" aria-label={`Vista ampliada de ${previewAsset.title}`} onClick={() => setPreviewAsset(null)}>
+          <div className="admin-assets-preview-card" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="btn btn-ghost btn-sm admin-assets-preview-close" onClick={() => setPreviewAsset(null)} aria-label="Cerrar vista ampliada">
+              ×
+            </button>
+            {/* eslint-disable-next-line @next/next/no-img-element -- remote storage image */}
+            <img src={previewAsset.src} alt={previewAsset.title} className="admin-assets-preview-image" referrerPolicy="no-referrer" />
+            <div className="admin-assets-preview-caption">{previewAsset.title}</div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

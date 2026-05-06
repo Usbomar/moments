@@ -8,7 +8,6 @@ import { FadingSlideshow } from "@/components/FadingSlideshow";
 import type { MainNavTab } from "@/components/LeftNav";
 import type { Asset } from "@/lib/types";
 import { UploadDropzone } from "@/components/upload-dropzone";
-import { FilterBar } from "@/components/FilterBar";
 import { type GalleryView } from "@/components/ViewSelector";
 import { FilterProvider, useFilters } from "@/context/FilterContext";
 import { ViewErrorBoundary } from "@/components/ViewErrorBoundary";
@@ -17,6 +16,8 @@ import type { EditOperation, ExportOptions } from "@/lib/image-edit-ops";
 import { MainLayout } from "@/layouts/MainLayout";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { loadCollections } from "@/lib/collections-storage";
+import type { AppCollection } from "@/lib/collections";
+import { AdminAssetManager } from "@/components/AdminAssetManager";
 
 const MapView = dynamic(() => import("@/views/MapView").then((mod) => mod.MapView), {
   ssr: false,
@@ -74,6 +75,8 @@ function HomeContent() {
   const [mainTab, setMainTab] = useState<MainNavTab>("library");
   const [slideshowItems, setSlideshowItems] = useState<Asset[] | null>(null);
   const [collectionSlideshow, setCollectionSlideshow] = useState<Asset[] | null>(null);
+  const [adminOpen, setAdminOpen] = useState(false);
+  const [adminCollections, setAdminCollections] = useState<AppCollection[]>([]);
   const [library, setLibrary] = useState<Asset[]>([]);
   const [loadingLibrary, setLoadingLibrary] = useState(false);
   const [libraryLoadError, setLibraryLoadError] = useState<string | null>(null);
@@ -240,6 +243,12 @@ function HomeContent() {
     void refreshLibraryRef.current();
   }, []);
 
+  const refreshAdminCollections = useCallback(async () => {
+    const res = await fetch("/api/collections", { cache: "no-store" });
+    const body = (await res.json().catch(() => ({}))) as { collections?: AppCollection[] };
+    if (res.ok) setAdminCollections(body.collections ?? []);
+  }, []);
+
   const saveImageEdits = useCallback(
     async (operations: EditOperation[], exportOpts: ExportOptions) => {
       const id = imageEditorAsset?.id;
@@ -317,6 +326,10 @@ function HomeContent() {
         libraryView={view}
         onLibraryViewChange={setView}
         searchInputRef={searchRef}
+        onAdminClick={() => {
+          setAdminOpen(true);
+          void refreshAdminCollections();
+        }}
         libraryUploadSlot={
           mainTab === "library" ? (
             <UploadDropzone
@@ -330,7 +343,6 @@ function HomeContent() {
         <div className="moments-card-inner">
           {mainTab === "library" ? (
             <>
-              <FilterBar />
               {loadingLibrary ? <p style={{ color: "var(--text-secondary)", marginTop: 12 }}>Actualitzant biblioteca…</p> : null}
               {libraryLoadError ? (
                 <p className="modal-error" style={{ marginTop: 12 }} role="alert">
@@ -447,6 +459,36 @@ function HomeContent() {
           />
         </ViewErrorBoundary>
       ) : null}
+
+      <AdminAssetManager
+        open={adminOpen}
+        assets={viewItems}
+        collections={adminCollections}
+        onClose={() => setAdminOpen(false)}
+        onEdit={(asset) => {
+          setAdminOpen(false);
+          setSelectedAsset(asset);
+        }}
+        onDelete={async (asset) => {
+          const res = await fetch(`/api/assets/${asset.id}`, { method: "DELETE" });
+          if (!res.ok) return;
+          setLibrary((prev) => prev.filter((x) => x.id !== asset.id));
+          if (selectedAsset?.id === asset.id) setSelectedAsset(null);
+          if (selectedId === asset.id) setSelectedId(null);
+          clearCache();
+          await refreshLibraryRef.current();
+          await refreshAdminCollections();
+        }}
+        onMoveToCollection={async (asset, collectionId) => {
+          const res = await fetch(`/api/collections/${collectionId}/assets`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ assetId: asset.id, include: true })
+          });
+          if (!res.ok) return;
+          await refreshAdminCollections();
+        }}
+      />
     </>
   );
 }

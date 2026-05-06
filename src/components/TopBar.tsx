@@ -11,6 +11,7 @@ type Props = {
   showLibraryViewSelector: boolean;
   libraryUploadSlot?: ReactNode;
   onMenuClick: () => void;
+  onAdminClick: () => void;
 };
 
 export function TopBar({
@@ -19,9 +20,10 @@ export function TopBar({
   onLibraryViewChange,
   showLibraryViewSelector,
   libraryUploadSlot,
-  onMenuClick
+  onMenuClick,
+  onAdminClick
 }: Props) {
-  const { filters, setSearch } = useFilters();
+  const { filters, setSearch, setYear } = useFilters();
 
   const onSearchChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -57,12 +59,33 @@ export function TopBar({
             id="global-search"
             type="search"
             className="moments-search-input"
-            placeholder="Cerca a la biblioteca…"
+            placeholder="Buscar por título, tags, descripción o ciudad…"
             defaultValue={filters.searchQuery}
             onChange={onSearchChange}
             autoComplete="off"
           />
         </label>
+        <div className="moments-year-mini" aria-label="Filtro por años">
+          <input
+            type="number"
+            min={2010}
+            max={filters.year[1]}
+            value={filters.year[0]}
+            onChange={(e) => setYear([Math.min(Number(e.target.value || 2010), filters.year[1]), filters.year[1]])}
+            aria-label="Año desde"
+          />
+          <span>—</span>
+          <input
+            type="number"
+            min={filters.year[0]}
+            max={new Date().getFullYear()}
+            value={filters.year[1]}
+            onChange={(e) =>
+              setYear([filters.year[0], Math.max(filters.year[0], Number(e.target.value || new Date().getFullYear()))])
+            }
+            aria-label="Año hasta"
+          />
+        </div>
       </div>
       <div className="moments-topbar-right">
         {libraryUploadSlot || showLibraryViewSelector ? (
@@ -71,7 +94,7 @@ export function TopBar({
             {showLibraryViewSelector ? <ViewSelector variant="compact" value={libraryView} onChange={onLibraryViewChange} /> : null}
           </div>
         ) : null}
-        <button type="button" className="btn btn-ghost" aria-label="Configuració (properament)" disabled title="Properament">
+        <button type="button" className="btn btn-ghost" aria-label="Administrar fotos" title="Administrar fotos" onClick={onAdminClick}>
           ⚙
         </button>
       </div>

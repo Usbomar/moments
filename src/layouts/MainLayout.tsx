@@ -14,6 +14,7 @@ type Props = {
   libraryView: GalleryView;
   onLibraryViewChange: (view: GalleryView) => void;
   searchInputRef: RefObject<HTMLInputElement | null>;
+  onAdminClick: () => void;
   /** P. ex. pujada de fotos (TopBar, cluster amb les vistes) */
   libraryUploadSlot?: ReactNode;
 };
@@ -25,7 +26,8 @@ export function MainLayout({
   libraryView,
   onLibraryViewChange,
   searchInputRef,
-  libraryUploadSlot
+  libraryUploadSlot,
+  onAdminClick
 }: Props) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
@@ -68,6 +70,7 @@ export function MainLayout({
         showLibraryViewSelector={activeNav === "library"}
         libraryUploadSlot={activeNav === "library" ? libraryUploadSlot : null}
         onMenuClick={openMobileDrawer}
+        onAdminClick={onAdminClick}
       />
       <div className="moments-body">
         <LeftNav

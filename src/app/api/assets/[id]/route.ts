@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/server/supabase-admin";
+import { getStorageBucket } from "@/lib/server/supabase-admin";
 import { isSupabaseConfigured } from "@/lib/server/supabase-config";
 import { toAsset } from "@/lib/server/asset-map";
+import { objectPathFromSignedUrl } from "@/lib/server/signed-url-path";
 
 type PatchBody = {
   title?: string;
@@ -117,6 +119,50 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     if (!row) return NextResponse.json({ error: "Not found after update" }, { status: 500 });
 
     return NextResponse.json({ asset: toAsset(row) });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+export async function DELETE(_request: Request, context: { params: Promise<{ id: string }> }) {
+  try {
+    if (!isSupabaseConfigured()) {
+      return NextResponse.json({ error: "SUPABASE_NOT_CONFIGURED" }, { status: 503 });
+    }
+    const id = await resolveParams(context);
+    const supabase = getSupabaseAdmin();
+
+    const { data: existing, error: existingErr } = await supabase
+      .from("assets")
+      .select("id,user_id")
+      .eq("id", id)
+      .maybeSingle();
+    if (existingErr) return NextResponse.json({ error: existingErr.message }, { status: 500 });
+    if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (existing.user_id !== "u-1") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+    const { data: fileRow } = await supabase
+      .from("asset_files")
+      .select("original_url,preview_url,medium_url,thumb_url")
+      .eq("asset_id", id)
+      .maybeSingle();
+
+    const rawUrls = [
+      fileRow?.original_url,
+      fileRow?.preview_url,
+      fileRow?.medium_url,
+      fileRow?.thumb_url
+    ].filter((u): u is string => typeof u === "string" && u.trim().length > 0);
+    const objectPaths = Array.from(new Set(rawUrls.map((u) => objectPathFromSignedUrl(u)).filter((p): p is string => !!p)));
+    if (objectPaths.length) {
+      const bucket = getStorageBucket();
+      await supabase.storage.from(bucket).remove(objectPaths);
+    }
+
+    const { error: delErr } = await supabase.from("assets").delete().eq("id", id).eq("user_id", "u-1");
+    if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 });
+    return NextResponse.json({ ok: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 500 });

@@ -1388,6 +1388,8 @@ button.danger {
 .moments-topbar-center {
   flex: 1;
   display: flex;
+  align-items: center;
+  gap: 10px;
   justify-content: center;
   min-width: 0;
 }
@@ -1413,6 +1415,29 @@ button.danger {
   height: 38px;
   border: 1px solid var(--border);
   background: var(--bg-primary);
+}
+
+.moments-year-mini {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+}
+
+.moments-year-mini input {
+  width: 64px;
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.moments-year-mini span {
+  color: var(--text-tertiary);
+  font-size: 12px;
 }
 
 .moments-search-input {
@@ -1444,6 +1469,75 @@ button.danger {
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.admin-assets-modal {
+  width: min(1200px, 96vw);
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-assets-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.admin-assets-head h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.admin-assets-table-wrap {
+  overflow: auto;
+  border: 1px solid var(--border);
+}
+
+.admin-assets-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.admin-assets-table th,
+.admin-assets-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.admin-assets-table th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-secondary);
+  z-index: 1;
+}
+
+.admin-assets-table th button {
+  border: none;
+  background: transparent;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--text-primary);
+}
+
+.admin-assets-tags {
+  color: var(--text-secondary);
+}
+
+.admin-assets-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.admin-assets-actions select {
+  min-width: 130px;
 }
 
 .upload-toolbar {

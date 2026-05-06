@@ -75,10 +75,6 @@ export async function GET(request: Request) {
     if (allowedIds) {
       query = query.in("id", allowedIds);
     }
-    if (q) {
-      query = query.ilike("title", `%${q}%`);
-    }
-
     const { data, error } = await query;
 
     if (error) {

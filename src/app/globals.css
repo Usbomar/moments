@@ -1555,13 +1555,39 @@ button.danger {
   table-layout: fixed;
 }
 
+.admin-assets-table th:nth-child(2),
+.admin-assets-table td:nth-child(2) {
+  width: 300px;
+}
+
+.admin-assets-table th:nth-child(3),
+.admin-assets-table td:nth-child(3) {
+  width: 130px;
+}
+
+.admin-assets-table th:nth-child(4),
+.admin-assets-table td:nth-child(4) {
+  width: 190px;
+}
+
+.admin-assets-table th:nth-child(5),
+.admin-assets-table td:nth-child(5) {
+  width: 210px;
+}
+
+.admin-assets-table th:nth-child(6),
+.admin-assets-table td:nth-child(6) {
+  width: 70px;
+}
+
 .admin-assets-table th,
 .admin-assets-table td {
   border-bottom: 1px solid var(--border);
-  padding: 6px 8px;
+  padding: 4px 8px;
   text-align: left;
-  vertical-align: middle;
+  vertical-align: top;
   white-space: nowrap;
+  height: 52px;
 }
 
 .admin-assets-table th {
@@ -1569,6 +1595,7 @@ button.danger {
   top: 0;
   background: var(--bg-secondary);
   z-index: 1;
+  height: 44px;
 }
 
 .admin-assets-table th button {
@@ -1578,6 +1605,8 @@ button.danger {
   cursor: pointer;
   color: var(--text-primary);
   padding: 0;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
 }
 
 .admin-assets-col-thumb {
@@ -1605,6 +1634,7 @@ button.danger {
   height: 40px;
   object-fit: cover;
   border: 1px solid var(--border);
+  display: block;
 }
 
 .admin-assets-hover-preview {
@@ -1644,20 +1674,44 @@ button.danger {
 .admin-assets-table td input[type="date"],
 .admin-assets-table td select {
   width: 100%;
-  min-width: 110px;
-  padding: 6px 8px;
+  min-width: 100px;
+  height: 32px;
+  padding: 4px 8px;
   font-size: 12px;
+  line-height: 1.2;
 }
 
 .admin-assets-table td input[type="checkbox"] {
   width: 16px;
   height: 16px;
+  margin: 0;
+}
+
+.admin-assets-title-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  width: 100%;
+}
+
+.admin-assets-title-cell input {
+  flex: 1;
+}
+
+.admin-assets-checkbox-wrap {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
 }
 
 .admin-assets-inline-color {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 6px;
+  width: 100%;
 }
 
 .admin-assets-color-chip {
@@ -1683,22 +1737,34 @@ button.danger {
 }
 
 .admin-assets-save {
-  display: block;
-  min-height: 14px;
-  margin-top: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 74px;
+  height: 22px;
   font-size: 11px;
+  line-height: 1;
+  border: 1px solid transparent;
+  padding: 0 6px;
+  border-radius: 0;
 }
 
 .admin-assets-save--saving {
   color: var(--warning);
+  border-color: color-mix(in srgb, var(--warning) 35%, transparent);
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
 }
 
 .admin-assets-save--saved {
   color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 35%, transparent);
+  background: color-mix(in srgb, var(--success) 12%, transparent);
 }
 
 .admin-assets-save--error {
   color: var(--error);
+  border-color: color-mix(in srgb, var(--error) 35%, transparent);
+  background: color-mix(in srgb, var(--error) 12%, transparent);
 }
 
 .admin-assets-load-more {

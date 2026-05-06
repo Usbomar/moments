@@ -332,14 +332,16 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
                     </div>
                   </td>
                   <td>
-                    <input
-                      type="text"
-                      value={draftById[a.id]?.title ?? a.title}
-                      onChange={(e) => updateDraft(a, { title: e.target.value })}
-                    />
-                    <span className={`admin-assets-save admin-assets-save--${saveState}`}>
-                      {saveState === "saving" ? "guardando..." : saveState === "saved" ? "guardado" : saveState === "error" ? "error" : ""}
-                    </span>
+                    <div className="admin-assets-title-cell">
+                      <input
+                        type="text"
+                        value={draftById[a.id]?.title ?? a.title}
+                        onChange={(e) => updateDraft(a, { title: e.target.value })}
+                      />
+                      <span className={`admin-assets-save admin-assets-save--${saveState}`}>
+                        {saveState === "saving" ? "guardando..." : saveState === "saved" ? "guardado" : saveState === "error" ? "error" : ""}
+                      </span>
+                    </div>
                   </td>
                   <td>
                     <input
@@ -389,7 +391,13 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
                     />
                   </td>
                   <td>
-                    <input type="checkbox" checked={draftById[a.id]?.favorite ?? a.favorite} onChange={(e) => updateDraft(a, { favorite: e.target.checked })} />
+                    <label className="admin-assets-checkbox-wrap" aria-label={`Favorito ${a.title}`}>
+                      <input
+                        type="checkbox"
+                        checked={draftById[a.id]?.favorite ?? a.favorite}
+                        onChange={(e) => updateDraft(a, { favorite: e.target.checked })}
+                      />
+                    </label>
                   </td>
                   {showContent ? <td>{a.description?.trim() ? "●" : ""}</td> : null}
                   {showContent ? <td>{a.tags?.length ? "●" : ""}</td> : null}

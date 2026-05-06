@@ -16,6 +16,7 @@ import { clearCache, getCached, setCached } from "@/lib/cache";
 import type { EditOperation, ExportOptions } from "@/lib/image-edit-ops";
 import { MainLayout } from "@/layouts/MainLayout";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { loadCollections } from "@/lib/collections-storage";
 
 const MapView = dynamic(() => import("@/views/MapView").then((mod) => mod.MapView), {
   ssr: false,
@@ -63,6 +64,7 @@ function TabLoadingHint({ label }: { label: string }) {
 }
 
 function HomeContent() {
+  const COLLECTIONS_MIGRATED_KEY = "moments_collections_migrated_to_server_v1";
   const { filters } = useFilters();
   const searchRef = useRef<HTMLInputElement>(null);
   const [view, setView] = useState<GalleryView>("masonry");
@@ -143,6 +145,33 @@ function HomeContent() {
   useEffect(() => {
     void refreshLibrary();
   }, [refreshLibrary]);
+
+  useEffect(() => {
+    if (supabaseConfigured !== true) return;
+    if (typeof window === "undefined") return;
+    const alreadyMigrated = window.localStorage.getItem(COLLECTIONS_MIGRATED_KEY);
+    if (alreadyMigrated === "1") return;
+    const legacy = loadCollections();
+    if (!legacy.length) {
+      window.localStorage.setItem(COLLECTIONS_MIGRATED_KEY, "1");
+      return;
+    }
+
+    void (async () => {
+      try {
+        const response = await fetch("/api/collections/import", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ collections: legacy })
+        });
+        if (response.ok) {
+          window.localStorage.setItem(COLLECTIONS_MIGRATED_KEY, "1");
+        }
+      } catch {
+        /* reintentarà al pròxim carregat */
+      }
+    })();
+  }, [supabaseConfigured]);
 
   const openDetailsEditorFromViewer = useCallback((asset: Asset) => {
     setSelectedId(null);

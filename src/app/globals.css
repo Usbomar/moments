@@ -1499,11 +1499,15 @@ button.danger {
   justify-content: space-between;
   gap: 10px;
   margin-bottom: 10px;
+  padding: 4px 2px 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
 }
 
 .admin-assets-head h2 {
   margin: 0;
   font-size: 18px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
 }
 
 .admin-assets-head-actions {
@@ -1546,6 +1550,7 @@ button.danger {
   border: 1px solid var(--border);
   flex: 1;
   min-height: 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
 }
 
 .admin-assets-table {
@@ -1593,9 +1598,10 @@ button.danger {
 .admin-assets-table th {
   position: sticky;
   top: 0;
-  background: var(--bg-secondary);
+  background: color-mix(in srgb, var(--bg-secondary) 90%, var(--bg-primary));
   z-index: 1;
   height: 44px;
+  box-shadow: inset 0 -1px 0 var(--border);
 }
 
 .admin-assets-table th button {
@@ -1607,6 +1613,8 @@ button.danger {
   padding: 0;
   line-height: 1.2;
   letter-spacing: 0.01em;
+  font-size: 12px;
+  text-transform: uppercase;
 }
 
 .admin-assets-col-thumb {
@@ -1679,6 +1687,7 @@ button.danger {
   padding: 4px 8px;
   font-size: 12px;
   line-height: 1.2;
+  border-color: color-mix(in srgb, var(--border-dark) 85%, transparent);
 }
 
 .admin-assets-table td input[type="checkbox"] {
@@ -1693,6 +1702,14 @@ button.danger {
   gap: 8px;
   min-height: 40px;
   width: 100%;
+}
+
+.admin-assets-table tbody tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--bg-primary) 94%, var(--bg-secondary));
+}
+
+.admin-assets-table tbody tr:hover td {
+  background: color-mix(in srgb, var(--accent-light) 20%, var(--bg-primary));
 }
 
 .admin-assets-title-cell input {

@@ -1513,6 +1513,19 @@ button.danger {
   margin-left: auto;
 }
 
+.admin-assets-custom-color {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.admin-assets-custom-color input[type="color"] {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--border);
+}
+
 .admin-assets-toggle {
   display: inline-flex;
   align-items: center;
@@ -1601,6 +1614,19 @@ button.danger {
 .admin-assets-table td input[type="checkbox"] {
   width: 16px;
   height: 16px;
+}
+
+.admin-assets-inline-color {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.admin-assets-color-chip {
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--border);
+  flex-shrink: 0;
 }
 
 .admin-assets-col-delete {

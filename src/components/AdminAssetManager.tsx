@@ -20,14 +20,27 @@ type DraftPatch = Partial<Pick<Asset, "title" | "takenAt" | "favorite" | "colorH
 
 const COLOR_PRESETS: Array<{ label: string; hue: number }> = [
   { label: "Rojo", hue: 0 },
-  { label: "Naranja", hue: 28 },
-  { label: "Amarillo", hue: 55 },
+  { label: "Rojo anaranjado", hue: 15 },
+  { label: "Naranja", hue: 30 },
+  { label: "Ámbar", hue: 45 },
+  { label: "Amarillo", hue: 60 },
+  { label: "Lima", hue: 75 },
+  { label: "Verde lima", hue: 95 },
   { label: "Verde", hue: 120 },
+  { label: "Verde menta", hue: 145 },
+  { label: "Turquesa", hue: 165 },
   { label: "Cian", hue: 180 },
+  { label: "Azul cielo", hue: 200 },
   { label: "Azul", hue: 220 },
+  { label: "Índigo", hue: 240 },
   { label: "Violeta", hue: 275 },
-  { label: "Rosa", hue: 330 }
+  { label: "Púrpura", hue: 290 },
+  { label: "Magenta", hue: 310 },
+  { label: "Rosa", hue: 330 },
+  { label: "Coral", hue: 345 },
+  { label: "Marrón", hue: 24 }
 ];
+const CUSTOM_COLOR_STORAGE_KEY = "moments_admin_custom_colors_v1";
 
 function cmpText(a: string, b: string): number {
   return a.localeCompare(b, "es", { sensitivity: "base", numeric: true });
@@ -71,6 +84,25 @@ function colorHueToPreset(hue?: number | null): string {
   return String(closest.hue);
 }
 
+function hexToHue(hex: string): number | null {
+  const clean = hex.trim();
+  const valid = /^#([0-9a-f]{6})$/i.test(clean);
+  if (!valid) return null;
+  const r = Number.parseInt(clean.slice(1, 3), 16) / 255;
+  const g = Number.parseInt(clean.slice(3, 5), 16) / 255;
+  const b = Number.parseInt(clean.slice(5, 7), 16) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const delta = max - min;
+  if (delta === 0) return 0;
+  let hue = 0;
+  if (max === r) hue = ((g - b) / delta) % 6;
+  else if (max === g) hue = (b - r) / delta + 2;
+  else hue = (r - g) / delta + 4;
+  const deg = Math.round(hue * 60);
+  return deg < 0 ? deg + 360 : deg;
+}
+
 export function AdminAssetManager({ open, assets, collections, onClose, onEdit, onDelete, onQuickUpdate }: Props) {
   const [sort, setSort] = useState<SortState[]>([{ key: "takenAt", dir: "desc" }]);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -79,7 +111,10 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
   const [showContent, setShowContent] = useState(true);
   const [savingById, setSavingById] = useState<Record<string, "idle" | "saving" | "saved" | "error">>({});
   const [draftById, setDraftById] = useState<Record<string, DraftPatch>>({});
+  const [customColors, setCustomColors] = useState<Array<{ label: string; hue: number }>>([]);
+  const [newColorHex, setNewColorHex] = useState("#ff7a00");
   const saveTimersRef = useRef<Record<string, number>>({});
+  const allColorOptions = useMemo(() => [...COLOR_PRESETS, ...customColors], [customColors]);
 
   const sorted = useMemo(() => {
     const list = [...assets];
@@ -126,6 +161,29 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
     []
   );
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(CUSTOM_COLOR_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Array<{ label?: string; hue?: number }>;
+      const safe = parsed
+        .filter((x) => typeof x?.hue === "number")
+        .map((x, idx) => ({
+          label: x.label?.trim() || `Personalizado ${idx + 1}`,
+          hue: Math.max(0, Math.min(359, Math.round(x.hue!)))
+        }));
+      setCustomColors(safe);
+    } catch {
+      setCustomColors([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(CUSTOM_COLOR_STORAGE_KEY, JSON.stringify(customColors));
+  }, [customColors]);
+
   if (!open) return null;
 
   const toggleSort = (key: SortKey, keepExisting: boolean) => {
@@ -170,6 +228,12 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
   };
 
   const loadMore = () => setVisibleCount((prev) => Math.min(prev + 100, sorted.length));
+  const addCustomColor = () => {
+    const hue = hexToHue(newColorHex);
+    if (hue === null) return;
+    if (allColorOptions.some((c) => Math.abs(c.hue - hue) <= 1)) return;
+    setCustomColors((prev) => [...prev, { label: `Personalizado ${prev.length + 1}`, hue }]);
+  };
 
   return (
     <div className="modal-overlay modal-overlay--front admin-assets-overlay" role="dialog" aria-modal="true" aria-label="Administrador de fotos" onClick={onClose}>
@@ -177,6 +241,12 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
         <header className="admin-assets-head">
           <h2>Administrador de fotos</h2>
           <div className="admin-assets-head-actions">
+            <div className="admin-assets-custom-color">
+              <input type="color" value={newColorHex} onChange={(e) => setNewColorHex(e.target.value)} aria-label="Escoger color personalizado" />
+              <button type="button" className="btn btn-sm" onClick={addCustomColor}>
+                + Color
+              </button>
+            </div>
             <label className="admin-assets-toggle">
               <input type="checkbox" checked={showMeta} onChange={(e) => setShowMeta(e.target.checked)} />
               Metadatos
@@ -252,17 +322,24 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
                     />
                   </td>
                   <td>
+                    <span className="admin-assets-inline-color">
+                      <span
+                        className="admin-assets-color-chip"
+                        style={{ backgroundColor: `hsl(${draftById[a.id]?.colorHue ?? a.colorHue ?? 0} 72% 46%)`, opacity: typeof (draftById[a.id]?.colorHue ?? a.colorHue) === "number" ? 1 : 0.2 }}
+                        aria-hidden
+                      />
                     <select
                       value={colorHueToPreset(draftById[a.id]?.colorHue ?? a.colorHue)}
                       onChange={(e) => updateDraft(a, { colorHue: e.target.value ? Number(e.target.value) : null })}
                     >
                       <option value="">Sin color</option>
-                      {COLOR_PRESETS.map((preset) => (
+                      {allColorOptions.map((preset) => (
                         <option key={preset.hue} value={preset.hue}>
                           {preset.label}
                         </option>
                       ))}
                     </select>
+                    </span>
                   </td>
                   <td>
                     <input

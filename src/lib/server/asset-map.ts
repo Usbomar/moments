@@ -107,6 +107,11 @@ export function toAsset(row: {
   const ch = row.color_hue;
   const colorHueProp =
     typeof ch === "number" && Number.isFinite(ch) ? { colorHue: Math.min(359, Math.max(0, Math.round(ch))) } : {};
+  const latNum = Number(location?.lat);
+  const lngNum = Number(location?.lng);
+  const hasValidCoords = Number.isFinite(latNum) && Number.isFinite(lngNum);
+  const city = location?.city?.trim() ?? "";
+  const country = location?.country?.trim() ?? "";
   return {
     id: row.id,
     userId: row.user_id,
@@ -125,12 +130,12 @@ export function toAsset(row: {
     autoTags,
     ...colorHueProp,
     location:
-      location && location.city && location.country
+      location && hasValidCoords
         ? {
-            lat: location.lat,
-            lng: location.lng,
-            city: location.city,
-            country: location.country
+            lat: latNum,
+            lng: lngNum,
+            city: city || "Unknown",
+            country: country || "Unknown"
           }
         : undefined,
     files: resultFiles

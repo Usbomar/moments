@@ -866,11 +866,13 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
             <div className="admin-assets-preview-caption">{previewAsset.title}</div>
             <div className="viewer-toolbar" role="toolbar" aria-label="Accions de la foto">
               <button type="button" className="viewer-toolbar-btn viewer-toolbar-btn--primary" onClick={() => {
+                setPreviewAsset(null);
                 onEdit(previewAsset.asset);
               }}>
                 Editar dades
               </button>
               <button type="button" className="viewer-toolbar-btn" onClick={() => {
+                setPreviewAsset(null);
                 onEditImage(previewAsset.asset);
               }}>
                 Editar imatge

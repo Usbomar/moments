@@ -158,7 +158,7 @@ button.active {
   max-height: 92vh;
   background: var(--bg-primary);
   border: 1px solid var(--border);
-  padding: 10px;
+  padding: 5px 5px 10px;
 }
 
 .viewer-close {
@@ -818,7 +818,7 @@ button.primary:hover {
 }
 
 .modal-overlay--front {
-  z-index: 220;
+  z-index: 260;
 }
 
 .tab-nav {
@@ -1540,6 +1540,7 @@ button.danger {
   padding: 0;
   align-items: stretch;
   justify-content: stretch;
+  z-index: 230;
 }
 
 .admin-assets-head {

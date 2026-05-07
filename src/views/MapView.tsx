@@ -178,7 +178,7 @@ export function MapView({ items, onOpenViewer, onEditPhoto }: Props) {
       <div ref={mapRootRef} className="map-view-shell" />
 
       {activeCluster ? (
-        <section>
+        <section className="map-view-selected-cluster">
           <h3 className="view-section-title">
             {activeCluster.city} · {activeCluster.items.length} foto(s)
           </h3>

@@ -112,6 +112,7 @@ export function toAsset(row: {
   const hasValidCoords = Number.isFinite(latNum) && Number.isFinite(lngNum);
   const city = location?.city?.trim() ?? "";
   const country = location?.country?.trim() ?? "";
+  const hasExplicitLocationLabel = Boolean(city) && Boolean(country);
   return {
     id: row.id,
     userId: row.user_id,
@@ -130,12 +131,12 @@ export function toAsset(row: {
     autoTags,
     ...colorHueProp,
     location:
-      location && hasValidCoords
+      location && hasValidCoords && hasExplicitLocationLabel
         ? {
             lat: latNum,
             lng: lngNum,
-            city: city || "Unknown",
-            country: country || "Unknown"
+            city,
+            country
           }
         : undefined,
     files: resultFiles

@@ -708,6 +708,8 @@ button.primary:hover {
   margin-bottom: var(--space-3);
   border: 1px solid var(--border);
   background: var(--bg-tertiary);
+  position: relative;
+  z-index: 1;
 }
 
 .map-view-toggle-row {
@@ -759,6 +761,13 @@ button.primary:hover {
 .map-cluster-popup-thumb:hover {
   border-color: var(--accent, #3b82f6);
   box-shadow: 0 0 0 1px var(--accent-light, #eff6ff);
+}
+
+.map-view-selected-cluster {
+  position: relative;
+  z-index: 3;
+  background: var(--bg-primary);
+  margin-top: 8px;
 }
 
 .photo-modal-color-row {

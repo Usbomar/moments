@@ -91,10 +91,13 @@ function buildClusterPopupContent(cluster: Cluster, onOpen: (a: Asset) => void):
 export function MapView({ items, onOpenViewer, onEditPhoto }: Props) {
   const clusters = useMemo(() => clusterByArea(items), [items]);
   const [selectedCluster, setSelectedCluster] = useState<Cluster | null>(null);
+  const [layerMode, setLayerMode] = useState<"markers" | "heatmap">("markers");
   const mapRootRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const onOpenViewerRef = useRef(onOpenViewer);
-  onOpenViewerRef.current = onOpenViewer;
+  useEffect(() => {
+    onOpenViewerRef.current = onOpenViewer;
+  }, [onOpenViewer]);
 
   useEffect(() => {
     const root = mapRootRef.current;
@@ -114,54 +117,83 @@ export function MapView({ items, onOpenViewer, onEditPhoto }: Props) {
     const map = mapRef.current;
     if (!map) return;
     map.eachLayer((layer: Layer) => {
-      if (layer instanceof L.CircleMarker) {
+      if (layer instanceof L.CircleMarker || layer instanceof L.Circle) {
         map.removeLayer(layer);
       }
     });
-    clusters.forEach((cluster) => {
-      const marker = L.circleMarker([cluster.lat, cluster.lng], {
-        radius: Math.min(24, Math.max(8, 4 + cluster.items.length)),
-        color: "#3b82f6",
-        fillColor: "#3b82f6",
-        fillOpacity: 0.35
-      }).addTo(map);
+    if (layerMode === "markers") {
+      clusters.forEach((cluster) => {
+        const marker = L.circleMarker([cluster.lat, cluster.lng], {
+          radius: Math.min(24, Math.max(8, 4 + cluster.items.length)),
+          color: "#3b82f6",
+          fillColor: "#3b82f6",
+          fillOpacity: 0.35
+        }).addTo(map);
 
-      const popupContent = buildClusterPopupContent(cluster, (a) => {
-        onOpenViewerRef.current(a);
-        map.closePopup();
+        const popupContent = buildClusterPopupContent(cluster, (a) => {
+          onOpenViewerRef.current(a);
+          map.closePopup();
+        });
+        marker.bindPopup(popupContent, {
+          maxWidth: 320,
+          className: "map-cluster-popup-wrap",
+          closeButton: true
+        });
+        marker.on("popupopen", () => {
+          setSelectedCluster(cluster);
+        });
       });
-      marker.bindPopup(popupContent, {
-        maxWidth: 320,
-        className: "map-cluster-popup-wrap",
-        closeButton: true
+    } else {
+      clusters.forEach((cluster) => {
+        L.circle([cluster.lat, cluster.lng], {
+          radius: Math.min(70000, 14000 + cluster.items.length * 2500),
+          color: "#ef4444",
+          weight: 1,
+          fillColor: "#ef4444",
+          fillOpacity: Math.min(0.45, 0.08 + cluster.items.length * 0.02)
+        }).addTo(map);
       });
-      marker.on("popupopen", () => {
-        setSelectedCluster(cluster);
-      });
-    });
-  }, [clusters]);
+    }
+    if (clusters.length) {
+      const bounds = L.latLngBounds(clusters.map((c) => [c.lat, c.lng] as [number, number]));
+      map.fitBounds(bounds, { padding: [36, 36], maxZoom: 12 });
+    }
+  }, [clusters, layerMode]);
 
   if (!clusters.length) {
     return <p className="view-empty">No hi ha fotos amb coordenades GPS.</p>;
   }
+  const activeCluster = layerMode === "markers" ? selectedCluster : null;
 
   return (
     <div>
+      <div className="map-view-toggle-row">
+        <button type="button" className={`btn btn-sm ${layerMode === "markers" ? "btn-primary" : ""}`} onClick={() => setLayerMode("markers")}>
+          Marcadors
+        </button>
+        <button type="button" className={`btn btn-sm ${layerMode === "heatmap" ? "btn-primary" : ""}`} onClick={() => setLayerMode("heatmap")}>
+          Mapa de calor
+        </button>
+      </div>
       <div ref={mapRootRef} className="map-view-shell" />
 
-      {selectedCluster ? (
+      {activeCluster ? (
         <section>
           <h3 className="view-section-title">
-            {selectedCluster.city} · {selectedCluster.items.length} foto(s)
+            {activeCluster.city} · {activeCluster.items.length} foto(s)
           </h3>
           <LibraryGrid
-            items={selectedCluster.items}
+            items={activeCluster.items}
             onOpenModal={onEditPhoto}
             onOpenViewer={onOpenViewer}
           />
         </section>
       ) : (
-        <p className="view-empty">Clica un marcador al mapa per veure les fotos d&apos;aquella zona (i miniatures al popup).</p>
+        <p className="view-empty">
+          {layerMode === "markers"
+            ? "Clica un marcador al mapa per veure les fotos d&apos;aquella zona (i miniatures al popup)."
+            : "Vista de calor activa: canvia a Marcadors per veure miniatures i obrir fotos."}
+        </p>
       )}
     </div>
   );

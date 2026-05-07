@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-export type MainNavTab = "library" | "collections" | "memories" | "analytics";
+export type MainNavTab = "library" | "map" | "collections" | "memories" | "analytics";
 
 const ITEMS: Array<{ id: MainNavTab; label: string; icon: string }> = [
   { id: "library", label: "Biblioteca", icon: "📸" },
+  { id: "map", label: "Mapa", icon: "🗺" },
   { id: "collections", label: "Col·leccions", icon: "📁" },
   { id: "memories", label: "Records", icon: "💭" },
   { id: "analytics", label: "Analítiques", icon: "📊" }
@@ -65,7 +66,7 @@ export function LeftNav({ active, onChange, collapsed, onToggleCollapse, mobileO
             <button
               key={item.id}
               type="button"
-              className={`moments-nav-item ${active === item.id ? "moments-nav-item--active" : ""}`}
+              className={`moments-nav-item ${item.id === "map" ? "moments-nav-item--map" : ""} ${active === item.id ? "moments-nav-item--active" : ""}`}
               onClick={() => select(item.id)}
               aria-current={active === item.id ? "page" : undefined}
             >

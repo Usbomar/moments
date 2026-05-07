@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { Asset } from "@/lib/types";
 import type { AppCollection } from "@/lib/collections";
-import { Collections } from "@/components/Collections";
 
 type Props = {
   open: boolean;
@@ -14,6 +13,7 @@ type Props = {
   onEditImage: (asset: Asset) => void;
   onDelete: (asset: Asset) => Promise<void>;
   onQuickUpdate: (asset: Asset, patch: Partial<Asset>) => Promise<void>;
+  onRefreshCollections?: () => Promise<void>;
 };
 
 type SortKey = "title" | "takenAt" | "color" | "location" | "favorite";
@@ -106,7 +106,7 @@ function hexToHue(hex: string): number | null {
   return deg < 0 ? deg + 360 : deg;
 }
 
-export function AdminAssetManager({ open, assets, collections, onClose, onEdit, onEditImage, onDelete, onQuickUpdate }: Props) {
+export function AdminAssetManager({ open, assets, collections, onClose, onEdit, onEditImage, onDelete, onQuickUpdate, onRefreshCollections }: Props) {
   const [activeTab, setActiveTab] = useState<TabId>("photos");
   const [sort, setSort] = useState<SortState[]>([{ key: "takenAt", dir: "desc" }]);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -121,6 +121,13 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
   const [previewAsset, setPreviewAsset] = useState<{ asset: Asset; src: string; title: string } | null>(null);
   const [editingColorHue, setEditingColorHue] = useState<number | null>(null);
   const [editingColorName, setEditingColorName] = useState("");
+  const [openTagRows, setOpenTagRows] = useState<Record<string, boolean>>({});
+  const [openLocationRows, setOpenLocationRows] = useState<Record<string, boolean>>({});
+  const [openCollectionRows, setOpenCollectionRows] = useState<Record<string, boolean>>({});
+  const [editingTagName, setEditingTagName] = useState<Record<string, string>>({});
+  const [editingLocationName, setEditingLocationName] = useState<Record<string, string>>({});
+  const [addAssetByTag, setAddAssetByTag] = useState<Record<string, string>>({});
+  const [addAssetByLocation, setAddAssetByLocation] = useState<Record<string, string>>({});
   const saveTimersRef = useRef<Record<string, number>>({});
   const allColorOptions = useMemo(() => [...COLOR_PRESETS, ...customColors], [customColors]);
   const tagStats = useMemo(() => {
@@ -151,6 +158,31 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
       .map(([value, total]) => ({ value, total }))
       .sort((a, b) => a.value.localeCompare(b.value, "ca", { sensitivity: "base", numeric: true }));
   }, [assets]);
+  const tagsToAssets = useMemo(() => {
+    const map = new Map<string, Asset[]>();
+    for (const asset of assets) {
+      for (const tagRaw of asset.tags ?? []) {
+        const tag = tagRaw.trim().toLowerCase();
+        if (!tag) continue;
+        const arr = map.get(tag) ?? [];
+        arr.push(asset);
+        map.set(tag, arr);
+      }
+    }
+    return map;
+  }, [assets]);
+  const locationsToAssets = useMemo(() => {
+    const map = new Map<string, Asset[]>();
+    for (const asset of assets) {
+      const key = [asset.location?.city?.trim() ?? "", asset.location?.country?.trim() ?? ""].filter(Boolean).join(", ");
+      if (!key) continue;
+      const arr = map.get(key) ?? [];
+      arr.push(asset);
+      map.set(key, arr);
+    }
+    return map;
+  }, [assets]);
+  const assetById = useMemo(() => new Map(assets.map((asset) => [asset.id, asset])), [assets]);
 
   const sorted = useMemo(() => {
     const list = [...assets];
@@ -290,6 +322,70 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
       setEditingColorHue(null);
       setEditingColorName("");
     }
+  };
+  const toggleTagRow = (tag: string) => setOpenTagRows((prev) => ({ ...prev, [tag]: !prev[tag] }));
+  const toggleLocationRow = (loc: string) => setOpenLocationRows((prev) => ({ ...prev, [loc]: !prev[loc] }));
+  const toggleCollectionRow = (id: string) => setOpenCollectionRows((prev) => ({ ...prev, [id]: !prev[id] }));
+  const removeTagFromAsset = async (asset: Asset, tag: string) => {
+    const nextTags = (asset.tags ?? []).filter((t) => t.trim().toLowerCase() !== tag);
+    await onQuickUpdate(asset, { tags: nextTags } as Partial<Asset>);
+  };
+  const addTagToAsset = async (asset: Asset, tag: string) => {
+    const normalized = tag.trim().toLowerCase();
+    const next = [...(asset.tags ?? [])];
+    if (!next.map((t) => t.trim().toLowerCase()).includes(normalized)) next.push(normalized);
+    await onQuickUpdate(asset, { tags: next } as Partial<Asset>);
+  };
+  const renameTag = async (oldTag: string) => {
+    const nextTag = (editingTagName[oldTag] ?? "").trim().toLowerCase();
+    if (!nextTag || nextTag === oldTag) return;
+    const list = tagsToAssets.get(oldTag) ?? [];
+    await Promise.all(
+      list.map((asset) => {
+        const tags = (asset.tags ?? []).map((t) => (t.trim().toLowerCase() === oldTag ? nextTag : t.trim().toLowerCase()));
+        return onQuickUpdate(asset, { tags } as Partial<Asset>);
+      })
+    );
+  };
+  const deleteTagEverywhere = async (tag: string) => {
+    const list = tagsToAssets.get(tag) ?? [];
+    await Promise.all(list.map((asset) => removeTagFromAsset(asset, tag)));
+  };
+  const removeLocationFromAsset = async (asset: Asset) => {
+    await onQuickUpdate(asset, { location: undefined } as Partial<Asset>);
+  };
+  const setLocationOnAsset = async (asset: Asset, city: string, country: string) => {
+    await onQuickUpdate(
+      asset,
+      {
+        location: {
+          lat: asset.location?.lat ?? 0,
+          lng: asset.location?.lng ?? 0,
+          city,
+          country
+        }
+      } as Partial<Asset>
+    );
+  };
+  const renameLocation = async (oldLocation: string) => {
+    const next = (editingLocationName[oldLocation] ?? "").trim();
+    if (!next || next === oldLocation) return;
+    const [city = "", country = ""] = next.split(",").map((s) => s.trim());
+    const list = locationsToAssets.get(oldLocation) ?? [];
+    await Promise.all(list.map((asset) => setLocationOnAsset(asset, city, country)));
+  };
+  const deleteLocationEverywhere = async (locationKey: string) => {
+    const list = locationsToAssets.get(locationKey) ?? [];
+    await Promise.all(list.map((asset) => removeLocationFromAsset(asset)));
+  };
+  const toggleAssetInCollection = async (collection: AppCollection, assetId: string, include: boolean) => {
+    const res = await fetch(`/api/collections/${collection.id}/assets`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ assetId, include })
+    });
+    if (!res.ok) return;
+    if (onRefreshCollections) await onRefreshCollections();
   };
 
   return (
@@ -489,7 +585,59 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
 
         {activeTab === "collections" ? (
           <div className="admin-tab-panel">
-            <Collections items={assets} />
+            <table className="admin-stats-table">
+              <thead>
+                <tr>
+                  <th>Col·lecció</th>
+                  <th>Total</th>
+                  <th>Fotos</th>
+                </tr>
+              </thead>
+              <tbody>
+                {collections.map((collection) => (
+                  <Fragment key={collection.id}>
+                    <tr>
+                      <td>{collection.name}</td>
+                      <td>{collection.assetIds.length}</td>
+                      <td>
+                        <button type="button" className="btn btn-sm" onClick={() => toggleCollectionRow(collection.id)}>
+                          {openCollectionRows[collection.id] ? "Amagar" : "Mostrar"}
+                        </button>
+                      </td>
+                    </tr>
+                    {openCollectionRows[collection.id] ? (
+                      <tr key={`${collection.id}-assets`} className="admin-stats-expanded-row">
+                        <td colSpan={3}>
+                          <div className="admin-linked-thumbs">
+                            {collection.assetIds.map((assetId) => {
+                              const asset = assetById.get(assetId);
+                              if (!asset) return null;
+                              const thumb = (asset.files.thumbUrl || asset.files.previewUrl || asset.files.originalUrl).trim();
+                              const included = collection.assetIds.includes(asset.id);
+                              return (
+                                <label key={`${collection.id}-${asset.id}`} className="admin-linked-thumb-item admin-linked-thumb-item--check">
+                                  <input
+                                    type="checkbox"
+                                    checked={included}
+                                    onChange={(e) => {
+                                      void toggleAssetInCollection(collection, asset.id, e.target.checked);
+                                    }}
+                                  />
+                                  <button type="button" onClick={() => setPreviewAsset({ asset, src: asset.files.previewUrl || asset.files.originalUrl || thumb, title: asset.title })}>
+                                    {/* eslint-disable-next-line @next/next/no-img-element -- remote storage image */}
+                                    <img src={thumb} alt={asset.title} referrerPolicy="no-referrer" />
+                                  </button>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
           </div>
         ) : null}
 
@@ -500,15 +648,78 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
                 <tr>
                   <th>Tag</th>
                   <th>Total d&apos;usos</th>
+                  <th>Accions</th>
                 </tr>
               </thead>
               <tbody>
-                {tagStats.map((row) => (
-                  <tr key={row.value}>
-                    <td>{row.value}</td>
-                    <td>{row.total}</td>
-                  </tr>
-                ))}
+                {tagStats.map((row) => {
+                  const linked = tagsToAssets.get(row.value) ?? [];
+                  const currentEdit = editingTagName[row.value] ?? row.value;
+                  const addable = assets.filter((asset) => !(asset.tags ?? []).map((t) => t.trim().toLowerCase()).includes(row.value));
+                  return (
+                    <Fragment key={row.value}>
+                      <tr>
+                        <td>
+                          <input
+                            type="text"
+                            value={currentEdit}
+                            onChange={(e) => setEditingTagName((prev) => ({ ...prev, [row.value]: e.target.value }))}
+                          />
+                        </td>
+                        <td>{row.total}</td>
+                        <td className="admin-color-actions">
+                          <button type="button" className="btn btn-sm" onClick={() => void renameTag(row.value)}>Desar nom</button>
+                          <button type="button" className="btn btn-sm" onClick={() => toggleTagRow(row.value)}>
+                            {openTagRows[row.value] ? "Amagar fotos" : "Mostrar fotos"}
+                          </button>
+                          <button type="button" className="btn btn-sm danger" onClick={() => void deleteTagEverywhere(row.value)}>Eliminar</button>
+                        </td>
+                      </tr>
+                      {openTagRows[row.value] ? (
+                        <tr key={`${row.value}-photos`} className="admin-stats-expanded-row">
+                          <td colSpan={3}>
+                            <div className="admin-linked-thumbs">
+                              {linked.slice(0, 8).map((asset) => {
+                                const thumb = (asset.files.thumbUrl || asset.files.previewUrl || asset.files.originalUrl).trim();
+                                return (
+                                  <div key={`${row.value}-${asset.id}`} className="admin-linked-thumb-item">
+                                    <button type="button" onClick={() => setPreviewAsset({ asset, src: asset.files.previewUrl || asset.files.originalUrl || thumb, title: asset.title })}>
+                                      {/* eslint-disable-next-line @next/next/no-img-element -- remote storage image */}
+                                      <img src={thumb} alt={asset.title} referrerPolicy="no-referrer" />
+                                    </button>
+                                    <button type="button" className="btn btn-sm danger" onClick={() => void removeTagFromAsset(asset, row.value)}>Treure</button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            {linked.length > 8 ? <p className="modal-muted">+ {linked.length - 8} fotos més</p> : null}
+                            <div className="admin-inline-add">
+                              <select value={addAssetByTag[row.value] ?? ""} onChange={(e) => setAddAssetByTag((prev) => ({ ...prev, [row.value]: e.target.value }))}>
+                                <option value="">Afegir foto al tag…</option>
+                                {addable.map((asset) => (
+                                  <option key={asset.id} value={asset.id}>{asset.title}</option>
+                                ))}
+                              </select>
+                              <button
+                                type="button"
+                                className="btn btn-sm"
+                                onClick={() => {
+                                  const selectedId = addAssetByTag[row.value];
+                                  if (!selectedId) return;
+                                  const asset = assetById.get(selectedId);
+                                  if (!asset) return;
+                                  void addTagToAsset(asset, row.value);
+                                }}
+                              >
+                                Afegir
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -521,15 +732,78 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
                 <tr>
                   <th>Ubicació</th>
                   <th>Total d&apos;usos</th>
+                  <th>Accions</th>
                 </tr>
               </thead>
               <tbody>
-                {locationStats.map((row) => (
-                  <tr key={row.value}>
-                    <td>{row.value}</td>
-                    <td>{row.total}</td>
-                  </tr>
-                ))}
+                {locationStats.map((row) => {
+                  const linked = locationsToAssets.get(row.value) ?? [];
+                  const currentEdit = editingLocationName[row.value] ?? row.value;
+                  const [city = "", country = ""] = row.value.split(",").map((s) => s.trim());
+                  const addable = assets.filter((asset) => {
+                    const key = [asset.location?.city?.trim() ?? "", asset.location?.country?.trim() ?? ""].filter(Boolean).join(", ");
+                    return key !== row.value;
+                  });
+                  return (
+                    <Fragment key={row.value}>
+                      <tr>
+                        <td>
+                          <input type="text" value={currentEdit} onChange={(e) => setEditingLocationName((prev) => ({ ...prev, [row.value]: e.target.value }))} />
+                        </td>
+                        <td>{row.total}</td>
+                        <td className="admin-color-actions">
+                          <button type="button" className="btn btn-sm" onClick={() => void renameLocation(row.value)}>Desar nom</button>
+                          <button type="button" className="btn btn-sm" onClick={() => toggleLocationRow(row.value)}>
+                            {openLocationRows[row.value] ? "Amagar fotos" : "Mostrar fotos"}
+                          </button>
+                          <button type="button" className="btn btn-sm danger" onClick={() => void deleteLocationEverywhere(row.value)}>Eliminar</button>
+                        </td>
+                      </tr>
+                      {openLocationRows[row.value] ? (
+                        <tr key={`${row.value}-photos`} className="admin-stats-expanded-row">
+                          <td colSpan={3}>
+                            <div className="admin-linked-thumbs">
+                              {linked.slice(0, 8).map((asset) => {
+                                const thumb = (asset.files.thumbUrl || asset.files.previewUrl || asset.files.originalUrl).trim();
+                                return (
+                                  <div key={`${row.value}-${asset.id}`} className="admin-linked-thumb-item">
+                                    <button type="button" onClick={() => setPreviewAsset({ asset, src: asset.files.previewUrl || asset.files.originalUrl || thumb, title: asset.title })}>
+                                      {/* eslint-disable-next-line @next/next/no-img-element -- remote storage image */}
+                                      <img src={thumb} alt={asset.title} referrerPolicy="no-referrer" />
+                                    </button>
+                                    <button type="button" className="btn btn-sm danger" onClick={() => void removeLocationFromAsset(asset)}>Treure</button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            {linked.length > 8 ? <p className="modal-muted">+ {linked.length - 8} fotos més</p> : null}
+                            <div className="admin-inline-add">
+                              <select value={addAssetByLocation[row.value] ?? ""} onChange={(e) => setAddAssetByLocation((prev) => ({ ...prev, [row.value]: e.target.value }))}>
+                                <option value="">Afegir foto a ubicació…</option>
+                                {addable.map((asset) => (
+                                  <option key={asset.id} value={asset.id}>{asset.title}</option>
+                                ))}
+                              </select>
+                              <button
+                                type="button"
+                                className="btn btn-sm"
+                                onClick={() => {
+                                  const selectedId = addAssetByLocation[row.value];
+                                  if (!selectedId) return;
+                                  const asset = assetById.get(selectedId);
+                                  if (!asset) return;
+                                  void setLocationOnAsset(asset, city, country);
+                                }}
+                              >
+                                Afegir
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>

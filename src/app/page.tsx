@@ -373,13 +373,6 @@ function HomeContent() {
                       onOpenViewer={(asset) => setSelectedId(asset.id)}
                     />
                   ) : null}
-                  {view === "map" ? (
-                    <MapView
-                      items={viewItems}
-                      onEditPhoto={(asset) => setSelectedAsset(asset)}
-                      onOpenViewer={(asset) => setSelectedId(asset.id)}
-                    />
-                  ) : null}
                   {view === "colors" ? (
                     <ColorView
                       items={viewItems}
@@ -410,6 +403,15 @@ function HomeContent() {
           {mainTab === "collections" ? (
             <ViewErrorBoundary label="Col·leccions">
               <Collections items={library} onPlaySlideshow={onCollectionSlideshow} />
+            </ViewErrorBoundary>
+          ) : null}
+          {mainTab === "map" ? (
+            <ViewErrorBoundary label="Mapa">
+              <MapView
+                items={library}
+                onEditPhoto={(asset) => setSelectedAsset(asset)}
+                onOpenViewer={(asset) => setSelectedId(asset.id)}
+              />
             </ViewErrorBoundary>
           ) : null}
           {mainTab === "memories" ? (
@@ -500,6 +502,7 @@ function HomeContent() {
           await refreshLibraryRef.current();
           await refreshAdminCollections();
         }}
+        onRefreshCollections={refreshAdminCollections}
       />
     </>
   );

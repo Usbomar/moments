@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-export type GalleryView = "masonry" | "map" | "timeline" | "colors" | "collections" | "slider";
+export type GalleryView = "masonry" | "timeline" | "colors" | "collections" | "slider";
 
 interface Props {
   value: GalleryView;
@@ -18,8 +18,7 @@ const OPTIONS: Array<{ id: GalleryView; label: string; icon: string }> = [
   { id: "timeline", label: "Data", icon: "🗓" },
   { id: "collections", label: "Col·leccions", icon: "▤" },
   { id: "colors", label: "Colors", icon: "⬤" },
-  { id: "slider", label: "Presentació", icon: "▶" },
-  { id: "map", label: "Mapa", icon: "⌖" }
+  { id: "slider", label: "Presentació", icon: "▶" }
 ];
 
 export function ViewSelector({ value, onChange, variant = "default" }: Props) {
@@ -50,7 +49,6 @@ export function ViewSelector({ value, onChange, variant = "default" }: Props) {
             title={option.label}
             aria-pressed={value === option.id}
             onClick={() => onChange(option.id)}
-            data-map-feature={option.id === "map" ? "true" : "false"}
           >
             <span aria-hidden>{option.icon}</span> <span>{option.label}</span>
           </button>

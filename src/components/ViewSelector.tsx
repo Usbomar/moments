@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-export type GalleryView = "masonry" | "map" | "timeline" | "colors" | "slider";
+export type GalleryView = "masonry" | "map" | "timeline" | "colors" | "collections" | "slider";
 
 interface Props {
   value: GalleryView;
@@ -14,11 +14,12 @@ interface Props {
 const STORAGE_KEY = "moments-view-preference";
 
 const OPTIONS: Array<{ id: GalleryView; label: string; icon: string }> = [
-  { id: "masonry", label: "Masonry", icon: "📊" },
-  { id: "map", label: "Map", icon: "🗺️" },
-  { id: "timeline", label: "Timeline", icon: "📅" },
-  { id: "colors", label: "Colors", icon: "🌈" },
-  { id: "slider", label: "Slider", icon: "▶️" }
+  { id: "masonry", label: "Quadrícula", icon: "▦" },
+  { id: "timeline", label: "Data", icon: "🗓" },
+  { id: "collections", label: "Col·leccions", icon: "▤" },
+  { id: "colors", label: "Colors", icon: "⬤" },
+  { id: "slider", label: "Presentació", icon: "▶" },
+  { id: "map", label: "Mapa", icon: "⌖" }
 ];
 
 export function ViewSelector({ value, onChange, variant = "default" }: Props) {
@@ -49,9 +50,9 @@ export function ViewSelector({ value, onChange, variant = "default" }: Props) {
             title={option.label}
             aria-pressed={value === option.id}
             onClick={() => onChange(option.id)}
+            data-map-feature={option.id === "map" ? "true" : "false"}
           >
-            <span aria-hidden>{option.icon}</span>
-            <span className="sr-only">{option.label}</span>
+            <span aria-hidden>{option.icon}</span> <span>{option.label}</span>
           </button>
         ))}
       </div>

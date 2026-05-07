@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Asset } from "@/lib/types";
 import type { AppCollection } from "@/lib/collections";
+import { Collections } from "@/components/Collections";
 
 type Props = {
   open: boolean;
@@ -10,6 +11,7 @@ type Props = {
   collections: AppCollection[];
   onClose: () => void;
   onEdit: (asset: Asset) => void;
+  onEditImage: (asset: Asset) => void;
   onDelete: (asset: Asset) => Promise<void>;
   onQuickUpdate: (asset: Asset, patch: Partial<Asset>) => Promise<void>;
 };
@@ -41,6 +43,7 @@ const COLOR_PRESETS: Array<{ label: string; hue: number }> = [
   { label: "Marrón", hue: 24 }
 ];
 const CUSTOM_COLOR_STORAGE_KEY = "moments_admin_custom_colors_v1";
+type TabId = "photos" | "collections" | "tags" | "locations" | "colors";
 
 function cmpText(a: string, b: string): number {
   return a.localeCompare(b, "es", { sensitivity: "base", numeric: true });
@@ -103,7 +106,8 @@ function hexToHue(hex: string): number | null {
   return deg < 0 ? deg + 360 : deg;
 }
 
-export function AdminAssetManager({ open, assets, collections, onClose, onEdit, onDelete, onQuickUpdate }: Props) {
+export function AdminAssetManager({ open, assets, collections, onClose, onEdit, onEditImage, onDelete, onQuickUpdate }: Props) {
+  const [activeTab, setActiveTab] = useState<TabId>("photos");
   const [sort, setSort] = useState<SortState[]>([{ key: "takenAt", dir: "desc" }]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(100);
@@ -114,9 +118,39 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
   const [customColors, setCustomColors] = useState<Array<{ label: string; hue: number }>>([]);
   const [newColorHex, setNewColorHex] = useState("#ff7a00");
   const [newColorName, setNewColorName] = useState("");
-  const [previewAsset, setPreviewAsset] = useState<{ src: string; title: string } | null>(null);
+  const [previewAsset, setPreviewAsset] = useState<{ asset: Asset; src: string; title: string } | null>(null);
+  const [editingColorHue, setEditingColorHue] = useState<number | null>(null);
+  const [editingColorName, setEditingColorName] = useState("");
   const saveTimersRef = useRef<Record<string, number>>({});
   const allColorOptions = useMemo(() => [...COLOR_PRESETS, ...customColors], [customColors]);
+  const tagStats = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const asset of assets) {
+      const seen = new Set<string>();
+      for (const raw of asset.tags ?? []) {
+        const tag = raw.trim().toLowerCase();
+        if (!tag || seen.has(tag)) continue;
+        seen.add(tag);
+        counts.set(tag, (counts.get(tag) ?? 0) + 1);
+      }
+    }
+    return [...counts.entries()]
+      .map(([value, total]) => ({ value, total }))
+      .sort((a, b) => a.value.localeCompare(b.value, "ca", { sensitivity: "base", numeric: true }));
+  }, [assets]);
+  const locationStats = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const asset of assets) {
+      const city = asset.location?.city?.trim() ?? "";
+      const country = asset.location?.country?.trim() ?? "";
+      const key = [city, country].filter(Boolean).join(", ");
+      if (!key) continue;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+      .map(([value, total]) => ({ value, total }))
+      .sort((a, b) => a.value.localeCompare(b.value, "ca", { sensitivity: "base", numeric: true }));
+  }, [assets]);
 
   const sorted = useMemo(() => {
     const list = [...assets];
@@ -172,7 +206,7 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
       const safe = parsed
         .filter((x) => typeof x?.hue === "number")
         .map((x, idx) => ({
-          label: x.label?.trim() || `Personalizado ${idx + 1}`,
+          label: x.label?.trim() || `Personalitzat ${idx + 1}`,
           hue: Math.max(0, Math.min(359, Math.round(x.hue!)))
         }));
       setCustomColors(safe);
@@ -234,67 +268,84 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
     const hue = hexToHue(newColorHex);
     if (hue === null) return;
     if (allColorOptions.some((c) => Math.abs(c.hue - hue) <= 1)) return;
-    const label = newColorName.trim() || `Personalizado ${customColors.length + 1}`;
+    const label = newColorName.trim() || `Personalitzat ${customColors.length + 1}`;
     setCustomColors((prev) => [...prev, { label, hue }]);
     setNewColorName("");
   };
+  const startEditColor = (hue: number, label: string) => {
+    setEditingColorHue(hue);
+    setEditingColorName(label);
+  };
+  const commitEditColor = () => {
+    if (editingColorHue === null) return;
+    const next = editingColorName.trim();
+    if (!next) return;
+    setCustomColors((prev) => prev.map((c) => (c.hue === editingColorHue ? { ...c, label: next } : c)));
+    setEditingColorHue(null);
+    setEditingColorName("");
+  };
+  const removeCustomColor = (hue: number) => {
+    setCustomColors((prev) => prev.filter((c) => c.hue !== hue));
+    if (editingColorHue === hue) {
+      setEditingColorHue(null);
+      setEditingColorName("");
+    }
+  };
 
   return (
-    <div className="modal-overlay modal-overlay--front admin-assets-overlay" role="dialog" aria-modal="true" aria-label="Administrador de fotos" onClick={onClose}>
+    <div className="modal-overlay modal-overlay--front admin-assets-overlay" role="dialog" aria-modal="true" aria-label="Configuració de la biblioteca" onClick={onClose}>
       <div className="modal-content admin-assets-modal admin-assets-modal--fullscreen" onClick={(e) => e.stopPropagation()}>
         <header className="admin-assets-head">
-          <h2>Administrador de fotos</h2>
+          <h2>Configuració</h2>
           <div className="admin-assets-head-actions">
-            <div className="admin-assets-custom-color">
-              <input type="color" value={newColorHex} onChange={(e) => setNewColorHex(e.target.value)} aria-label="Escoger color personalizado" />
-              <input
-                type="text"
-                value={newColorName}
-                onChange={(e) => setNewColorName(e.target.value)}
-                placeholder="Nombre color"
-                aria-label="Nombre del color personalizado"
-              />
-              <button type="button" className="btn btn-sm" onClick={addCustomColor}>
-                + Color
-              </button>
+            <div className="admin-tabs" role="tablist" aria-label="Pestanyes de configuració">
+              <button type="button" role="tab" aria-selected={activeTab === "photos"} className={activeTab === "photos" ? "is-active" : ""} onClick={() => setActiveTab("photos")}>Fotos</button>
+              <button type="button" role="tab" aria-selected={activeTab === "collections"} className={activeTab === "collections" ? "is-active" : ""} onClick={() => setActiveTab("collections")}>Col·leccions</button>
+              <button type="button" role="tab" aria-selected={activeTab === "tags"} className={activeTab === "tags" ? "is-active" : ""} onClick={() => setActiveTab("tags")}>Tags</button>
+              <button type="button" role="tab" aria-selected={activeTab === "locations"} className={activeTab === "locations" ? "is-active" : ""} onClick={() => setActiveTab("locations")}>Ubicacions</button>
+              <button type="button" role="tab" aria-selected={activeTab === "colors"} className={activeTab === "colors" ? "is-active" : ""} onClick={() => setActiveTab("colors")}>Colors</button>
             </div>
-            <label className="admin-assets-toggle">
-              <input type="checkbox" checked={showMeta} onChange={(e) => setShowMeta(e.target.checked)} />
-              Metadatos
-            </label>
-            <label className="admin-assets-toggle">
-              <input type="checkbox" checked={showContent} onChange={(e) => setShowContent(e.target.checked)} />
-              Contenido
-            </label>
           </div>
-          <button type="button" className="btn btn-ghost btn-sm" onClick={onClose} aria-label="Cerrar">
+          <button type="button" className="btn btn-ghost btn-sm" onClick={onClose} aria-label="Tancar">
             ×
           </button>
         </header>
 
+        {activeTab === "photos" ? (
+        <>
+        <div className="admin-assets-subhead">
+          <label className="admin-assets-toggle">
+            <input type="checkbox" checked={showMeta} onChange={(e) => setShowMeta(e.target.checked)} />
+            Metadades
+          </label>
+          <label className="admin-assets-toggle">
+            <input type="checkbox" checked={showContent} onChange={(e) => setShowContent(e.target.checked)} />
+            Contingut
+          </label>
+        </div>
         <div className="admin-assets-table-wrap">
           <table className="admin-assets-table">
             <thead>
               <tr>
                 <th className="admin-assets-col-thumb">Mini</th>
                 <th>
-                  <button type="button" onClick={(e) => toggleSort("title", e.shiftKey)}>Nombre</button>
+                  <button type="button" onClick={(e) => toggleSort("title", e.shiftKey)}>Nom</button>
                 </th>
                 <th>
-                  <button type="button" onClick={(e) => toggleSort("takenAt", e.shiftKey)}>Fecha</button>
+                  <button type="button" onClick={(e) => toggleSort("takenAt", e.shiftKey)}>Data</button>
                 </th>
                 <th>
                   <button type="button" onClick={(e) => toggleSort("color", e.shiftKey)}>Color</button>
                 </th>
                 <th>
-                  <button type="button" onClick={(e) => toggleSort("location", e.shiftKey)}>Ubicación</button>
+                  <button type="button" onClick={(e) => toggleSort("location", e.shiftKey)}>Ubicació</button>
                 </th>
                 <th>
-                  <button type="button" onClick={(e) => toggleSort("favorite", e.shiftKey)}>Fav</button>
+                  <button type="button" onClick={(e) => toggleSort("favorite", e.shiftKey)}>Preferit</button>
                 </th>
                 {showContent ? <th title="Descripción">📝</th> : null}
                 {showContent ? <th title="Tags">🏷</th> : null}
-                {showMeta ? <th title="Colecciones">📚</th> : null}
+                {showMeta ? <th title="Col·leccions">📚</th> : null}
                 <th className="admin-assets-col-delete">X</th>
               </tr>
             </thead>
@@ -312,7 +363,7 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
                         className="admin-assets-thumb-btn"
                         onClick={() => {
                           if (!thumb) return;
-                          setPreviewAsset({ src: a.files.previewUrl || a.files.originalUrl || thumb, title: a.title });
+                          setPreviewAsset({ asset: a, src: a.files.previewUrl || a.files.originalUrl || thumb, title: a.title });
                         }}
                         aria-label={`Ampliar ${a.title}`}
                       >
@@ -339,7 +390,7 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
                         onChange={(e) => updateDraft(a, { title: e.target.value })}
                       />
                       <span className={`admin-assets-save admin-assets-save--${saveState}`}>
-                        {saveState === "saving" ? "guardando..." : saveState === "saved" ? "guardado" : saveState === "error" ? "error" : ""}
+                        {saveState === "saving" ? "desant..." : saveState === "saved" ? "desat" : saveState === "error" ? "error" : ""}
                       </span>
                     </div>
                   </td>
@@ -361,7 +412,7 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
                       value={colorHueToPreset(draftById[a.id]?.colorHue ?? a.colorHue, allColorOptions)}
                       onChange={(e) => updateDraft(a, { colorHue: e.target.value ? Number(e.target.value) : null })}
                     >
-                      <option value="">Sin color</option>
+                      <option value="">Sense color</option>
                       {allColorOptions.map((preset) => (
                         <option key={preset.hue} value={preset.hue}>
                           {preset.label}
@@ -408,7 +459,7 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
                         className="btn btn-sm danger admin-assets-delete"
                         disabled={busyId === a.id}
                         onClick={async () => {
-                          if (!confirm(`¿Eliminar "${a.title}"? Esta acción no se puede deshacer.`)) return;
+                          if (!confirm(`Vols eliminar "${a.title}"? Aquesta acció no es pot desfer.`)) return;
                           setBusyId(a.id);
                           try {
                             await onDelete(a);
@@ -428,21 +479,129 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
           {visibleCount < sorted.length ? (
             <div className="admin-assets-load-more">
               <button type="button" className="btn btn-sm" onClick={loadMore}>
-                Cargar más
+                Carregar més
               </button>
             </div>
           ) : null}
         </div>
+        </>
+        ) : null}
+
+        {activeTab === "collections" ? (
+          <div className="admin-tab-panel">
+            <Collections items={assets} />
+          </div>
+        ) : null}
+
+        {activeTab === "tags" ? (
+          <div className="admin-tab-panel">
+            <table className="admin-stats-table">
+              <thead>
+                <tr>
+                  <th>Tag</th>
+                  <th>Total d&apos;usos</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tagStats.map((row) => (
+                  <tr key={row.value}>
+                    <td>{row.value}</td>
+                    <td>{row.total}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+
+        {activeTab === "locations" ? (
+          <div className="admin-tab-panel">
+            <table className="admin-stats-table">
+              <thead>
+                <tr>
+                  <th>Ubicació</th>
+                  <th>Total d&apos;usos</th>
+                </tr>
+              </thead>
+              <tbody>
+                {locationStats.map((row) => (
+                  <tr key={row.value}>
+                    <td>{row.value}</td>
+                    <td>{row.total}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+
+        {activeTab === "colors" ? (
+          <div className="admin-tab-panel">
+            <div className="admin-assets-custom-color">
+              <input type="color" value={newColorHex} onChange={(e) => setNewColorHex(e.target.value)} aria-label="Escull color personalitzat" />
+              <input type="text" value={newColorName} onChange={(e) => setNewColorName(e.target.value)} placeholder="Nom del color" />
+              <button type="button" className="btn btn-sm" onClick={addCustomColor}>Afegir color</button>
+            </div>
+            <table className="admin-stats-table">
+              <thead>
+                <tr>
+                  <th>Mostra</th>
+                  <th>Nom</th>
+                  <th>Accions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {customColors.map((color) => (
+                  <tr key={color.hue}>
+                    <td><span className="admin-assets-color-chip" style={{ backgroundColor: `hsl(${color.hue} 72% 46%)` }} /></td>
+                    <td>
+                      {editingColorHue === color.hue ? (
+                        <input type="text" value={editingColorName} onChange={(e) => setEditingColorName(e.target.value)} />
+                      ) : (
+                        color.label
+                      )}
+                    </td>
+                    <td className="admin-color-actions">
+                      {editingColorHue === color.hue ? (
+                        <>
+                          <button type="button" className="btn btn-sm" onClick={commitEditColor}>Desar</button>
+                          <button type="button" className="btn btn-sm" onClick={() => setEditingColorHue(null)}>Cancel·lar</button>
+                        </>
+                      ) : (
+                        <>
+                          <button type="button" className="btn btn-sm" onClick={() => startEditColor(color.hue, color.label)}>Editar</button>
+                          <button type="button" className="btn btn-sm danger" onClick={() => removeCustomColor(color.hue)}>Eliminar</button>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
       </div>
       {previewAsset ? (
         <div className="admin-assets-preview-overlay" role="dialog" aria-modal="true" aria-label={`Vista ampliada de ${previewAsset.title}`} onClick={() => setPreviewAsset(null)}>
           <div className="admin-assets-preview-card" onClick={(e) => e.stopPropagation()}>
-            <button type="button" className="btn btn-ghost btn-sm admin-assets-preview-close" onClick={() => setPreviewAsset(null)} aria-label="Cerrar vista ampliada">
+            <button type="button" className="btn btn-ghost btn-sm admin-assets-preview-close" onClick={() => setPreviewAsset(null)} aria-label="Tancar vista ampliada">
               ×
             </button>
             {/* eslint-disable-next-line @next/next/no-img-element -- remote storage image */}
             <img src={previewAsset.src} alt={previewAsset.title} className="admin-assets-preview-image" referrerPolicy="no-referrer" />
             <div className="admin-assets-preview-caption">{previewAsset.title}</div>
+            <div className="viewer-toolbar" role="toolbar" aria-label="Accions de la foto">
+              <button type="button" className="viewer-toolbar-btn viewer-toolbar-btn--primary" onClick={() => {
+                onEdit(previewAsset.asset);
+              }}>
+                Editar dades
+              </button>
+              <button type="button" className="viewer-toolbar-btn" onClick={() => {
+                onEditImage(previewAsset.asset);
+              }}>
+                Editar imatge
+              </button>
+            </div>
           </div>
         </div>
       ) : null}

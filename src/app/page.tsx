@@ -35,6 +35,9 @@ const SliderView = dynamic(() => import("@/views/SliderView").then((mod) => mod.
 const Collections = dynamic(() => import("@/components/Collections").then((mod) => mod.Collections), {
   loading: () => <TabLoadingHint label="col·leccions" />
 });
+const CollectionMosaicView = dynamic(() => import("@/components/CollectionMosaicView").then((mod) => mod.CollectionMosaicView), {
+  loading: () => <TabLoadingHint label="col·leccions" />
+});
 
 const Memories = dynamic(() => import("@/components/Memories").then((mod) => mod.Memories), {
   loading: () => <TabLoadingHint label="records" />
@@ -151,6 +154,12 @@ function HomeContent() {
   }, [refreshLibrary]);
 
   useEffect(() => {
+    if (mainTab !== "library") return;
+    if (view !== "collections") return;
+    void refreshAdminCollections();
+  }, [mainTab, refreshAdminCollections, view]);
+
+  useEffect(() => {
     if (supabaseConfigured !== true) return;
     if (typeof window === "undefined") return;
     const alreadyMigrated = window.localStorage.getItem(COLLECTIONS_MIGRATED_KEY);
@@ -176,18 +185,6 @@ function HomeContent() {
       }
     })();
   }, [supabaseConfigured]);
-
-  const openDetailsEditorFromViewer = useCallback((asset: Asset) => {
-    setSelectedId(null);
-    setSlideshowItems(null);
-    setSelectedAsset(asset);
-  }, []);
-
-  const openImageEditorFromViewer = useCallback((asset: Asset) => {
-    setSelectedId(null);
-    setSlideshowItems(null);
-    setImageEditorAsset(asset);
-  }, []);
 
   const onMemoryView = useCallback((memAssets: Asset[]) => {
     if (!memAssets.length) return;
@@ -390,6 +387,15 @@ function HomeContent() {
                       onOpenViewer={(asset) => setSelectedId(asset.id)}
                     />
                   ) : null}
+                  {view === "collections" ? (
+                    <CollectionMosaicView
+                      items={viewItems}
+                      collections={adminCollections}
+                      maxOpen={5}
+                      onOpenModal={(asset) => setSelectedAsset(asset)}
+                      onOpenViewer={(asset) => setSelectedId(asset.id)}
+                    />
+                  ) : null}
                   {view === "slider" ? (
                     <SliderView
                       items={viewItems}
@@ -424,8 +430,6 @@ function HomeContent() {
         selectedId={selectedId}
         onSelect={setSelectedId}
         onClose={onViewerClose}
-        onEditDetails={openDetailsEditorFromViewer}
-        onEditImage={openImageEditorFromViewer}
       />
 
       {collectionSlideshow?.length ? (
@@ -473,6 +477,9 @@ function HomeContent() {
         onEdit={(asset) => {
           setPhotoModalFront(true);
           setSelectedAsset(asset);
+        }}
+        onEditImage={(asset) => {
+          setImageEditorAsset(asset);
         }}
         onQuickUpdate={async (asset, patch) => {
           const merged: Asset = {

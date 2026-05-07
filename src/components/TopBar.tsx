@@ -49,6 +49,7 @@ export function TopBar({
         </span>
       </div>
       <div className="moments-topbar-center">
+        {showLibraryViewSelector ? <ViewSelector variant="compact" value={libraryView} onChange={onLibraryViewChange} /> : null}
         <label className="moments-search-label" htmlFor="global-search">
           <span className="sr-only">Cerca</span>
           <span aria-hidden className="moments-search-icon">
@@ -59,20 +60,20 @@ export function TopBar({
             id="global-search"
             type="search"
             className="moments-search-input"
-            placeholder="Buscar por título, tags, descripción o ciudad…"
+            placeholder="Cerca per títol, tags, descripció o ciutat…"
             defaultValue={filters.searchQuery}
             onChange={onSearchChange}
             autoComplete="off"
           />
         </label>
-        <div className="moments-year-mini" aria-label="Filtro por años">
+        <div className="moments-year-mini" aria-label="Filtre per anys">
           <input
             type="number"
             min={2010}
             max={filters.year[1]}
             value={filters.year[0]}
             onChange={(e) => setYear([Math.min(Number(e.target.value || 2010), filters.year[1]), filters.year[1]])}
-            aria-label="Año desde"
+            aria-label="Any des de"
           />
           <span>—</span>
           <input
@@ -83,19 +84,16 @@ export function TopBar({
             onChange={(e) =>
               setYear([filters.year[0], Math.max(filters.year[0], Number(e.target.value || new Date().getFullYear()))])
             }
-            aria-label="Año hasta"
+            aria-label="Any fins"
           />
         </div>
       </div>
       <div className="moments-topbar-right">
-        {libraryUploadSlot || showLibraryViewSelector ? (
-          <div className="moments-topbar-toolbar">
-            {libraryUploadSlot}
-            {showLibraryViewSelector ? <ViewSelector variant="compact" value={libraryView} onChange={onLibraryViewChange} /> : null}
-          </div>
-        ) : null}
-        <button type="button" className="btn btn-ghost" aria-label="Administrar fotos" title="Administrar fotos" onClick={onAdminClick}>
-          ⚙
+        {libraryUploadSlot ? <div className="moments-topbar-toolbar moments-topbar-toolbar--actions">{libraryUploadSlot}</div> : null}
+        <button type="button" className="btn btn-ghost moments-settings-btn" aria-label="Configuració" title="Configuració" onClick={onAdminClick}>
+          <span className="moments-settings-btn-icon" aria-hidden>
+            ⚙
+          </span>
         </button>
       </div>
     </header>

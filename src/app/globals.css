@@ -1390,8 +1390,9 @@ button.danger {
   display: flex;
   align-items: center;
   gap: 10px;
-  justify-content: center;
+  justify-content: flex-start;
   min-width: 0;
+  padding-left: 8px;
 }
 
 .moments-logo {
@@ -1462,6 +1463,16 @@ button.danger {
 
 .view-selector-compact-btn {
   min-width: 40px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.view-selector-compact-btn[data-map-feature="true"] {
+  border-color: color-mix(in srgb, var(--accent) 65%, var(--border-dark));
+  background: color-mix(in srgb, var(--accent-light) 60%, var(--bg-primary));
+  font-weight: 600;
 }
 
 .moments-topbar-toolbar {
@@ -1469,6 +1480,21 @@ button.danger {
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.moments-topbar-toolbar--actions {
+  margin-right: 12px;
+}
+
+.moments-settings-btn {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+}
+
+.moments-settings-btn-icon {
+  display: inline-block;
+  transform: scale(1.5);
 }
 
 .admin-assets-modal {
@@ -1515,6 +1541,33 @@ button.danger {
   align-items: center;
   gap: 12px;
   margin-left: auto;
+}
+
+.admin-tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.admin-tabs button {
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+  padding: 8px 12px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.admin-tabs button.is-active {
+  background: color-mix(in srgb, var(--accent-light) 65%, var(--bg-primary));
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.admin-assets-subhead {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 8px;
 }
 
 .admin-assets-custom-color {
@@ -1809,6 +1862,114 @@ button.danger {
   background: var(--bg-primary);
   border: 1px solid var(--border);
   padding: 10px;
+}
+
+.admin-tab-panel {
+  border: 1px solid var(--border);
+  padding: 10px;
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.admin-stats-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.admin-stats-table th,
+.admin-stats-table td {
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  padding: 8px;
+  font-size: 13px;
+}
+
+.admin-color-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.collection-mosaic-root {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.collection-mosaic-section {
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+}
+
+.collection-mosaic-header {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg-secondary) 90%, var(--bg-primary));
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.collection-mosaic-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px;
+}
+
+.collection-mosaic-item {
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+  padding: 0;
+  cursor: pointer;
+}
+
+.collection-mosaic-item.is-big {
+  grid-column: span 2;
+  grid-row: span 2;
+}
+
+.collection-mosaic-cover {
+  position: relative;
+  border: none;
+  width: 100%;
+  aspect-ratio: 16/5;
+  padding: 0;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.collection-mosaic-image {
+  object-fit: cover;
+}
+
+.viewer-caption-card {
+  margin-top: 12px;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid var(--border);
+}
+
+.viewer-caption-title {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.viewer-caption-text {
+  margin: 0 0 6px;
+  color: var(--text-secondary);
+}
+
+.viewer-caption-meta {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 
 .admin-assets-preview-image {

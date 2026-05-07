@@ -9,10 +9,8 @@ interface Props {
   selectedId: string | null;
   onClose: () => void;
   onSelect: (id: string) => void;
-  /** Obre l’editor de metadades (títol, tags, ubicació, etc.). */
-  onEditDetails: (asset: Asset) => void;
-  /** Obre l’editor d’imatge (retall, filtres, export, IA). */
-  onEditImage: (asset: Asset) => void;
+  onEditDetails?: (asset: Asset) => void;
+  onEditImage?: (asset: Asset) => void;
 }
 
 /** Matches library-grid placeholder look (gray gradient + centered text). */
@@ -33,7 +31,7 @@ const placeholderStyle: CSSProperties = {
   boxSizing: "border-box"
 };
 
-export function FullscreenViewer({ items, selectedId, onClose, onSelect, onEditDetails, onEditImage }: Props) {
+export function FullscreenViewer({ items, selectedId, onClose, onSelect }: Props) {
   const index = items.findIndex((x) => x.id === selectedId);
   const current = index >= 0 ? items[index] : null;
 
@@ -80,27 +78,13 @@ export function FullscreenViewer({ items, selectedId, onClose, onSelect, onEditD
             <span style={{ wordBreak: "break-word", maxWidth: "100%" }}>{current.title}</span>
           </div>
         )}
-        <div className="viewer-toolbar" role="toolbar" aria-label="Accions de la foto">
-          <button
-            type="button"
-            className="viewer-toolbar-btn viewer-toolbar-btn--primary"
-            onClick={() => onEditDetails(current)}
-            aria-label="Obrir l’editor de metadades"
-          >
-            Editar dades
-          </button>
-          <button
-            type="button"
-            className="viewer-toolbar-btn"
-            disabled={current.type !== "photo"}
-            title={current.type !== "photo" ? "Només fotos" : undefined}
-            aria-label="Editar imatge"
-            onClick={() => {
-              if (current.type === "photo") onEditImage(current);
-            }}
-          >
-            Editar imatge
-          </button>
+        <div className="viewer-caption-card">
+          <strong className="viewer-caption-title">{current.title}</strong>
+          {current.description?.trim() ? <p className="viewer-caption-text">{current.description.trim()}</p> : null}
+          <p className="viewer-caption-meta">
+            {new Date(current.takenAt).toLocaleDateString("ca-ES", { day: "numeric", month: "long", year: "numeric" })}
+            {current.location ? ` · ${current.location.city}, ${current.location.country}` : ""}
+          </p>
         </div>
       </div>
     </div>

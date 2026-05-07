@@ -73,8 +73,8 @@ export function FullscreenViewer({ items, selectedId, onClose, onSelect }: Props
             referrerPolicy="no-referrer"
           />
         ) : (
-          <div className="viewer-media" style={placeholderStyle} role="img" aria-label="Image not available">
-            <span style={{ fontWeight: 600, color: "var(--text, #151719)" }}>Image not available</span>
+          <div className="viewer-media" style={placeholderStyle} role="img" aria-label="Imatge no disponible">
+            <span style={{ fontWeight: 600, color: "var(--text, #151719)" }}>Imatge no disponible</span>
             <span style={{ wordBreak: "break-word", maxWidth: "100%" }}>{current.title}</span>
           </div>
         )}

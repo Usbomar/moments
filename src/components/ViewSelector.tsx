@@ -62,7 +62,7 @@ export function ViewSelector({ value, onChange, variant = "default" }: Props) {
   return (
     <div style={{ position: "relative" }}>
       <button type="button" onClick={() => setOpen((prev) => !prev)} aria-expanded={open} aria-haspopup="menu">
-        Views
+        Vistes
       </button>
       {open ? (
         <div className="card" style={{ position: "absolute", right: 0, zIndex: 15, marginTop: 6, padding: 8, minWidth: 190 }}>

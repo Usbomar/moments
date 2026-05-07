@@ -50,9 +50,12 @@ export function FullscreenViewer({ items, selectedId, onClose, onSelect }: Props
 
   const previewUrl = (current.files.mediumUrl || current.files.previewUrl)?.trim() ?? "";
 
+  const takenAtText = new Date(current.takenAt).toLocaleDateString("ca-ES", { day: "numeric", month: "long", year: "numeric" });
+  const locationText = current.location ? `${current.location.city}${current.location.country ? `, ${current.location.country}` : ""}` : "";
+
   return (
     <div className="viewer" role="dialog" aria-modal="true" aria-label="Visor de fotos a pantalla completa" onClick={onClose}>
-      <div className="viewer-inner" onClick={(e) => e.stopPropagation()}>
+      <div className="viewer-inner viewer-inner--framed" onClick={(e) => e.stopPropagation()}>
         <button
           type="button"
           className="viewer-close"
@@ -64,7 +67,7 @@ export function FullscreenViewer({ items, selectedId, onClose, onSelect }: Props
         </button>
         {previewUrl ? (
           <img
-            className="viewer-media"
+            className="viewer-media viewer-media--framed"
             src={previewUrl}
             alt={current.title}
             width={current.width || undefined}
@@ -78,12 +81,12 @@ export function FullscreenViewer({ items, selectedId, onClose, onSelect }: Props
             <span style={{ wordBreak: "break-word", maxWidth: "100%" }}>{current.title}</span>
           </div>
         )}
-        <div className="viewer-caption-card">
+        <div className="viewer-caption-card viewer-caption-card--framed">
           <strong className="viewer-caption-title">{current.title}</strong>
           {current.description?.trim() ? <p className="viewer-caption-text">{current.description.trim()}</p> : null}
           <p className="viewer-caption-meta">
-            {new Date(current.takenAt).toLocaleDateString("ca-ES", { day: "numeric", month: "long", year: "numeric" })}
-            {current.location ? ` · ${current.location.city}, ${current.location.country}` : ""}
+            {takenAtText}
+            {locationText ? ` · ${locationText}` : ""}
           </p>
         </div>
       </div>

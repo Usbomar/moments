@@ -153,16 +153,24 @@ button.active {
   width: min(95vw, 1100px);
 }
 
+.viewer-inner--framed {
+  max-width: min(92vw, 1120px);
+  max-height: 92vh;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  padding: 10px;
+}
+
 .viewer-close {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: 6px;
+  right: 6px;
   width: 36px;
   height: 36px;
-  border: 1px solid rgba(255, 255, 255, 0.45);
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.5);
-  color: #fff;
+  border: 1px solid var(--border);
+  border-radius: 0;
+  background: color-mix(in srgb, var(--bg-primary) 92%, #000 8%);
+  color: var(--text-primary);
   font-size: 24px;
   line-height: 1;
   cursor: pointer;
@@ -170,7 +178,7 @@ button.active {
 }
 
 .viewer-close:hover {
-  background: rgba(0, 0, 0, 0.72);
+  background: var(--bg-secondary);
 }
 
 /* Slider: imatge i barra de controls en blocs separats (res de controls sobre la foto) */
@@ -216,6 +224,15 @@ button.active {
   border-radius: 0;
   max-height: 80vh;
   object-fit: contain;
+}
+
+.viewer-media--framed {
+  max-width: min(90vw, 1080px);
+  max-height: calc(90vh - 120px);
+  width: auto;
+  height: auto;
+  display: block;
+  margin: 0 auto;
 }
 
 .viewer-toolbar {
@@ -2000,6 +2017,19 @@ button.danger {
   cursor: pointer;
 }
 
+.collection-mosaic-cover-title {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 1;
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(8, 12, 18, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  padding: 6px 10px;
+}
+
 .collection-mosaic-image {
   object-fit: cover;
 }
@@ -2009,6 +2039,11 @@ button.danger {
   padding: 12px;
   background: #fff;
   border: 1px solid var(--border);
+}
+
+.viewer-caption-card--framed {
+  margin-top: 8px;
+  border-color: color-mix(in srgb, var(--border) 80%, transparent);
 }
 
 .viewer-caption-title {

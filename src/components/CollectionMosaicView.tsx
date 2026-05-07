@@ -64,6 +64,7 @@ export function CollectionMosaicView({ items, collections, maxOpen, onOpenModal,
             ) : coverUrl ? (
               <button type="button" className="collection-mosaic-cover" onClick={() => toggleOpen(collection.id)}>
                 <LazyImage fill src={coverUrl} alt={collection.name} className="collection-mosaic-image" referrerPolicy="no-referrer" />
+                <span className="collection-mosaic-cover-title">{collection.name}</span>
               </button>
             ) : null}
           </section>

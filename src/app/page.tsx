@@ -154,12 +154,6 @@ function HomeContent() {
   }, [refreshLibrary]);
 
   useEffect(() => {
-    if (mainTab !== "library") return;
-    if (view !== "collections") return;
-    void refreshAdminCollections();
-  }, [mainTab, refreshAdminCollections, view]);
-
-  useEffect(() => {
     if (supabaseConfigured !== true) return;
     if (typeof window === "undefined") return;
     const alreadyMigrated = window.localStorage.getItem(COLLECTIONS_MIGRATED_KEY);
@@ -246,6 +240,12 @@ function HomeContent() {
     const body = (await res.json().catch(() => ({}))) as { collections?: AppCollection[] };
     if (res.ok) setAdminCollections(body.collections ?? []);
   }, []);
+
+  useEffect(() => {
+    if (mainTab !== "library") return;
+    if (view !== "collections") return;
+    void refreshAdminCollections();
+  }, [mainTab, refreshAdminCollections, view]);
 
   const saveImageEdits = useCallback(
     async (operations: EditOperation[], exportOpts: ExportOptions) => {

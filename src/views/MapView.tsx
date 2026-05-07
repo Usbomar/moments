@@ -27,6 +27,8 @@ function clusterByArea(items: Asset[]): Cluster[] {
     const lat = item.location?.lat;
     const lng = item.location?.lng;
     if (typeof lat !== "number" || typeof lng !== "number") continue;
+    // Guard against invalid placeholder coordinates that create "ghost" points in the Gulf of Guinea.
+    if (Math.abs(lat) < 0.000001 && Math.abs(lng) < 0.000001) continue;
     const key = `${Math.round(lat * 5) / 5}-${Math.round(lng * 5) / 5}`;
     const existing = grouped.get(key);
     if (existing) {

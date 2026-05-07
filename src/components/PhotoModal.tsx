@@ -200,11 +200,9 @@ export function PhotoModal({ asset, onClose, onSave, libraryTagSuggestions = [],
       } else {
         const geo = await fetchGeocode(locFromText);
         if (geo) {
+          // Keep labels consistent with the resolved coordinates.
+          // Mixing typed city/country with unrelated geocoded coords creates "ghost" map points.
           location = { lat: geo.lat, lng: geo.lng, city: geo.city, country: geo.country };
-          const parts = locFromText.split(",").map((p) => p.trim());
-          if (parts.length >= 2 && parts[0] && parts[1]) {
-            location = { ...location, city: parts[0], country: parts[1] };
-          }
         } else if (
           pickedLocation?.lat &&
           pickedLocation?.lng &&

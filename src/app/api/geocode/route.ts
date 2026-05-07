@@ -10,6 +10,30 @@ type NominatimHit = {
   address?: Record<string, string>;
 };
 
+function scoreHit(hit: NominatimHit, query: string): number {
+  const q = query.toLowerCase();
+  const qParts = q
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean);
+  const display = (hit.display_name ?? "").toLowerCase();
+  const country = (hit.address?.country ?? "").toLowerCase();
+  const city = pickCity(hit.address).toLowerCase();
+  const road = (hit.address?.road ?? "").toLowerCase();
+
+  let score = 0;
+  if (display.includes(q)) score += 6;
+  if (qParts.length >= 2) {
+    const cityHint = qParts[0]!;
+    const regionHint = qParts[qParts.length - 1]!;
+    if (city.includes(cityHint) || road.includes(cityHint) || display.includes(cityHint)) score += 2;
+    if (country.includes(regionHint) || city.includes(regionHint) || display.includes(regionHint)) score += 3;
+  }
+  // Prefer populated place matches over pure street POIs when ambiguous.
+  if (hit.address?.city || hit.address?.town || hit.address?.village) score += 1;
+  return score;
+}
+
 function pickCity(addr: Record<string, string> | undefined): string {
   if (!addr) return "Unknown";
   const order = [
@@ -49,7 +73,7 @@ export async function GET(req: NextRequest) {
   const url = new URL(NOMINATIM);
   url.searchParams.set("q", q);
   url.searchParams.set("format", "json");
-  url.searchParams.set("limit", "1");
+  url.searchParams.set("limit", "5");
   url.searchParams.set("addressdetails", "1");
 
   try {
@@ -71,7 +95,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "not found" }, { status: 404 });
     }
 
-    const hit = data[0];
+    const ranked = [...data].sort((a, b) => scoreHit(b, q) - scoreHit(a, q));
+    const hit = ranked[0]!;
     const lat = Number.parseFloat(hit.lat);
     const lng = Number.parseFloat(hit.lon);
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) {

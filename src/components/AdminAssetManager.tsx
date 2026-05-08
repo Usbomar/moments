@@ -462,7 +462,13 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
                 {showContent ? <th title="Descripción">📝</th> : null}
                 {showContent ? <th>TAGS</th> : null}
                 {showMeta ? <th className="admin-assets-col-collections">Col·leccions</th> : null}
-                <th className="admin-assets-col-delete">X</th>
+                <th className="admin-assets-col-delete" scope="col">
+                  <span className="admin-assets-actions-head" aria-hidden>
+                    <span className="admin-assets-actions-head-edit">✎</span>
+                    <span className="admin-assets-actions-head-del">×</span>
+                  </span>
+                  <span className="sr-only">Editar informació i eliminar</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -575,7 +581,20 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
                     </td>
                   ) : null}
                   <td className="admin-assets-col-delete">
-                    <button
+                    <div className="admin-assets-row-actions">
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-ghost admin-assets-edit-info-btn"
+                        onClick={() => onEdit(a)}
+                        aria-label={`Editar informació: ${a.title}`}
+                        title="Editar informació de la foto"
+                      >
+                        <svg className="admin-assets-edit-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                        </svg>
+                      </button>
+                      <button
                         type="button"
                         className="btn btn-sm danger admin-assets-delete"
                         disabled={busyId === a.id}
@@ -588,9 +607,11 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
                             setBusyId(null);
                           }
                         }}
+                        aria-label={`Eliminar ${a.title}`}
                       >
                         ×
                       </button>
+                    </div>
                   </td>
                 </tr>
                 );

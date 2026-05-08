@@ -273,7 +273,11 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
     });
   };
 
-  const getCollectionCount = (assetId: string) => collections.filter((c) => c.assetIds.includes(assetId)).length;
+  const getCollectionNames = (assetId: string) =>
+    collections
+      .filter((c) => c.assetIds.includes(assetId))
+      .map((c) => c.name)
+      .join(", ");
 
   const scheduleSave = (asset: Asset, patch: DraftPatch) => {
     if (saveTimersRef.current[asset.id]) window.clearTimeout(saveTimersRef.current[asset.id]);
@@ -413,7 +417,7 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
             <div className="admin-tabs" role="tablist" aria-label="Pestanyes de configuració">
               <button type="button" role="tab" aria-selected={activeTab === "photos"} className={activeTab === "photos" ? "is-active" : ""} onClick={() => setActiveTab("photos")}>Fotos</button>
               <button type="button" role="tab" aria-selected={activeTab === "collections"} className={activeTab === "collections" ? "is-active" : ""} onClick={() => setActiveTab("collections")}>Col·leccions</button>
-              <button type="button" role="tab" aria-selected={activeTab === "tags"} className={activeTab === "tags" ? "is-active" : ""} onClick={() => setActiveTab("tags")}>Tags</button>
+              <button type="button" role="tab" aria-selected={activeTab === "tags"} className={activeTab === "tags" ? "is-active" : ""} onClick={() => setActiveTab("tags")}>TAGS</button>
               <button type="button" role="tab" aria-selected={activeTab === "locations"} className={activeTab === "locations" ? "is-active" : ""} onClick={() => setActiveTab("locations")}>Ubicacions</button>
               <button type="button" role="tab" aria-selected={activeTab === "colors"} className={activeTab === "colors" ? "is-active" : ""} onClick={() => setActiveTab("colors")}>Colors</button>
             </div>
@@ -456,8 +460,8 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
                   <button type="button" onClick={(e) => toggleSort("favorite", e.shiftKey)}>Preferit</button>
                 </th>
                 {showContent ? <th title="Descripción">📝</th> : null}
-                {showContent ? <th title="Tags">🏷</th> : null}
-                {showMeta ? <th title="Col·leccions">📚</th> : null}
+                {showContent ? <th>TAGS</th> : null}
+                {showMeta ? <th className="admin-assets-col-collections">Col·leccions</th> : null}
                 <th className="admin-assets-col-delete">X</th>
               </tr>
             </thead>
@@ -466,13 +470,14 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
                 const thumb = (a.files.thumbUrl || a.files.previewUrl || a.files.originalUrl).trim();
                 const locationText = `${draftById[a.id]?.location?.city ?? a.location?.city ?? ""}${(draftById[a.id]?.location?.country ?? a.location?.country) ? `, ${draftById[a.id]?.location?.country ?? a.location?.country ?? ""}` : ""}`;
                 const saveState = savingById[a.id] ?? "idle";
+                const isFavorite = draftById[a.id]?.favorite ?? a.favorite;
                 return (
                 <tr key={a.id}>
                   <td className="admin-assets-col-thumb">
                     <div className="admin-assets-thumb-wrap">
                       <button
                         type="button"
-                        className="admin-assets-thumb-btn"
+                        className={`admin-assets-thumb-btn${isFavorite ? " admin-assets-thumb-btn--favorite" : ""}`}
                         onClick={() => {
                           if (!thumb) return;
                           openPreview(a, visibleAssets);
@@ -564,7 +569,11 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
                   </td>
                   {showContent ? <td>{a.description?.trim() ? "●" : ""}</td> : null}
                   {showContent ? <td>{a.tags?.length ? "●" : ""}</td> : null}
-                  {showMeta ? <td>{getCollectionCount(a.id) ? "●" : ""}</td> : null}
+                  {showMeta ? (
+                    <td className="admin-assets-col-collections admin-assets-collections-cell">
+                      {getCollectionNames(a.id) || "—"}
+                    </td>
+                  ) : null}
                   <td className="admin-assets-col-delete">
                     <button
                         type="button"

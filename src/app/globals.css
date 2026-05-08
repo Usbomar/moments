@@ -1724,6 +1724,12 @@ button.danger {
   cursor: pointer;
 }
 
+.admin-assets-thumb-btn--favorite .admin-assets-thumb,
+.admin-assets-thumb-btn--favorite .admin-assets-thumb--empty {
+  border: 2px solid #39ff14;
+  box-shadow: 0 0 0 1px color-mix(in srgb, #39ff14 45%, transparent);
+}
+
 .admin-assets-thumb-wrap {
   position: relative;
   display: inline-flex;
@@ -1768,6 +1774,18 @@ button.danger {
   align-items: center;
   justify-content: center;
   color: var(--text-tertiary);
+}
+
+.admin-assets-col-collections {
+  width: 220px;
+  min-width: 160px;
+}
+
+.admin-assets-collections-cell {
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.35;
+  vertical-align: top;
 }
 
 .admin-assets-table td input[type="text"],

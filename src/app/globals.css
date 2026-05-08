@@ -235,6 +235,12 @@ button.active {
   margin: 0 auto;
 }
 
+.viewer-media--framed.is-zoomed,
+.admin-assets-preview-image.is-zoomed {
+  transform: scale(1.9);
+  transform-origin: center center;
+}
+
 .viewer-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -2085,6 +2091,13 @@ button.danger {
   margin-top: 6px;
   font-size: 12px;
   color: var(--text-secondary);
+}
+
+.admin-assets-preview-nav {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
 }
 
 .admin-assets-preview-close {

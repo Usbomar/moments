@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import type { Asset } from "@/lib/types";
 
@@ -34,6 +34,7 @@ const placeholderStyle: CSSProperties = {
 export function FullscreenViewer({ items, selectedId, onClose, onSelect }: Props) {
   const index = items.findIndex((x) => x.id === selectedId);
   const current = index >= 0 ? items[index] : null;
+  const [zoom, setZoom] = useState<1 | 2>(1);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -45,7 +46,6 @@ export function FullscreenViewer({ items, selectedId, onClose, onSelect }: Props
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [current, index, items, onClose, onSelect]);
-
   if (!current) return null;
 
   const previewUrl = (current.files.mediumUrl || current.files.previewUrl)?.trim() ?? "";
@@ -67,7 +67,7 @@ export function FullscreenViewer({ items, selectedId, onClose, onSelect }: Props
         </button>
         {previewUrl ? (
           <img
-            className="viewer-media viewer-media--framed"
+            className={`viewer-media viewer-media--framed ${zoom === 2 ? "is-zoomed" : ""}`}
             src={previewUrl}
             alt={current.title}
             width={current.width || undefined}
@@ -81,6 +81,17 @@ export function FullscreenViewer({ items, selectedId, onClose, onSelect }: Props
             <span style={{ wordBreak: "break-word", maxWidth: "100%" }}>{current.title}</span>
           </div>
         )}
+        <div className="viewer-toolbar" role="toolbar" aria-label="Navegació i zoom">
+          <button type="button" className="viewer-toolbar-btn" disabled={index <= 0} onClick={() => index > 0 && onSelect(items[index - 1].id)}>
+            ←
+          </button>
+          <button type="button" className="viewer-toolbar-btn" onClick={() => setZoom((z) => (z === 1 ? 2 : 1))}>
+            {zoom === 1 ? "Zoom x2" : "Zoom x1"}
+          </button>
+          <button type="button" className="viewer-toolbar-btn" disabled={index >= items.length - 1} onClick={() => index < items.length - 1 && onSelect(items[index + 1].id)}>
+            →
+          </button>
+        </div>
         <div className="viewer-caption-card viewer-caption-card--framed">
           <strong className="viewer-caption-title">{current.title}</strong>
           {current.description?.trim() ? <p className="viewer-caption-text">{current.description.trim()}</p> : null}

@@ -118,7 +118,8 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
   const [customColors, setCustomColors] = useState<Array<{ label: string; hue: number }>>([]);
   const [newColorHex, setNewColorHex] = useState("#ff7a00");
   const [newColorName, setNewColorName] = useState("");
-  const [previewAsset, setPreviewAsset] = useState<{ asset: Asset; src: string; title: string } | null>(null);
+  const [previewAsset, setPreviewAsset] = useState<{ assetId: string; sourceIds: string[] } | null>(null);
+  const [previewZoom, setPreviewZoom] = useState<1 | 2>(1);
   const [editingColorHue, setEditingColorHue] = useState<number | null>(null);
   const [editingColorName, setEditingColorName] = useState("");
   const [openTagRows, setOpenTagRows] = useState<Record<string, boolean>>({});
@@ -387,6 +388,21 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
     if (!res.ok) return;
     if (onRefreshCollections) await onRefreshCollections();
   };
+  const openPreview = (asset: Asset, sourceAssets: Asset[]) => {
+    setPreviewZoom(1);
+    setPreviewAsset({
+      assetId: asset.id,
+      sourceIds: sourceAssets.map((x) => x.id)
+    });
+  };
+  const previewCurrent = previewAsset ? assetById.get(previewAsset.assetId) ?? null : null;
+  const previewSourceAssets = previewAsset
+    ? previewAsset.sourceIds.map((id) => assetById.get(id)).filter((x): x is Asset => Boolean(x))
+    : [];
+  const previewIndex = previewCurrent ? previewSourceAssets.findIndex((x) => x.id === previewCurrent.id) : -1;
+  const previewCanPrev = previewIndex > 0;
+  const previewCanNext = previewIndex >= 0 && previewIndex < previewSourceAssets.length - 1;
+  const previewSrc = previewCurrent ? (previewCurrent.files.previewUrl || previewCurrent.files.originalUrl || previewCurrent.files.thumbUrl).trim() : "";
 
   return (
     <div className="modal-overlay modal-overlay--front admin-assets-overlay" role="dialog" aria-modal="true" aria-label="Configuració de la biblioteca" onClick={onClose}>
@@ -459,7 +475,7 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
                         className="admin-assets-thumb-btn"
                         onClick={() => {
                           if (!thumb) return;
-                          setPreviewAsset({ asset: a, src: a.files.previewUrl || a.files.originalUrl || thumb, title: a.title });
+                          openPreview(a, visibleAssets);
                         }}
                         aria-label={`Ampliar ${a.title}`}
                       >
@@ -623,7 +639,7 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
                                       void toggleAssetInCollection(collection, asset.id, e.target.checked);
                                     }}
                                   />
-                                  <button type="button" onClick={() => setPreviewAsset({ asset, src: asset.files.previewUrl || asset.files.originalUrl || thumb, title: asset.title })}>
+                                  <button type="button" onClick={() => openPreview(asset, collection.assetIds.map((id) => assetById.get(id)).filter((x): x is Asset => Boolean(x)))}>
                                     {/* eslint-disable-next-line @next/next/no-img-element -- remote storage image */}
                                     <img src={thumb} alt={asset.title} referrerPolicy="no-referrer" />
                                   </button>
@@ -683,7 +699,7 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
                                 const thumb = (asset.files.thumbUrl || asset.files.previewUrl || asset.files.originalUrl).trim();
                                 return (
                                   <div key={`${row.value}-${asset.id}`} className="admin-linked-thumb-item">
-                                    <button type="button" onClick={() => setPreviewAsset({ asset, src: asset.files.previewUrl || asset.files.originalUrl || thumb, title: asset.title })}>
+                                    <button type="button" onClick={() => openPreview(asset, linked)}>
                                       {/* eslint-disable-next-line @next/next/no-img-element -- remote storage image */}
                                       <img src={thumb} alt={asset.title} referrerPolicy="no-referrer" />
                                     </button>
@@ -767,7 +783,7 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
                                 const thumb = (asset.files.thumbUrl || asset.files.previewUrl || asset.files.originalUrl).trim();
                                 return (
                                   <div key={`${row.value}-${asset.id}`} className="admin-linked-thumb-item">
-                                    <button type="button" onClick={() => setPreviewAsset({ asset, src: asset.files.previewUrl || asset.files.originalUrl || thumb, title: asset.title })}>
+                                    <button type="button" onClick={() => openPreview(asset, linked)}>
                                       {/* eslint-disable-next-line @next/next/no-img-element -- remote storage image */}
                                       <img src={thumb} alt={asset.title} referrerPolicy="no-referrer" />
                                     </button>
@@ -855,25 +871,53 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
           </div>
         ) : null}
       </div>
-      {previewAsset ? (
-        <div className="admin-assets-preview-overlay" role="dialog" aria-modal="true" aria-label={`Vista ampliada de ${previewAsset.title}`} onClick={() => setPreviewAsset(null)}>
+      {previewCurrent ? (
+        <div className="admin-assets-preview-overlay" role="dialog" aria-modal="true" aria-label={`Vista ampliada de ${previewCurrent.title}`} onClick={() => setPreviewAsset(null)}>
           <div className="admin-assets-preview-card" onClick={(e) => e.stopPropagation()}>
             <button type="button" className="btn btn-ghost btn-sm admin-assets-preview-close" onClick={() => setPreviewAsset(null)} aria-label="Tancar vista ampliada">
               ×
             </button>
-            {/* eslint-disable-next-line @next/next/no-img-element -- remote storage image */}
-            <img src={previewAsset.src} alt={previewAsset.title} className="admin-assets-preview-image" referrerPolicy="no-referrer" />
-            <div className="admin-assets-preview-caption">{previewAsset.title}</div>
+            {previewSrc ? (
+              // eslint-disable-next-line @next/next/no-img-element -- remote storage image
+              <img
+                src={previewSrc}
+                alt={previewCurrent.title}
+                className={`admin-assets-preview-image ${previewZoom === 2 ? "is-zoomed" : ""}`}
+                referrerPolicy="no-referrer"
+              />
+            ) : null}
+            <div className="admin-assets-preview-caption">{previewCurrent.title}</div>
+            <div className="admin-assets-preview-nav">
+              <button type="button" className="btn btn-sm" disabled={!previewCanPrev} onClick={() => {
+                if (!previewCanPrev) return;
+                const prev = previewSourceAssets[previewIndex - 1];
+                if (!prev) return;
+                setPreviewAsset((state) => (state ? { ...state, assetId: prev.id } : state));
+              }}>
+                ←
+              </button>
+              <button type="button" className="btn btn-sm" onClick={() => setPreviewZoom((z) => (z === 1 ? 2 : 1))}>
+                {previewZoom === 1 ? "Zoom x2" : "Zoom x1"}
+              </button>
+              <button type="button" className="btn btn-sm" disabled={!previewCanNext} onClick={() => {
+                if (!previewCanNext) return;
+                const next = previewSourceAssets[previewIndex + 1];
+                if (!next) return;
+                setPreviewAsset((state) => (state ? { ...state, assetId: next.id } : state));
+              }}>
+                →
+              </button>
+            </div>
             <div className="viewer-toolbar" role="toolbar" aria-label="Accions de la foto">
               <button type="button" className="viewer-toolbar-btn viewer-toolbar-btn--primary" onClick={() => {
                 setPreviewAsset(null);
-                onEdit(previewAsset.asset);
+                onEdit(previewCurrent);
               }}>
                 Editar dades
               </button>
               <button type="button" className="viewer-toolbar-btn" onClick={() => {
                 setPreviewAsset(null);
-                onEditImage(previewAsset.asset);
+                onEditImage(previewCurrent);
               }}>
                 Editar imatge
               </button>

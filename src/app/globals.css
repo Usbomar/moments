@@ -271,6 +271,23 @@ button.active {
   opacity: 0.45;
 }
 
+.viewer-toolbar-btn--icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  padding: 6px 8px;
+  line-height: 0;
+}
+
+.viewer-toolbar-btn--subtle {
+  opacity: 0.68;
+}
+
+.viewer-toolbar-btn--subtle:hover:not(:disabled) {
+  opacity: 1;
+}
+
 .viewer-toolbar-btn--primary {
   background: var(--accent);
   border-color: var(--accent);
@@ -280,32 +297,6 @@ button.active {
 .viewer-toolbar-btn--primary:hover:not(:disabled) {
   background: var(--accent-hover);
   border-color: var(--accent-hover);
-}
-
-.viewer-toolbar-icon-group {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-left: 4px;
-  padding-left: 10px;
-  border-left: 1px solid rgba(255, 255, 255, 0.18);
-}
-
-.viewer-toolbar-icon-btn {
-  padding: 4px;
-  min-width: 28px;
-  min-height: 28px;
-  line-height: 1;
-  opacity: 0.62;
-  font-size: 12px;
-}
-
-.viewer-toolbar-icon-btn svg {
-  display: block;
-}
-
-.viewer-toolbar-icon-btn:hover:not(:disabled) {
-  opacity: 1;
 }
 
 /* Presentació col·lecció: fos entre fotos */
@@ -1750,11 +1741,11 @@ button.danger {
   cursor: pointer;
 }
 
-/* Preferida (config): Taronga viu — només administració */
+/* Preferit a configuració: taronga viu (només aquest marc, no la resta de l’app) */
 .admin-assets-thumb-btn--favorite .admin-assets-thumb,
 .admin-assets-thumb-btn--favorite .admin-assets-thumb--empty {
-  border: 2px solid #00b8c4;
-  box-shadow: 0 0 0 1px color-mix(in srgb, #00b8c4 40%, transparent);
+  border: 2px solid #00c9b8;
+  box-shadow: 0 0 0 1px color-mix(in srgb, #00c9b8 48%, transparent);
 }
 
 .admin-assets-thumb-wrap {

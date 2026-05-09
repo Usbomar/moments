@@ -431,7 +431,7 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
         <div className="admin-assets-subhead">
           <label className="admin-assets-toggle">
             <input type="checkbox" checked={showContent} onChange={(e) => setShowContent(e.target.checked)} />
-            Contingut
+            Contingut (descripció i TAGS)
           </label>
         </div>
         <div className="admin-assets-table-wrap">
@@ -907,6 +907,13 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
                 alt={previewCurrent.title}
                 className={`admin-assets-preview-image ${previewZoom === 2 ? "is-zoomed" : ""}`}
                 referrerPolicy="no-referrer"
+                style={{ cursor: previewZoom === 2 ? "zoom-out" : undefined }}
+                onClick={(e) => {
+                  if (previewZoom === 2) {
+                    e.stopPropagation();
+                    setPreviewZoom(1);
+                  }
+                }}
               />
             ) : null}
             <div className="admin-assets-preview-caption">{previewCurrent.title}</div>

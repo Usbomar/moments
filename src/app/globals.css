@@ -231,7 +231,7 @@ button.active {
   margin: 0 auto;
   padding: 10px 10px 0;
   border: 1px solid var(--border);
-  background: var(--bg-primary);
+  background: transparent;
   box-sizing: border-box;
   max-width: min(90vw, 1080px);
 }
@@ -2141,7 +2141,7 @@ button.danger {
 .viewer-caption-card {
   margin-top: 12px;
   padding: 12px;
-  background: #fff;
+  background: transparent;
   border: 1px solid var(--border);
 }
 
@@ -2149,7 +2149,7 @@ button.danger {
   margin-top: 0;
   border: 0;
   padding: 8px 10px 10px;
-  background: var(--bg-primary);
+  background: transparent;
 }
 
 .viewer-caption-title {

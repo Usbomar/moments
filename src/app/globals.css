@@ -229,7 +229,7 @@ button.active {
 .viewer-media-frame {
   display: inline-flex;
   margin: 0 auto;
-  padding: 10px;
+  padding: 10px 10px 0;
   border: 1px solid var(--border);
   background: var(--bg-primary);
   box-sizing: border-box;
@@ -2146,8 +2146,10 @@ button.danger {
 }
 
 .viewer-caption-card--framed {
-  margin-top: 8px;
-  border-color: color-mix(in srgb, var(--border) 80%, transparent);
+  margin-top: 0;
+  border: 0;
+  padding: 8px 10px 10px;
+  background: var(--bg-primary);
 }
 
 .viewer-caption-title {

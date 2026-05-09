@@ -196,6 +196,29 @@ function HomeContent() {
     setCollectionSlideshow(assets);
   }, []);
 
+  const openViewer = useCallback((asset: Asset, contextItems: Asset[]) => {
+    setCollectionSlideshow(null);
+    setSelectedAsset(null);
+    setImageEditorAsset(null);
+    setSlideshowItems(null);
+    setViewerQueue(contextItems.length ? contextItems : null);
+    setSelectedId(asset.id);
+  }, []);
+
+  const openDetailsFromViewer = useCallback((asset: Asset) => {
+    setSelectedId(null);
+    setSlideshowItems(null);
+    setCollectionSlideshow(null);
+    setSelectedAsset(asset);
+  }, []);
+
+  const openImageEditorFromViewer = useCallback((asset: Asset) => {
+    setSelectedId(null);
+    setSlideshowItems(null);
+    setCollectionSlideshow(null);
+    setImageEditorAsset(asset);
+  }, []);
+
   const openDetailsFromCollectionSlideshow = useCallback((asset: Asset) => {
     setCollectionSlideshow(null);
     setSelectedId(null);

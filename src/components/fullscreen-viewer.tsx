@@ -65,10 +65,19 @@ function ViewerSlide({ current, index, items, onSelect, onEditDetails, onEditIma
   useEffect(() => {
     const contentFrame = document.querySelector(".viewer-content-frame");
     const frame = document.querySelector(".viewer-media-frame");
+    const image = document.querySelector(".viewer-media--framed");
     const caption = document.querySelector(".viewer-caption-card--framed");
     const contentFrameStyle = contentFrame ? window.getComputedStyle(contentFrame) : null;
     const frameStyle = frame ? window.getComputedStyle(frame) : null;
+    const imageStyle = image ? window.getComputedStyle(image) : null;
     const captionStyle = caption ? window.getComputedStyle(caption) : null;
+    const contentRect = contentFrame?.getBoundingClientRect();
+    const imageRect = image?.getBoundingClientRect();
+    const captionRect = caption?.getBoundingClientRect();
+    const viewportCenterX = window.innerWidth / 2;
+    const viewportCenterY = window.innerHeight / 2;
+    const contentCenterX = contentRect ? contentRect.left + contentRect.width / 2 : null;
+    const contentCenterY = contentRect ? contentRect.top + contentRect.height / 2 : null;
     // #region agent log
     fetch("http://127.0.0.1:7454/ingest/404cef76-724a-4eae-b86e-2c4b6c9c679d", {
       method: "POST",
@@ -85,10 +94,35 @@ function ViewerSlide({ current, index, items, onSelect, onEditDetails, onEditIma
           contentFrameFound: !!contentFrame,
           contentFrameBorder: contentFrameStyle?.border ?? null,
           contentFrameBackground: contentFrameStyle?.backgroundColor ?? null,
+          contentFrameWidth: contentRect?.width ?? null,
+          contentFrameHeight: contentRect?.height ?? null,
+          contentFrameLeft: contentRect?.left ?? null,
+          contentFrameRight: contentRect?.right ?? null,
+          contentFrameTop: contentRect?.top ?? null,
+          contentFrameBottom: contentRect?.bottom ?? null,
+          viewportCenterX,
+          viewportCenterY,
+          viewportWidth: window.innerWidth,
+          viewportHeight: window.innerHeight,
+          contentCenterX,
+          contentCenterY,
+          centerDeltaX: contentCenterX !== null ? Number((contentCenterX - viewportCenterX).toFixed(2)) : null,
+          centerDeltaY: contentCenterY !== null ? Number((contentCenterY - viewportCenterY).toFixed(2)) : null,
+          viewportUsageWPercent:
+            contentRect?.width ? Number(((contentRect.width / window.innerWidth) * 100).toFixed(2)) : null,
+          viewportUsageHPercent:
+            contentRect?.height ? Number(((contentRect.height / window.innerHeight) * 100).toFixed(2)) : null,
           frameFound: !!frame,
           framePadding: frameStyle?.padding ?? null,
           frameBackground: frameStyle?.backgroundColor ?? null,
           frameBorder: frameStyle?.border ?? null,
+          imageFound: !!image,
+          imageWidth: imageRect?.width ?? null,
+          imageHeight: imageRect?.height ?? null,
+          imageMaxWidth: imageStyle?.maxWidth ?? null,
+          imageMaxHeight: imageStyle?.maxHeight ?? null,
+          captionWidth: captionRect?.width ?? null,
+          captionHeight: captionRect?.height ?? null,
           captionFound: !!caption,
           captionPadding: captionStyle?.padding ?? null,
           captionBackground: captionStyle?.backgroundColor ?? null,

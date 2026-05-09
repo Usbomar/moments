@@ -185,29 +185,39 @@ export function ImageEditorV2({ asset, onDiscard, onSave }: Props) {
   const imageUrl = (asset.files.originalUrl || asset.files.previewUrl).trim();
 
   useEffect(() => {
-    dispatch({ type: "RESET" });
-    setDraftAdjust(INITIAL_ADJUSTMENT_DRAFT);
-    queueMicrotask(() => setPreviewDims({ w: asset.width, h: asset.height }));
-    if (!imageUrl || asset.type !== "photo") {
-      dispatch({ type: "SET_LOAD_ERROR", message: "No hi ha imatge editable." });
-      return;
-    }
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      sourceRef.current = img;
-      const nw = img.naturalWidth;
-      const nh = img.naturalHeight;
-      setNaturalSize({ w: nw, h: nh });
-      setPreviewDims({ w: nw, h: nh });
-      setSourceEpoch((n) => n + 1);
-      dispatch({ type: "SET_LOAD_ERROR", message: null });
+    let cancelled = false;
+    const frameId = window.requestAnimationFrame(() => {
+      if (cancelled) return;
+      dispatch({ type: "RESET" });
+      setDraftAdjust(INITIAL_ADJUSTMENT_DRAFT);
+      queueMicrotask(() => setPreviewDims({ w: asset.width, h: asset.height }));
+      if (!imageUrl || asset.type !== "photo") {
+        dispatch({ type: "SET_LOAD_ERROR", message: "No hi ha imatge editable." });
+        return;
+      }
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        if (cancelled) return;
+        sourceRef.current = img;
+        const nw = img.naturalWidth;
+        const nh = img.naturalHeight;
+        setNaturalSize({ w: nw, h: nh });
+        setPreviewDims({ w: nw, h: nh });
+        setSourceEpoch((n) => n + 1);
+        dispatch({ type: "SET_LOAD_ERROR", message: null });
+      };
+      img.onerror = () => {
+        if (cancelled) return;
+        sourceRef.current = null;
+        dispatch({ type: "SET_LOAD_ERROR", message: "No s’ha pogut carregar la imatge (CORS o URL)." });
+      };
+      img.src = imageUrl;
+    });
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(frameId);
     };
-    img.onerror = () => {
-      sourceRef.current = null;
-      dispatch({ type: "SET_LOAD_ERROR", message: "No s’ha pogut carregar la imatge (CORS o URL)." });
-    };
-    img.src = imageUrl;
   }, [asset.height, asset.id, asset.type, asset.width, imageUrl]);
 
   useEffect(() => {
@@ -684,6 +694,7 @@ export function ImageEditorV2({ asset, onDiscard, onSave }: Props) {
         <div className="editor-v2-ai-overlay" role="dialog" aria-modal="true" aria-label="Previsualització IA" onClick={() => setAiPreview(null)}>
           <div className="modal-content editor-v2-ai-dialog" onClick={(ev) => ev.stopPropagation()}>
             <h3>Millora IA</h3>
+            {/* eslint-disable-next-line @next/next/no-img-element -- data URL generada al client */}
             <img src={aiPreview.dataUrl} alt="Previsualització millora" width={640} height={400} style={{ width: "100%", height: "auto" }} />
             <div className="modal-actions">
               <button type="button" className="btn" onClick={() => setAiPreview(null)}>

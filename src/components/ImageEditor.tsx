@@ -445,6 +445,7 @@ export function ImageEditor({ asset, onClose, onDiscard, onSaveSuccess }: Props)
             onClick={(e) => e.stopPropagation()}
           >
             <h3 style={{ marginTop: 0, fontSize: 18 }}>Millora IA</h3>
+            {/* eslint-disable-next-line @next/next/no-img-element -- data URL generada al client */}
             <img src={aiPreview.dataUrl} alt="" style={{ width: "100%", height: "auto", borderRadius: 8 }} />
             <div className="modal-actions" style={{ marginTop: 12 }}>
               <button type="button" onClick={() => setAiPreview(null)}>

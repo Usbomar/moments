@@ -51,12 +51,13 @@ type SlideProps = {
   index: number;
   items: Asset[];
   onSelect: (id: string) => void;
+  onClose: () => void;
   onEditDetails?: (asset: Asset) => void;
   onEditImage?: (asset: Asset) => void;
 };
 
 /** `key={selectedId}` al muntar reinicia el zoom sense efectes. */
-function ViewerSlide({ current, index, items, onSelect, onEditDetails, onEditImage }: SlideProps) {
+function ViewerSlide({ current, index, items, onSelect, onClose, onEditDetails, onEditImage }: SlideProps) {
   const [zoom, setZoom] = useState<1 | 2>(1);
   const previewUrl = (current.files.mediumUrl || current.files.previewUrl)?.trim() ?? "";
   const takenAtText = new Date(current.takenAt).toLocaleDateString("ca-ES", { day: "numeric", month: "long", year: "numeric" });
@@ -138,6 +139,15 @@ function ViewerSlide({ current, index, items, onSelect, onEditDetails, onEditIma
   return (
     <>
       <div className="viewer-content-frame">
+        <button
+          type="button"
+          className="viewer-close"
+          onClick={onClose}
+          aria-label="Tancar visor"
+          title="Tancar"
+        >
+          ×
+        </button>
         {previewUrl ? (
           <div className="viewer-media-frame">
             {/* eslint-disable-next-line @next/next/no-img-element -- URL signades / visor */}
@@ -224,8 +234,13 @@ export function FullscreenViewer({ items, selectedId, onClose, onSelect, onEditD
   useEffect(() => {
     const viewerInner = document.querySelector(".viewer-inner--framed");
     const viewerRoot = document.querySelector(".viewer");
+    const closeBtn = document.querySelector(".viewer-close");
+    const contentFrame = document.querySelector(".viewer-content-frame");
     const innerStyle = viewerInner ? window.getComputedStyle(viewerInner) : null;
     const rootStyle = viewerRoot ? window.getComputedStyle(viewerRoot) : null;
+    const closeStyle = closeBtn ? window.getComputedStyle(closeBtn) : null;
+    const closeRect = closeBtn?.getBoundingClientRect();
+    const contentRect = contentFrame?.getBoundingClientRect();
     // #region agent log
     fetch("http://127.0.0.1:7454/ingest/404cef76-724a-4eae-b86e-2c4b6c9c679d", {
       method: "POST",
@@ -245,7 +260,18 @@ export function FullscreenViewer({ items, selectedId, onClose, onSelect, onEditD
           viewerInnerPadding: innerStyle?.padding ?? null,
           viewerInnerBackground: innerStyle?.backgroundColor ?? null,
           viewerInnerBorderColor: innerStyle?.borderColor ?? null,
-          viewerRootBackground: rootStyle?.backgroundColor ?? null
+          viewerRootBackground: rootStyle?.backgroundColor ?? null,
+          closeFound: !!closeBtn,
+          closeTop: closeRect?.top ?? null,
+          closeRight: closeRect?.right ?? null,
+          closeLeft: closeRect?.left ?? null,
+          closePosition: closeStyle?.position ?? null,
+          closeOffsetTop: closeStyle?.top ?? null,
+          closeOffsetRight: closeStyle?.right ?? null,
+          contentFrameFound: !!contentFrame,
+          contentFrameTop: contentRect?.top ?? null,
+          contentFrameRight: contentRect?.right ?? null,
+          contentFrameLeft: contentRect?.left ?? null
         },
         timestamp: Date.now()
       })
@@ -269,21 +295,13 @@ export function FullscreenViewer({ items, selectedId, onClose, onSelect, onEditD
   return (
     <div className="viewer" role="dialog" aria-modal="true" aria-label="Visor de fotos a pantalla completa" onClick={onClose}>
       <div className="viewer-inner viewer-inner--framed" onClick={(e) => e.stopPropagation()}>
-        <button
-          type="button"
-          className="viewer-close"
-          onClick={onClose}
-          aria-label="Tancar visor"
-          title="Tancar"
-        >
-          ×
-        </button>
         <ViewerSlide
           key={selectedId}
           current={current}
           index={index}
           items={items}
           onSelect={onSelect}
+          onClose={onClose}
           onEditDetails={onEditDetails}
           onEditImage={onEditImage}
         />

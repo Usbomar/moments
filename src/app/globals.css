@@ -229,6 +229,7 @@ button.active {
 .viewer-content-frame {
   display: flex;
   flex-direction: column;
+  position: relative;
   width: fit-content;
   margin: 0 auto;
   border: 1px solid var(--border);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CanvasPipelineSource } from "@/lib/client/canvas-image-ops";
 
 export type CropBox = { x: number; y: number; width: number; height: number };
@@ -82,7 +82,10 @@ function clampRect(r: Rect, cw: number, ch: number): Rect {
  */
 export function CropEditor({ source, onApply, onCancel, aspectRatio }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [scale, setScale] = useState(1);
+  const displayScale = useMemo(() => {
+    const { w: nw, h: nh } = pipelineSourceSize(source);
+    return Math.min(MAX_DISPLAY / nw, MAX_DISPLAY / nh, 1);
+  }, [source]);
   const [rect, setRect] = useState<Rect | null>(null);
   const dragRef = useRef<{
     kind: HandleId;
@@ -106,12 +109,11 @@ export function CropEditor({ source, onApply, onCancel, aspectRatio }: Props) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     const { w: nw, h: nh } = pipelineSourceSize(source);
-    const sc = Math.min(MAX_DISPLAY / nw, MAX_DISPLAY / nh, 1);
+    const sc = displayScale;
     const dw = Math.round(nw * sc);
     const dh = Math.round(nh * sc);
     canvas.width = dw;
     canvas.height = dh;
-    setScale(sc);
     ctx.fillStyle = "#0a0c10";
     ctx.fillRect(0, 0, dw, dh);
     ctx.drawImage(source, 0, 0, nw, nh, 0, 0, dw, dh);
@@ -163,7 +165,7 @@ export function CropEditor({ source, onApply, onCancel, aspectRatio }: Props) {
         ctx.stroke();
       }
     }
-  }, [source, rect]);
+  }, [source, rect, displayScale]);
 
   useEffect(() => {
     draw();
@@ -179,7 +181,7 @@ export function CropEditor({ source, onApply, onCancel, aspectRatio }: Props) {
       const m = 0;
       return { x: m, y: m, w: canvas.width - 2 * m, h: canvas.height - 2 * m };
     });
-  }, [scale, source]);
+  }, [displayScale, source]);
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
@@ -338,14 +340,14 @@ export function CropEditor({ source, onApply, onCancel, aspectRatio }: Props) {
 
   const handleApply = useCallback(() => {
     if (!rect || rect.w < MIN || rect.h < MIN) return;
-    const sc = scale || 1;
+    const sc = displayScale || 1;
     onApply({
       x: Math.round(rect.x / sc),
       y: Math.round(rect.y / sc),
       width: Math.round(rect.w / sc),
       height: Math.round(rect.h / sc)
     });
-  }, [rect, onApply, scale]);
+  }, [rect, onApply, displayScale]);
 
   return (
     <div className="crop-editor-overlay" role="dialog" aria-modal="true" aria-label="Retall">

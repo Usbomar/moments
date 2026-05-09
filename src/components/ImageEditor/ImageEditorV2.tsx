@@ -172,7 +172,7 @@ export function ImageEditorV2({ asset, onDiscard, onSave }: Props) {
   const [draftAdjust, setDraftAdjust] = useState<AdjustmentDraft>(INITIAL_ADJUSTMENT_DRAFT);
   const [histData, setHistData] = useState<ImageData | null>(null);
   const [cropOpen, setCropOpen] = useState(false);
-  const cropSnapshotRef = useRef<HTMLCanvasElement | null>(null);
+  const [cropSnapshot, setCropSnapshot] = useState<HTMLCanvasElement | null>(null);
   const [cropAspectKey, setCropAspectKey] = useState<"free" | "1" | "4:3" | "16:9" | "3:2">("free");
   const [aiPreview, setAiPreview] = useState<{ dataUrl: string; op: Extract<EditOperation, { type: "autoEnhance" }> } | null>(null);
   const zKeyRef = useRef(false);
@@ -270,7 +270,7 @@ export function ImageEditorV2({ asset, onDiscard, onSave }: Props) {
     const src = sourceRef.current;
     if (!src?.complete || src.naturalWidth === 0) return;
     try {
-      cropSnapshotRef.current = applyOperationsToCanvas(src, previewOps);
+      setCropSnapshot(applyOperationsToCanvas(src, previewOps));
       setCropOpen(true);
     } catch {
       dispatch({ type: "SET_LOAD_ERROR", message: "No s’ha pogut preparar el retall." });
@@ -278,7 +278,7 @@ export function ImageEditorV2({ asset, onDiscard, onSave }: Props) {
   }, [previewOps]);
 
   const endCrop = useCallback(() => {
-    cropSnapshotRef.current = null;
+    setCropSnapshot(null);
     setCropOpen(false);
   }, []);
 
@@ -668,9 +668,9 @@ export function ImageEditorV2({ asset, onDiscard, onSave }: Props) {
         </footer>
       </div>
 
-      {cropOpen && cropSnapshotRef.current ? (
+      {cropOpen && cropSnapshot ? (
         <CropEditor
-          source={cropSnapshotRef.current}
+          source={cropSnapshot}
           aspectRatio={cropAspectKey === "free" ? null : cropAspectKey === "1" ? 1 : cropAspectKey === "4:3" ? 4 / 3 : cropAspectKey === "16:9" ? 16 / 9 : 3 / 2}
           onCancel={endCrop}
           onApply={(box) => {

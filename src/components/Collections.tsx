@@ -32,7 +32,10 @@ export function Collections({ items, onPlaySlideshow }: Props) {
   }, []);
 
   useEffect(() => {
-    void refreshCollections();
+    const id = window.requestAnimationFrame(() => {
+      void refreshCollections();
+    });
+    return () => window.cancelAnimationFrame(id);
   }, [refreshCollections]);
 
   const assetById = useMemo(() => {

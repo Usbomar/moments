@@ -35,10 +35,14 @@ export function MainLayout({
   useEffect(() => {
     try {
       const v = window.localStorage.getItem(SIDEBAR_KEY);
-      if (v === "1") setSidebarCollapsed(true);
+      if (v === "1") {
+        const id = window.requestAnimationFrame(() => setSidebarCollapsed(true));
+        return () => window.cancelAnimationFrame(id);
+      }
     } catch {
       /* ignore */
     }
+    return undefined;
   }, []);
 
   const toggleSidebar = useCallback(() => {

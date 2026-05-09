@@ -36,11 +36,14 @@ export function FadingSlideshow({ items, onClose, onEditDetails, dwellMs = 2800 
   }, [index]);
 
   useEffect(() => {
-    setIndex(0);
-    indexRef.current = 0;
-    setVeilOn(false);
-    busyRef.current = false;
-    setPlaying(true);
+    const id = window.requestAnimationFrame(() => {
+      setIndex(0);
+      indexRef.current = 0;
+      setVeilOn(false);
+      busyRef.current = false;
+      setPlaying(true);
+    });
+    return () => window.cancelAnimationFrame(id);
   }, [itemsKey]);
 
   const goToIndex = useCallback(

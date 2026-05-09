@@ -254,7 +254,7 @@ export function PhotoModal({ asset, onClose, onSave, libraryTagSuggestions = [],
   );
 
   /* Només re-muntar el mapa si canvia la foto o el punt (evita parpelleigs i pèrdua de focus quan el pare passa un nou objecte asset amb el mateix id). */
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- deps intencionalment estretes a id + coordenades
+  /* eslint-disable-next-line react-hooks/exhaustive-deps -- deps només id/coords per evitar remuntar el mapa massa sovint */
   useEffect(() => {
     if (!asset) return;
     const root = mapRootRef.current;
@@ -344,6 +344,7 @@ export function PhotoModal({ asset, onClose, onSave, libraryTagSuggestions = [],
     };
   }, [asset?.id, asset?.location?.lat, asset?.location?.lng]);
 
+  /* eslint-disable-next-line react-hooks/exhaustive-deps -- només re-geocodificar quan canvia id o cerca, no tot l’objecte asset */
   useEffect(() => {
     if (!asset || !mapReady) return;
     const q = debouncedLocationText.trim();

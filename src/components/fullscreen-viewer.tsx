@@ -71,6 +71,7 @@ export function FullscreenViewer({ items, selectedId, onClose, onSelect, onEditD
           ×
         </button>
         {previewUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- URL signades / emmagatzematge extern
           <img
             className={`viewer-media viewer-media--framed ${zoom === 2 ? "is-zoomed" : ""}`}
             src={previewUrl}

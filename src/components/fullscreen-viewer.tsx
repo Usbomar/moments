@@ -65,27 +65,31 @@ function ViewerSlide({ current, index, items, onSelect, onEditDetails, onEditIma
   return (
     <>
       {previewUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element -- URL signades / visor
-        <img
-          className={`viewer-media viewer-media--framed ${zoom === 2 ? "is-zoomed" : ""}`}
-          src={previewUrl}
-          alt={current.title}
-          width={current.width || undefined}
-          height={current.height || undefined}
-          fetchPriority="high"
-          referrerPolicy="no-referrer"
-          style={{ cursor: zoom === 2 ? "zoom-out" : "default" }}
-          onClick={(e) => {
-            if (zoom === 2) {
-              e.stopPropagation();
-              setZoom(1);
-            }
-          }}
-        />
+        <div className="viewer-media-frame">
+          {/* eslint-disable-next-line @next/next/no-img-element -- URL signades / visor */}
+          <img
+            className={`viewer-media viewer-media--framed ${zoom === 2 ? "is-zoomed" : ""}`}
+            src={previewUrl}
+            alt={current.title}
+            width={current.width || undefined}
+            height={current.height || undefined}
+            fetchPriority="high"
+            referrerPolicy="no-referrer"
+            style={{ cursor: zoom === 2 ? "zoom-out" : "default" }}
+            onClick={(e) => {
+              if (zoom === 2) {
+                e.stopPropagation();
+                setZoom(1);
+              }
+            }}
+          />
+        </div>
       ) : (
-        <div className="viewer-media" style={placeholderStyle} role="img" aria-label="Imatge no disponible">
-          <span style={{ fontWeight: 600, color: "var(--text, #151719)" }}>Imatge no disponible</span>
-          <span style={{ wordBreak: "break-word", maxWidth: "100%" }}>{current.title}</span>
+        <div className="viewer-media-frame">
+          <div className="viewer-media" style={placeholderStyle} role="img" aria-label="Imatge no disponible">
+            <span style={{ fontWeight: 600, color: "var(--text, #151719)" }}>Imatge no disponible</span>
+            <span style={{ wordBreak: "break-word", maxWidth: "100%" }}>{current.title}</span>
+          </div>
         </div>
       )}
       <div className="viewer-toolbar" role="toolbar" aria-label="Navegació, edició i zoom">

@@ -9,7 +9,7 @@ import { LibraryGrid } from "@/components/library-grid";
 
 interface Props {
   items: Asset[];
-  onOpenViewer: (asset: Asset) => void;
+  onOpenViewer: (asset: Asset, contextItems?: Asset[]) => void;
   onEditPhoto: (asset: Asset) => void;
 }
 
@@ -50,7 +50,7 @@ function thumbUrl(asset: Asset): string {
   return (asset.files.thumbUrl || asset.files.previewUrl || asset.files.originalUrl).trim();
 }
 
-function buildClusterPopupContent(cluster: Cluster, onOpen: (a: Asset) => void): HTMLDivElement {
+function buildClusterPopupContent(cluster: Cluster, onOpen: (a: Asset, contextItems: Asset[]) => void): HTMLDivElement {
   const wrap = document.createElement("div");
   wrap.className = "map-cluster-popup-inner";
 
@@ -63,13 +63,13 @@ function buildClusterPopupContent(cluster: Cluster, onOpen: (a: Asset) => void):
   count.textContent = `${cluster.items.length} foto(s) — clic a una miniatura per obrir-la`;
   wrap.appendChild(count);
 
-  const sorted = [...cluster.items].sort((a, b) => Number(b.favorite) - Number(a.favorite)).slice(0, 5);
+  const sorted = [...cluster.items].sort((a, b) => Number(b.favorite) - Number(a.favorite));
   const thumbs = document.createElement("div");
   thumbs.className = "map-cluster-popup-thumbs";
   thumbs.setAttribute("role", "group");
   thumbs.setAttribute("aria-label", "Fins a 5 miniatures (preferides primer)");
 
-  for (const asset of sorted) {
+  for (const asset of sorted.slice(0, 5)) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "map-cluster-popup-thumb";
@@ -82,7 +82,7 @@ function buildClusterPopupContent(cluster: Cluster, onOpen: (a: Asset) => void):
     btn.appendChild(img);
     btn.addEventListener("click", (ev) => {
       ev.stopPropagation();
-      onOpen(asset);
+      onOpen(asset, sorted);
     });
     thumbs.appendChild(btn);
   }
@@ -132,8 +132,8 @@ export function MapView({ items, onOpenViewer, onEditPhoto }: Props) {
           fillOpacity: 0.35
         }).addTo(map);
 
-        const popupContent = buildClusterPopupContent(cluster, (a) => {
-          onOpenViewerRef.current(a);
+        const popupContent = buildClusterPopupContent(cluster, (a, ctx) => {
+          onOpenViewerRef.current(a, ctx);
           map.closePopup();
         });
         marker.bindPopup(popupContent, {

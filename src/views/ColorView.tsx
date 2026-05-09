@@ -6,7 +6,7 @@ import { LibraryGrid } from "@/components/library-grid";
 
 interface Props {
   items: Asset[];
-  onOpenViewer: (asset: Asset) => void;
+  onOpenViewer: (asset: Asset, contextItems: Asset[]) => void;
   onEditPhoto: (asset: Asset) => void;
 }
 

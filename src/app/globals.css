@@ -158,7 +158,7 @@ button.active {
   max-height: 92vh;
   background: var(--bg-primary);
   border: 1px solid var(--border);
-  padding: 5px 5px 10px;
+  padding: 10px;
 }
 
 .viewer-close {
@@ -280,6 +280,32 @@ button.active {
 .viewer-toolbar-btn--primary:hover:not(:disabled) {
   background: var(--accent-hover);
   border-color: var(--accent-hover);
+}
+
+.viewer-toolbar-icon-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 4px;
+  padding-left: 10px;
+  border-left: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.viewer-toolbar-icon-btn {
+  padding: 4px;
+  min-width: 28px;
+  min-height: 28px;
+  line-height: 1;
+  opacity: 0.62;
+  font-size: 12px;
+}
+
+.viewer-toolbar-icon-btn svg {
+  display: block;
+}
+
+.viewer-toolbar-icon-btn:hover:not(:disabled) {
+  opacity: 1;
 }
 
 /* Presentació col·lecció: fos entre fotos */
@@ -1724,10 +1750,11 @@ button.danger {
   cursor: pointer;
 }
 
+/* Preferida (config): Taronga viu — només administració */
 .admin-assets-thumb-btn--favorite .admin-assets-thumb,
 .admin-assets-thumb-btn--favorite .admin-assets-thumb--empty {
-  border: 2px solid #39ff14;
-  box-shadow: 0 0 0 1px color-mix(in srgb, #39ff14 45%, transparent);
+  border: 2px solid #00b8c4;
+  box-shadow: 0 0 0 1px color-mix(in srgb, #00b8c4 40%, transparent);
 }
 
 .admin-assets-thumb-wrap {

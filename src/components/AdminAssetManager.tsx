@@ -111,7 +111,6 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
   const [sort, setSort] = useState<SortState[]>([{ key: "takenAt", dir: "desc" }]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(100);
-  const [showMeta, setShowMeta] = useState(false);
   const [showContent, setShowContent] = useState(true);
   const [savingById, setSavingById] = useState<Record<string, "idle" | "saving" | "saved" | "error">>({});
   const [draftById, setDraftById] = useState<Record<string, DraftPatch>>({});
@@ -431,10 +430,6 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
         <>
         <div className="admin-assets-subhead">
           <label className="admin-assets-toggle">
-            <input type="checkbox" checked={showMeta} onChange={(e) => setShowMeta(e.target.checked)} />
-            Metadades
-          </label>
-          <label className="admin-assets-toggle">
             <input type="checkbox" checked={showContent} onChange={(e) => setShowContent(e.target.checked)} />
             Contingut
           </label>
@@ -461,7 +456,7 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
                 </th>
                 {showContent ? <th title="Descripción">📝</th> : null}
                 {showContent ? <th>TAGS</th> : null}
-                {showMeta ? <th className="admin-assets-col-collections">Col·leccions</th> : null}
+                <th className="admin-assets-col-collections">Col·leccions</th>
                 <th className="admin-assets-col-delete" scope="col">
                   <span className="admin-assets-actions-head" aria-hidden>
                     <span className="admin-assets-actions-head-edit">✎</span>
@@ -575,11 +570,9 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
                   </td>
                   {showContent ? <td>{a.description?.trim() ? "●" : ""}</td> : null}
                   {showContent ? <td>{a.tags?.length ? "●" : ""}</td> : null}
-                  {showMeta ? (
-                    <td className="admin-assets-col-collections admin-assets-collections-cell">
-                      {getCollectionNames(a.id) || "—"}
-                    </td>
-                  ) : null}
+                  <td className="admin-assets-col-collections admin-assets-collections-cell">
+                    {getCollectionNames(a.id) || "—"}
+                  </td>
                   <td className="admin-assets-col-delete">
                     <div className="admin-assets-row-actions">
                       <button

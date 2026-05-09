@@ -10,7 +10,7 @@ type Props = {
   collections: AppCollection[];
   maxOpen: number;
   onOpenModal: (asset: Asset) => void;
-  onOpenViewer: (asset: Asset) => void;
+  onOpenViewer: (asset: Asset, contextItems: Asset[]) => void;
 };
 
 export function CollectionMosaicView({ items, collections, maxOpen, onOpenModal, onOpenViewer }: Props) {
@@ -52,7 +52,7 @@ export function CollectionMosaicView({ items, collections, maxOpen, onOpenModal,
                       type="button"
                       key={asset.id}
                       className={`collection-mosaic-item ${big ? "is-big" : ""}`}
-                      onClick={() => onOpenViewer(asset)}
+                      onClick={() => onOpenViewer(asset, assets)}
                       onDoubleClick={() => onOpenModal(asset)}
                       title={asset.title}
                     >

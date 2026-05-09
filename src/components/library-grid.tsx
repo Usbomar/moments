@@ -8,7 +8,7 @@ import { LazyImage } from "@/components/LazyImage";
 interface Props {
   items: Asset[];
   /** Clic al thumbnail: obre el visor a pantalla completa (prioritat sobre onOpenModal). */
-  onOpenViewer?: (asset: Asset) => void;
+  onOpenViewer?: (asset: Asset, contextItems: Asset[]) => void;
   /** Opcional: només si no hi ha onOpenViewer (p. ex. eines internes). */
   onOpenModal?: (asset: Asset) => void;
   /** Compatibilitat enrere: si no hi ha onOpenViewer ni onOpenModal. */
@@ -33,21 +33,23 @@ const placeholderStyle: CSSProperties = {
 
 function LibraryTile({
   asset,
+  gridItems,
   onOpen,
   onOpenModal,
   onOpenViewer
 }: {
   asset: Asset;
+  gridItems: Asset[];
   onOpen?: (a: Asset) => void;
   onOpenModal?: (a: Asset) => void;
-  onOpenViewer?: (a: Asset) => void;
+  onOpenViewer?: (a: Asset, contextItems: Asset[]) => void;
 }) {
   const thumbUrl = asset.files.thumbUrl?.trim() ?? "";
   const [imgBroken, setImgBroken] = useState(false);
 
   const handleClick = () => {
     if (onOpenViewer) {
-      onOpenViewer(asset);
+      onOpenViewer(asset, gridItems);
       return;
     }
     if (onOpenModal) {
@@ -94,6 +96,7 @@ export function LibraryGrid({ items, onOpen, onOpenModal, onOpenViewer }: Props)
         <LibraryTile
           key={`${asset.id}:${asset.files.thumbUrl ?? ""}`}
           asset={asset}
+          gridItems={items}
           onOpen={onOpen}
           onOpenModal={onOpenModal}
           onOpenViewer={onOpenViewer}

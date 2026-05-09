@@ -205,6 +205,13 @@ function HomeContent() {
     setSlideshowItems(null);
   }, []);
 
+  /** Navegació del visor = ordre de la graella / vista actual quan s’indica `contextItems`. */
+  const openGalleryViewer = useCallback((asset: Asset, contextItems?: Asset[]) => {
+    if (contextItems?.length) setSlideshowItems(contextItems);
+    else setSlideshowItems(null);
+    setSelectedId(asset.id);
+  }, []);
+
   const modalOpen = !!(selectedAsset || imageEditorAsset || selectedId || (collectionSlideshow?.length ?? 0) > 0);
 
   const onModalEscape = useCallback(() => {
@@ -363,21 +370,21 @@ function HomeContent() {
                     <TimelineView
                       items={viewItems}
                       onOpenModal={(asset) => setSelectedAsset(asset)}
-                      onOpenViewer={(asset) => setSelectedId(asset.id)}
+                      onOpenViewer={openGalleryViewer}
                     />
                   ) : null}
                   {view === "masonry" ? (
                     <LibraryGrid
                       items={viewItems}
                       onOpenModal={(asset) => setSelectedAsset(asset)}
-                      onOpenViewer={(asset) => setSelectedId(asset.id)}
+                      onOpenViewer={openGalleryViewer}
                     />
                   ) : null}
                   {view === "colors" ? (
                     <ColorView
                       items={viewItems}
                       onEditPhoto={(asset) => setSelectedAsset(asset)}
-                      onOpenViewer={(asset) => setSelectedId(asset.id)}
+                      onOpenViewer={openGalleryViewer}
                     />
                   ) : null}
                   {view === "collections" ? (
@@ -386,14 +393,14 @@ function HomeContent() {
                       collections={adminCollections}
                       maxOpen={5}
                       onOpenModal={(asset) => setSelectedAsset(asset)}
-                      onOpenViewer={(asset) => setSelectedId(asset.id)}
+                      onOpenViewer={openGalleryViewer}
                     />
                   ) : null}
                   {view === "slider" ? (
                     <SliderView
                       items={viewItems}
                       onEditPhoto={(asset) => setSelectedAsset(asset)}
-                      onOpenViewer={(asset) => setSelectedId(asset.id)}
+                      onOpenViewer={openGalleryViewer}
                     />
                   ) : null}
                 </div>
@@ -410,7 +417,7 @@ function HomeContent() {
               <MapView
                 items={library}
                 onEditPhoto={(asset) => setSelectedAsset(asset)}
-                onOpenViewer={(asset) => setSelectedId(asset.id)}
+                onOpenViewer={openGalleryViewer}
               />
             </ViewErrorBoundary>
           ) : null}
@@ -432,6 +439,14 @@ function HomeContent() {
         selectedId={selectedId}
         onSelect={setSelectedId}
         onClose={onViewerClose}
+        onEditDetails={(asset) => {
+          onViewerClose();
+          setSelectedAsset(asset);
+        }}
+        onEditImage={(asset) => {
+          onViewerClose();
+          setImageEditorAsset(asset);
+        }}
       />
 
       {collectionSlideshow?.length ? (

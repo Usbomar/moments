@@ -7,7 +7,7 @@ interface Props {
   items: Asset[];
   onEditPhoto: (asset: Asset) => void;
   /** Obre el visor de pantalla completa amb aquest asset. */
-  onOpenViewer?: (asset: Asset) => void;
+  onOpenViewer?: (asset: Asset, contextItems: Asset[]) => void;
 }
 
 export function SliderView({ items, onEditPhoto, onOpenViewer }: Props) {
@@ -101,7 +101,7 @@ export function SliderView({ items, onEditPhoto, onOpenViewer }: Props) {
             Següent
           </button>
           {onOpenViewer ? (
-            <button type="button" className={btnClass} onClick={() => onOpenViewer(current)}>
+            <button type="button" className={btnClass} onClick={() => onOpenViewer(current, items)}>
               Presentació
             </button>
           ) : null}

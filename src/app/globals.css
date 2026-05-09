@@ -156,9 +156,9 @@ button.active {
 .viewer-inner--framed {
   max-width: min(92vw, 1120px);
   max-height: 92vh;
-  background: var(--bg-primary);
-  border: 1px solid var(--border);
-  padding: 10px;
+  background: transparent;
+  border: 0;
+  padding: 0;
 }
 
 .viewer-close {
@@ -226,14 +226,23 @@ button.active {
   object-fit: contain;
 }
 
-.viewer-media-frame {
-  display: inline-flex;
+.viewer-content-frame {
+  display: inline-block;
   margin: 0 auto;
-  padding: 10px 10px 0;
   border: 1px solid var(--border);
-  background: transparent;
+  background: var(--panel);
   box-sizing: border-box;
   max-width: min(90vw, 1080px);
+}
+
+.viewer-media-frame {
+  display: block;
+  margin: 0;
+  padding: 10px 10px 0;
+  border: 0;
+  background: transparent;
+  box-sizing: border-box;
+  max-width: 100%;
 }
 
 .viewer-media--framed {
@@ -2141,7 +2150,7 @@ button.danger {
 .viewer-caption-card {
   margin-top: 12px;
   padding: 12px;
-  background: transparent;
+  background: var(--panel);
   border: 1px solid var(--border);
 }
 

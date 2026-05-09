@@ -62,36 +62,85 @@ function ViewerSlide({ current, index, items, onSelect, onEditDetails, onEditIma
   const takenAtText = new Date(current.takenAt).toLocaleDateString("ca-ES", { day: "numeric", month: "long", year: "numeric" });
   const locationText = current.location ? `${current.location.city}${current.location.country ? `, ${current.location.country}` : ""}` : "";
 
+  useEffect(() => {
+    const contentFrame = document.querySelector(".viewer-content-frame");
+    const frame = document.querySelector(".viewer-media-frame");
+    const caption = document.querySelector(".viewer-caption-card--framed");
+    const contentFrameStyle = contentFrame ? window.getComputedStyle(contentFrame) : null;
+    const frameStyle = frame ? window.getComputedStyle(frame) : null;
+    const captionStyle = caption ? window.getComputedStyle(caption) : null;
+    // #region agent log
+    fetch("http://127.0.0.1:7454/ingest/404cef76-724a-4eae-b86e-2c4b6c9c679d", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "634310" },
+      body: JSON.stringify({
+        sessionId: "634310",
+        runId: "frame-debug-1",
+        hypothesisId: "H2",
+        location: "src/components/fullscreen-viewer.tsx:ViewerSlide.useEffect",
+        message: "Viewer slide style snapshot",
+        data: {
+          assetId: current.id,
+          hasPreviewUrl: !!previewUrl,
+          contentFrameFound: !!contentFrame,
+          contentFrameBorder: contentFrameStyle?.border ?? null,
+          contentFrameBackground: contentFrameStyle?.backgroundColor ?? null,
+          frameFound: !!frame,
+          framePadding: frameStyle?.padding ?? null,
+          frameBackground: frameStyle?.backgroundColor ?? null,
+          frameBorder: frameStyle?.border ?? null,
+          captionFound: !!caption,
+          captionPadding: captionStyle?.padding ?? null,
+          captionBackground: captionStyle?.backgroundColor ?? null,
+          captionBorder: captionStyle?.border ?? null,
+          captionMarginTop: captionStyle?.marginTop ?? null
+        },
+        timestamp: Date.now()
+      })
+    }).catch(() => {});
+    // #endregion
+  }, [current.id, previewUrl]);
+
   return (
     <>
-      {previewUrl ? (
-        <div className="viewer-media-frame">
-          {/* eslint-disable-next-line @next/next/no-img-element -- URL signades / visor */}
-          <img
-            className={`viewer-media viewer-media--framed ${zoom === 2 ? "is-zoomed" : ""}`}
-            src={previewUrl}
-            alt={current.title}
-            width={current.width || undefined}
-            height={current.height || undefined}
-            fetchPriority="high"
-            referrerPolicy="no-referrer"
-            style={{ cursor: zoom === 2 ? "zoom-out" : "default" }}
-            onClick={(e) => {
-              if (zoom === 2) {
-                e.stopPropagation();
-                setZoom(1);
-              }
-            }}
-          />
-        </div>
-      ) : (
-        <div className="viewer-media-frame">
-          <div className="viewer-media" style={placeholderStyle} role="img" aria-label="Imatge no disponible">
-            <span style={{ fontWeight: 600, color: "var(--text, #151719)" }}>Imatge no disponible</span>
-            <span style={{ wordBreak: "break-word", maxWidth: "100%" }}>{current.title}</span>
+      <div className="viewer-content-frame">
+        {previewUrl ? (
+          <div className="viewer-media-frame">
+            {/* eslint-disable-next-line @next/next/no-img-element -- URL signades / visor */}
+            <img
+              className={`viewer-media viewer-media--framed ${zoom === 2 ? "is-zoomed" : ""}`}
+              src={previewUrl}
+              alt={current.title}
+              width={current.width || undefined}
+              height={current.height || undefined}
+              fetchPriority="high"
+              referrerPolicy="no-referrer"
+              style={{ cursor: zoom === 2 ? "zoom-out" : "default" }}
+              onClick={(e) => {
+                if (zoom === 2) {
+                  e.stopPropagation();
+                  setZoom(1);
+                }
+              }}
+            />
           </div>
+        ) : (
+          <div className="viewer-media-frame">
+            <div className="viewer-media" style={placeholderStyle} role="img" aria-label="Imatge no disponible">
+              <span style={{ fontWeight: 600, color: "var(--text, #151719)" }}>Imatge no disponible</span>
+              <span style={{ wordBreak: "break-word", maxWidth: "100%" }}>{current.title}</span>
+            </div>
+          </div>
+        )}
+        <div className="viewer-caption-card viewer-caption-card--framed">
+          <strong className="viewer-caption-title">{current.title}</strong>
+          {current.description?.trim() ? <p className="viewer-caption-text">{current.description.trim()}</p> : null}
+          <p className="viewer-caption-meta">
+            {takenAtText}
+            {locationText ? ` · ${locationText}` : ""}
+          </p>
         </div>
-      )}
+      </div>
       <div className="viewer-toolbar" role="toolbar" aria-label="Navegació, edició i zoom">
         <button type="button" className="viewer-toolbar-btn" disabled={index <= 0} onClick={() => index > 0 && onSelect(items[index - 1]!.id)}>
           ←
@@ -130,14 +179,6 @@ function ViewerSlide({ current, index, items, onSelect, onEditDetails, onEditIma
           →
         </button>
       </div>
-      <div className="viewer-caption-card viewer-caption-card--framed">
-        <strong className="viewer-caption-title">{current.title}</strong>
-        {current.description?.trim() ? <p className="viewer-caption-text">{current.description.trim()}</p> : null}
-        <p className="viewer-caption-meta">
-          {takenAtText}
-          {locationText ? ` · ${locationText}` : ""}
-        </p>
-      </div>
     </>
   );
 }
@@ -145,6 +186,38 @@ function ViewerSlide({ current, index, items, onSelect, onEditDetails, onEditIma
 export function FullscreenViewer({ items, selectedId, onClose, onSelect, onEditDetails, onEditImage }: Props) {
   const index = items.findIndex((x) => x.id === selectedId);
   const current = index >= 0 ? items[index] : null;
+
+  useEffect(() => {
+    const viewerInner = document.querySelector(".viewer-inner--framed");
+    const viewerRoot = document.querySelector(".viewer");
+    const innerStyle = viewerInner ? window.getComputedStyle(viewerInner) : null;
+    const rootStyle = viewerRoot ? window.getComputedStyle(viewerRoot) : null;
+    // #region agent log
+    fetch("http://127.0.0.1:7454/ingest/404cef76-724a-4eae-b86e-2c4b6c9c679d", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "634310" },
+      body: JSON.stringify({
+        sessionId: "634310",
+        runId: "frame-debug-1",
+        hypothesisId: "H3",
+        location: "src/components/fullscreen-viewer.tsx:FullscreenViewer.useEffect",
+        message: "Fullscreen viewer render state",
+        data: {
+          selectedId,
+          itemsCount: items.length,
+          resolvedIndex: index,
+          resolvedAssetId: current?.id ?? null,
+          viewerInnerFound: !!viewerInner,
+          viewerInnerPadding: innerStyle?.padding ?? null,
+          viewerInnerBackground: innerStyle?.backgroundColor ?? null,
+          viewerInnerBorderColor: innerStyle?.borderColor ?? null,
+          viewerRootBackground: rootStyle?.backgroundColor ?? null
+        },
+        timestamp: Date.now()
+      })
+    }).catch(() => {});
+    // #endregion
+  }, [current?.id, index, items.length, selectedId]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {

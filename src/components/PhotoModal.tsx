@@ -117,6 +117,25 @@ export function PhotoModal({ asset, onClose, onSave, libraryTagSuggestions = [],
     setGeocodeHint(null);
   }, [asset]);
 
+  useEffect(() => {
+    if (!asset) return;
+    // #region agent log
+    fetch("http://127.0.0.1:7454/ingest/404cef76-724a-4eae-b86e-2c4b6c9c679d", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "634310" },
+      body: JSON.stringify({
+        sessionId: "634310",
+        runId: "frame-debug-1",
+        hypothesisId: "H4",
+        location: "src/components/PhotoModal.tsx:useEffect",
+        message: "Photo modal opened",
+        data: { assetId: asset.id, front },
+        timestamp: Date.now()
+      })
+    }).catch(() => {});
+    // #endregion
+  }, [asset, front]);
+
   const mapRootRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const markerRef = useRef<LeafletMarker | null>(null);

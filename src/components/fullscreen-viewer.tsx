@@ -63,79 +63,6 @@ function ViewerSlide({ current, index, items, onSelect, onClose, onEditDetails, 
   const takenAtText = new Date(current.takenAt).toLocaleDateString("ca-ES", { day: "numeric", month: "long", year: "numeric" });
   const locationText = current.location ? `${current.location.city}${current.location.country ? `, ${current.location.country}` : ""}` : "";
 
-  useEffect(() => {
-    const contentFrame = document.querySelector(".viewer-content-frame");
-    const frame = document.querySelector(".viewer-media-frame");
-    const image = document.querySelector(".viewer-media--framed");
-    const caption = document.querySelector(".viewer-caption-card--framed");
-    const contentFrameStyle = contentFrame ? window.getComputedStyle(contentFrame) : null;
-    const frameStyle = frame ? window.getComputedStyle(frame) : null;
-    const imageStyle = image ? window.getComputedStyle(image) : null;
-    const captionStyle = caption ? window.getComputedStyle(caption) : null;
-    const contentRect = contentFrame?.getBoundingClientRect();
-    const imageRect = image?.getBoundingClientRect();
-    const captionRect = caption?.getBoundingClientRect();
-    const viewportCenterX = window.innerWidth / 2;
-    const viewportCenterY = window.innerHeight / 2;
-    const contentCenterX = contentRect ? contentRect.left + contentRect.width / 2 : null;
-    const contentCenterY = contentRect ? contentRect.top + contentRect.height / 2 : null;
-    // #region agent log
-    fetch("http://127.0.0.1:7454/ingest/404cef76-724a-4eae-b86e-2c4b6c9c679d", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "634310" },
-      body: JSON.stringify({
-        sessionId: "634310",
-        runId: "frame-debug-1",
-        hypothesisId: "H2",
-        location: "src/components/fullscreen-viewer.tsx:ViewerSlide.useEffect",
-        message: "Viewer slide style snapshot",
-        data: {
-          assetId: current.id,
-          hasPreviewUrl: !!previewUrl,
-          contentFrameFound: !!contentFrame,
-          contentFrameBorder: contentFrameStyle?.border ?? null,
-          contentFrameBackground: contentFrameStyle?.backgroundColor ?? null,
-          contentFrameWidth: contentRect?.width ?? null,
-          contentFrameHeight: contentRect?.height ?? null,
-          contentFrameLeft: contentRect?.left ?? null,
-          contentFrameRight: contentRect?.right ?? null,
-          contentFrameTop: contentRect?.top ?? null,
-          contentFrameBottom: contentRect?.bottom ?? null,
-          viewportCenterX,
-          viewportCenterY,
-          viewportWidth: window.innerWidth,
-          viewportHeight: window.innerHeight,
-          contentCenterX,
-          contentCenterY,
-          centerDeltaX: contentCenterX !== null ? Number((contentCenterX - viewportCenterX).toFixed(2)) : null,
-          centerDeltaY: contentCenterY !== null ? Number((contentCenterY - viewportCenterY).toFixed(2)) : null,
-          viewportUsageWPercent:
-            contentRect?.width ? Number(((contentRect.width / window.innerWidth) * 100).toFixed(2)) : null,
-          viewportUsageHPercent:
-            contentRect?.height ? Number(((contentRect.height / window.innerHeight) * 100).toFixed(2)) : null,
-          frameFound: !!frame,
-          framePadding: frameStyle?.padding ?? null,
-          frameBackground: frameStyle?.backgroundColor ?? null,
-          frameBorder: frameStyle?.border ?? null,
-          imageFound: !!image,
-          imageWidth: imageRect?.width ?? null,
-          imageHeight: imageRect?.height ?? null,
-          imageMaxWidth: imageStyle?.maxWidth ?? null,
-          imageMaxHeight: imageStyle?.maxHeight ?? null,
-          captionWidth: captionRect?.width ?? null,
-          captionHeight: captionRect?.height ?? null,
-          captionFound: !!caption,
-          captionPadding: captionStyle?.padding ?? null,
-          captionBackground: captionStyle?.backgroundColor ?? null,
-          captionBorder: captionStyle?.border ?? null,
-          captionMarginTop: captionStyle?.marginTop ?? null
-        },
-        timestamp: Date.now()
-      })
-    }).catch(() => {});
-    // #endregion
-  }, [current.id, previewUrl]);
-
   return (
     <>
       <div className="viewer-content-frame">
@@ -230,54 +157,6 @@ function ViewerSlide({ current, index, items, onSelect, onClose, onEditDetails, 
 export function FullscreenViewer({ items, selectedId, onClose, onSelect, onEditDetails, onEditImage }: Props) {
   const index = items.findIndex((x) => x.id === selectedId);
   const current = index >= 0 ? items[index] : null;
-
-  useEffect(() => {
-    const viewerInner = document.querySelector(".viewer-inner--framed");
-    const viewerRoot = document.querySelector(".viewer");
-    const closeBtn = document.querySelector(".viewer-close");
-    const contentFrame = document.querySelector(".viewer-content-frame");
-    const innerStyle = viewerInner ? window.getComputedStyle(viewerInner) : null;
-    const rootStyle = viewerRoot ? window.getComputedStyle(viewerRoot) : null;
-    const closeStyle = closeBtn ? window.getComputedStyle(closeBtn) : null;
-    const closeRect = closeBtn?.getBoundingClientRect();
-    const contentRect = contentFrame?.getBoundingClientRect();
-    // #region agent log
-    fetch("http://127.0.0.1:7454/ingest/404cef76-724a-4eae-b86e-2c4b6c9c679d", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "634310" },
-      body: JSON.stringify({
-        sessionId: "634310",
-        runId: "frame-debug-1",
-        hypothesisId: "H3",
-        location: "src/components/fullscreen-viewer.tsx:FullscreenViewer.useEffect",
-        message: "Fullscreen viewer render state",
-        data: {
-          selectedId,
-          itemsCount: items.length,
-          resolvedIndex: index,
-          resolvedAssetId: current?.id ?? null,
-          viewerInnerFound: !!viewerInner,
-          viewerInnerPadding: innerStyle?.padding ?? null,
-          viewerInnerBackground: innerStyle?.backgroundColor ?? null,
-          viewerInnerBorderColor: innerStyle?.borderColor ?? null,
-          viewerRootBackground: rootStyle?.backgroundColor ?? null,
-          closeFound: !!closeBtn,
-          closeTop: closeRect?.top ?? null,
-          closeRight: closeRect?.right ?? null,
-          closeLeft: closeRect?.left ?? null,
-          closePosition: closeStyle?.position ?? null,
-          closeOffsetTop: closeStyle?.top ?? null,
-          closeOffsetRight: closeStyle?.right ?? null,
-          contentFrameFound: !!contentFrame,
-          contentFrameTop: contentRect?.top ?? null,
-          contentFrameRight: contentRect?.right ?? null,
-          contentFrameLeft: contentRect?.left ?? null
-        },
-        timestamp: Date.now()
-      })
-    }).catch(() => {});
-    // #endregion
-  }, [current?.id, index, items.length, selectedId]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {

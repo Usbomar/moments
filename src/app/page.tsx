@@ -92,24 +92,6 @@ function HomeContent() {
   const supabaseConfiguredRef = useRef(supabaseConfigured);
   supabaseConfiguredRef.current = supabaseConfigured;
 
-  useEffect(() => {
-    // #region agent log
-    fetch("http://127.0.0.1:7454/ingest/404cef76-724a-4eae-b86e-2c4b6c9c679d", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "634310" },
-      body: JSON.stringify({
-        sessionId: "634310",
-        runId: "frame-debug-2",
-        hypothesisId: "H5",
-        location: "src/app/page.tsx:HomeContent.useEffect",
-        message: "Home content mounted",
-        data: { initialMainTab: "library" },
-        timestamp: Date.now()
-      })
-    }).catch(() => {});
-    // #endregion
-  }, []);
-
   const refreshLibrary = useCallback(async () => {
     setLoadingLibrary(true);
     setLibraryLoadError(null);
@@ -215,28 +197,13 @@ function HomeContent() {
   }, []);
 
   const openViewer = useCallback((asset: Asset, contextItems: Asset[]) => {
-    // #region agent log
-    fetch("http://127.0.0.1:7454/ingest/404cef76-724a-4eae-b86e-2c4b6c9c679d", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "634310" },
-      body: JSON.stringify({
-        sessionId: "634310",
-        runId: "frame-debug-1",
-        hypothesisId: "H1",
-        location: "src/app/page.tsx:openViewer",
-        message: "Open viewer requested from page",
-        data: { mainTab, view, assetId: asset.id, contextCount: contextItems.length },
-        timestamp: Date.now()
-      })
-    }).catch(() => {});
-    // #endregion
     setCollectionSlideshow(null);
     setSelectedAsset(null);
     setImageEditorAsset(null);
     setSlideshowItems(null);
     setViewerQueue(contextItems.length ? contextItems : null);
     setSelectedId(asset.id);
-  }, [mainTab, view]);
+  }, []);
 
   const openDetailsFromViewer = useCallback((asset: Asset) => {
     setSelectedId(null);

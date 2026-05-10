@@ -29,9 +29,15 @@ begin
   where user_id is distinct from uid_text;
   get diagnostics albums_updated = row_count;
 
-  insert into public.profiles (id, role)
-  values (uid_text::uuid, 'owner')
-  on conflict (id) do nothing;
+  if exists (
+    select 1
+    from information_schema.tables
+    where table_schema = 'public' and table_name = 'profiles'
+  ) then
+    insert into public.profiles (id, role)
+    values (uid_text::uuid, 'owner')
+    on conflict (id) do nothing;
+  end if;
 
   raise notice 'Moments: user_id assignat a %. Assets actualitzats: %. Albums actualitzats: %.', uid_text, assets_updated, albums_updated;
 end $$;

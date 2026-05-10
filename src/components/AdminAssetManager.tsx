@@ -3,6 +3,12 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { Asset } from "@/lib/types";
 import type { AppCollection } from "@/lib/collections";
+import { AdminAssetPickerModal } from "@/components/AdminAssetPickerModal";
+
+type AssetPickerTarget =
+  | { kind: "collection"; id: string }
+  | { kind: "tag"; tag: string }
+  | { kind: "location"; key: string };
 
 type Props = {
   open: boolean;
@@ -126,16 +132,11 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
   const [openCollectionRows, setOpenCollectionRows] = useState<Record<string, boolean>>({});
   const [editingTagName, setEditingTagName] = useState<Record<string, string>>({});
   const [editingLocationName, setEditingLocationName] = useState<Record<string, string>>({});
-  const [addAssetByTag, setAddAssetByTag] = useState<Record<string, string>>({});
-  const [addAssetByLocation, setAddAssetByLocation] = useState<Record<string, string>>({});
   const [newCollectionName, setNewCollectionName] = useState("");
   const [editingCollectionId, setEditingCollectionId] = useState<string | null>(null);
   const [editingCollectionDraft, setEditingCollectionDraft] = useState("");
   const [deleteCollectionId, setDeleteCollectionId] = useState<string | null>(null);
-  const [addPhotosForCollectionId, setAddPhotosForCollectionId] = useState<string | null>(null);
-  const [addPhotosQuery, setAddPhotosQuery] = useState("");
-  const [addPhotosSelectedIds, setAddPhotosSelectedIds] = useState<string[]>([]);
-  const [addPhotosBusy, setAddPhotosBusy] = useState(false);
+  const [assetPickerTarget, setAssetPickerTarget] = useState<AssetPickerTarget | null>(null);
   const saveTimersRef = useRef<Record<string, number>>({});
   const allColorOptions = useMemo(() => [...COLOR_PRESETS, ...customColors], [customColors]);
   const tagStats = useMemo(() => {
@@ -192,26 +193,55 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
   }, [assets]);
   const assetById = useMemo(() => new Map(assets.map((asset) => [asset.id, asset])), [assets]);
 
-  const addPhotosTarget = useMemo(
-    () => collections.find((c) => c.id === addPhotosForCollectionId) ?? null,
-    [collections, addPhotosForCollectionId]
-  );
-
-  const addPhotosAvailableFiltered = useMemo(() => {
-    if (!addPhotosTarget) return [];
-    const member = new Set(addPhotosTarget.assetIds);
-    let list = assets.filter((a) => !member.has(a.id));
-    const q = addPhotosQuery.trim().toLowerCase();
-    if (q) {
-      list = list.filter((a) => {
-        const title = (a.title ?? "").toLowerCase();
-        const dateStr = (a.takenAt ?? "").slice(0, 10);
-        return title.includes(q) || dateStr.includes(q);
-      });
+  const pickerAvailableAssets = useMemo(() => {
+    if (!assetPickerTarget) return [];
+    if (assetPickerTarget.kind === "collection") {
+      const c = collections.find((x) => x.id === assetPickerTarget.id);
+      if (!c) return [];
+      const member = new Set(c.assetIds);
+      return assets.filter((a) => !member.has(a.id));
     }
-    list.sort((a, b) => cmpText(b.takenAt ?? "", a.takenAt ?? ""));
-    return list;
-  }, [assets, addPhotosTarget, addPhotosQuery]);
+    if (assetPickerTarget.kind === "tag") {
+      const tag = assetPickerTarget.tag;
+      return assets.filter((asset) => !(asset.tags ?? []).map((t) => t.trim().toLowerCase()).includes(tag));
+    }
+    const key = assetPickerTarget.key;
+    return assets.filter((asset) => {
+      const ak = [asset.location?.city?.trim() ?? "", asset.location?.country?.trim() ?? ""].filter(Boolean).join(", ");
+      return ak !== key;
+    });
+  }, [assetPickerTarget, assets, collections]);
+
+  const pickerTitle = useMemo(() => {
+    if (!assetPickerTarget) return "";
+    if (assetPickerTarget.kind === "collection") {
+      const name = collections.find((c) => c.id === assetPickerTarget.id)?.name ?? "";
+      return `Afegir fotos a «${name}»`;
+    }
+    if (assetPickerTarget.kind === "tag") {
+      return `Afegir fotos al tag «${assetPickerTarget.tag}»`;
+    }
+    return `Afegir fotos a la ubicació «${assetPickerTarget.key}»`;
+  }, [assetPickerTarget, collections]);
+
+  const pickerSubtitle = useMemo(() => {
+    if (!assetPickerTarget) return "";
+    if (assetPickerTarget.kind === "collection") {
+      return "Cerca per nom o data (AAAA-MM-DD). Selecciona una o més fotos que encara no siguin en aquesta col·lecció.";
+    }
+    if (assetPickerTarget.kind === "tag") {
+      return "Cerca per nom o data (AAAA-MM-DD). Selecciona fotos que encara no tinguin aquest tag.";
+    }
+    return "Cerca per nom o data (AAAA-MM-DD). Selecciona fotos que encara no tinguin aquesta ubicació (ciutat, país).";
+  }, [assetPickerTarget]);
+
+  const pickerEmptyEligible = useMemo(() => {
+    if (!assetPickerTarget) return "";
+    if (assets.length === 0) return "No hi ha fotos a la biblioteca.";
+    if (assetPickerTarget.kind === "collection") return "Totes les fotos ja són en aquesta col·lecció.";
+    if (assetPickerTarget.kind === "tag") return "Totes les fotos ja tenen aquest tag.";
+    return "Totes les fotos ja tenen aquesta ubicació.";
+  }, [assetPickerTarget, assets.length]);
 
   const sorted = useMemo(() => {
     const list = [...assets];
@@ -280,22 +310,6 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
     if (typeof window === "undefined") return;
     window.localStorage.setItem(CUSTOM_COLOR_STORAGE_KEY, JSON.stringify(customColors));
   }, [customColors]);
-
-  useEffect(() => {
-    if (addPhotosForCollectionId) {
-      setAddPhotosQuery("");
-      setAddPhotosSelectedIds([]);
-    }
-  }, [addPhotosForCollectionId]);
-
-  useEffect(() => {
-    if (!addPhotosForCollectionId) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setAddPhotosForCollectionId(null);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [addPhotosForCollectionId]);
 
   if (!open) return null;
 
@@ -475,27 +489,17 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
       delete next[removedId];
       return next;
     });
-    if (addPhotosForCollectionId === removedId) setAddPhotosForCollectionId(null);
+    if (assetPickerTarget?.kind === "collection" && assetPickerTarget.id === removedId) setAssetPickerTarget(null);
     await onRefreshCollections?.();
   };
 
-  const toggleAddPhotoSelected = (assetId: string) => {
-    setAddPhotosSelectedIds((prev) => (prev.includes(assetId) ? prev.filter((x) => x !== assetId) : [...prev, assetId]));
-  };
-
-  const selectAllVisibleAddPhotos = () => {
-    setAddPhotosSelectedIds(addPhotosAvailableFiltered.map((a) => a.id));
-  };
-
-  const clearAddPhotosSelection = () => setAddPhotosSelectedIds([]);
-
-  const commitAddPhotos = async () => {
-    const colId = addPhotosForCollectionId;
-    if (!colId || addPhotosSelectedIds.length === 0) return;
-    setAddPhotosBusy(true);
-    try {
+  const handleAssetPickerConfirm = async (selectedIds: string[]) => {
+    const target = assetPickerTarget;
+    if (!target || selectedIds.length === 0) return;
+    if (target.kind === "collection") {
+      const colId = target.id;
       const results = await Promise.allSettled(
-        addPhotosSelectedIds.map((assetId) =>
+        selectedIds.map((assetId) =>
           fetch(`/api/collections/${colId}/assets`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -509,10 +513,36 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
       if (failed > 0) {
         window.alert(`${failed} foto${failed === 1 ? "" : "s"} no s'han pogut afegir.`);
       }
-      setAddPhotosSelectedIds([]);
       await onRefreshCollections?.();
-    } finally {
-      setAddPhotosBusy(false);
+      return;
+    }
+    if (target.kind === "tag") {
+      const tag = target.tag;
+      const results = await Promise.allSettled(
+        selectedIds.map((id) => {
+          const asset = assetById.get(id);
+          if (!asset) return Promise.reject(new Error("missing"));
+          return addTagToAsset(asset, tag);
+        })
+      );
+      const failed = results.filter((r) => r.status === "rejected").length;
+      if (failed > 0) {
+        window.alert(`${failed} foto${failed === 1 ? "" : "s"} no s'han pogut actualitzar.`);
+      }
+      return;
+    }
+    const key = target.key;
+    const [city = "", country = ""] = key.split(",").map((s) => s.trim());
+    const results = await Promise.allSettled(
+      selectedIds.map((id) => {
+        const asset = assetById.get(id);
+        if (!asset) return Promise.reject(new Error("missing"));
+        return setLocationOnAsset(asset, city, country);
+      })
+    );
+    const failed = results.filter((r) => r.status === "rejected").length;
+    if (failed > 0) {
+      window.alert(`${failed} foto${failed === 1 ? "" : "s"} no s'han pogut actualitzar.`);
     }
   };
 
@@ -836,7 +866,7 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
                           <button
                             type="button"
                             className="btn btn-sm btn-primary"
-                            onClick={() => setAddPhotosForCollectionId(collection.id)}
+                            onClick={() => setAssetPickerTarget({ kind: "collection", id: collection.id })}
                           >
                             Afegir fotos…
                           </button>
@@ -913,7 +943,6 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
                 {tagStats.map((row) => {
                   const linked = tagsToAssets.get(row.value) ?? [];
                   const currentEdit = editingTagName[row.value] ?? row.value;
-                  const addable = assets.filter((asset) => !(asset.tags ?? []).map((t) => t.trim().toLowerCase()).includes(row.value));
                   return (
                     <Fragment key={row.value}>
                       <tr>
@@ -929,6 +958,13 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
                           <button type="button" className="btn btn-sm" onClick={() => void renameTag(row.value)}>Desar nom</button>
                           <button type="button" className="btn btn-sm" onClick={() => toggleTagRow(row.value)}>
                             {openTagRows[row.value] ? "Amagar fotos" : "Mostrar fotos"}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-primary"
+                            onClick={() => setAssetPickerTarget({ kind: "tag", tag: row.value })}
+                          >
+                            Afegir fotos…
                           </button>
                           <button type="button" className="btn btn-sm danger" onClick={() => void deleteTagEverywhere(row.value)}>Eliminar</button>
                         </td>
@@ -951,27 +987,6 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
                               })}
                             </div>
                             {linked.length > 8 ? <p className="modal-muted">+ {linked.length - 8} fotos més</p> : null}
-                            <div className="admin-inline-add">
-                              <select value={addAssetByTag[row.value] ?? ""} onChange={(e) => setAddAssetByTag((prev) => ({ ...prev, [row.value]: e.target.value }))}>
-                                <option value="">Afegir foto al tag…</option>
-                                {addable.map((asset) => (
-                                  <option key={asset.id} value={asset.id}>{asset.title}</option>
-                                ))}
-                              </select>
-                              <button
-                                type="button"
-                                className="btn btn-sm"
-                                onClick={() => {
-                                  const selectedId = addAssetByTag[row.value];
-                                  if (!selectedId) return;
-                                  const asset = assetById.get(selectedId);
-                                  if (!asset) return;
-                                  void addTagToAsset(asset, row.value);
-                                }}
-                              >
-                                Afegir
-                              </button>
-                            </div>
                           </td>
                         </tr>
                       ) : null}
@@ -997,11 +1012,6 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
                 {locationStats.map((row) => {
                   const linked = locationsToAssets.get(row.value) ?? [];
                   const currentEdit = editingLocationName[row.value] ?? row.value;
-                  const [city = "", country = ""] = row.value.split(",").map((s) => s.trim());
-                  const addable = assets.filter((asset) => {
-                    const key = [asset.location?.city?.trim() ?? "", asset.location?.country?.trim() ?? ""].filter(Boolean).join(", ");
-                    return key !== row.value;
-                  });
                   return (
                     <Fragment key={row.value}>
                       <tr>
@@ -1013,6 +1023,13 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
                           <button type="button" className="btn btn-sm" onClick={() => void renameLocation(row.value)}>Desar nom</button>
                           <button type="button" className="btn btn-sm" onClick={() => toggleLocationRow(row.value)}>
                             {openLocationRows[row.value] ? "Amagar fotos" : "Mostrar fotos"}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-primary"
+                            onClick={() => setAssetPickerTarget({ kind: "location", key: row.value })}
+                          >
+                            Afegir fotos…
                           </button>
                           <button type="button" className="btn btn-sm danger" onClick={() => void deleteLocationEverywhere(row.value)}>Eliminar</button>
                         </td>
@@ -1035,27 +1052,6 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
                               })}
                             </div>
                             {linked.length > 8 ? <p className="modal-muted">+ {linked.length - 8} fotos més</p> : null}
-                            <div className="admin-inline-add">
-                              <select value={addAssetByLocation[row.value] ?? ""} onChange={(e) => setAddAssetByLocation((prev) => ({ ...prev, [row.value]: e.target.value }))}>
-                                <option value="">Afegir foto a ubicació…</option>
-                                {addable.map((asset) => (
-                                  <option key={asset.id} value={asset.id}>{asset.title}</option>
-                                ))}
-                              </select>
-                              <button
-                                type="button"
-                                className="btn btn-sm"
-                                onClick={() => {
-                                  const selectedId = addAssetByLocation[row.value];
-                                  if (!selectedId) return;
-                                  const asset = assetById.get(selectedId);
-                                  if (!asset) return;
-                                  void setLocationOnAsset(asset, city, country);
-                                }}
-                              >
-                                Afegir
-                              </button>
-                            </div>
                           </td>
                         </tr>
                       ) : null}
@@ -1197,91 +1193,23 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
         </div>
       ) : null}
 
-      {addPhotosForCollectionId && addPhotosTarget ? (
-        <div
-          className="modal-overlay admin-sub-overlay"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="admin-add-photos-title"
-          onClick={() => setAddPhotosForCollectionId(null)}
-        >
-          <div className="modal-content admin-add-photos-dialog" onClick={(e) => e.stopPropagation()}>
-            <header className="admin-add-photos-head">
-              <h3 id="admin-add-photos-title">Afegir fotos a «{addPhotosTarget.name}»</h3>
-              <button type="button" className="btn btn-ghost btn-sm" aria-label="Tancar" onClick={() => setAddPhotosForCollectionId(null)}>
-                ×
-              </button>
-            </header>
-            <p className="modal-muted admin-add-photos-sub">
-              Cerca per nom o data (AAAA-MM-DD). Selecciona una o més fotos que encara no siguin en aquesta col·lecció.
-            </p>
-            <div className="admin-add-photos-toolbar">
-              <input
-                type="search"
-                className="admin-add-photos-search"
-                value={addPhotosQuery}
-                onChange={(e) => setAddPhotosQuery(e.target.value)}
-                placeholder="Cercar…"
-                aria-label="Cercar fotos per nom o data"
-              />
-              <button type="button" className="btn btn-sm" onClick={selectAllVisibleAddPhotos} disabled={addPhotosAvailableFiltered.length === 0}>
-                Seleccionar totes les visibles
-              </button>
-              <button type="button" className="btn btn-sm" onClick={clearAddPhotosSelection} disabled={addPhotosSelectedIds.length === 0}>
-                Netejar selecció
-              </button>
-            </div>
-            <div className="admin-picker-scroll">
-              {addPhotosAvailableFiltered.length ? (
-                <div className="admin-picker-grid">
-                  {addPhotosAvailableFiltered.map((asset) => {
-                    const thumb = (asset.files.thumbUrl || asset.files.previewUrl || asset.files.originalUrl).trim();
-                    const sel = addPhotosSelectedIds.includes(asset.id);
-                    return (
-                      <button
-                        key={asset.id}
-                        type="button"
-                        aria-pressed={sel}
-                        className={`admin-picker-tile${sel ? " admin-picker-tile--selected" : ""}`}
-                        onClick={() => toggleAddPhotoSelected(asset.id)}
-                      >
-                        <span className="admin-picker-tile-check" aria-hidden>
-                          {sel ? "✓" : ""}
-                        </span>
-                        {thumb ? (
-                          // eslint-disable-next-line @next/next/no-img-element -- remote storage image
-                          <img src={thumb} alt="" className="admin-picker-tile-img" referrerPolicy="no-referrer" />
-                        ) : (
-                          <span className="admin-picker-tile-placeholder">Sense miniatura</span>
-                        )}
-                        <span className="admin-picker-tile-title">{asset.title}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="modal-muted admin-picker-empty">
-                  {assets.length === 0
-                    ? "No hi ha fotos a la biblioteca."
-                    : "Cap foto coincideix o totes ja són en aquesta col·lecció."}
-                </p>
-              )}
-            </div>
-            <div className="admin-add-photos-footer">
-              <button type="button" className="btn btn-sm" onClick={() => setAddPhotosForCollectionId(null)}>
-                Cancel·lar
-              </button>
-              <button
-                type="button"
-                className="btn btn-sm btn-primary"
-                disabled={addPhotosSelectedIds.length === 0 || addPhotosBusy}
-                onClick={() => void commitAddPhotos()}
-              >
-                {addPhotosBusy ? "Afegint…" : `Afegir ${addPhotosSelectedIds.length} foto${addPhotosSelectedIds.length === 1 ? "" : "s"}`}
-              </button>
-            </div>
-          </div>
-        </div>
+      {assetPickerTarget ? (
+        <AdminAssetPickerModal
+          key={
+            assetPickerTarget.kind === "collection"
+              ? `c-${assetPickerTarget.id}`
+              : assetPickerTarget.kind === "tag"
+                ? `t-${assetPickerTarget.tag}`
+                : `l-${assetPickerTarget.key}`
+          }
+          open
+          title={pickerTitle}
+          subtitle={pickerSubtitle}
+          availableAssets={pickerAvailableAssets}
+          emptyWhenNoEligible={pickerEmptyEligible}
+          onClose={() => setAssetPickerTarget(null)}
+          onConfirm={handleAssetPickerConfirm}
+        />
       ) : null}
     </div>
   );

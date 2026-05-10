@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { Asset } from "@/lib/types";
 
@@ -56,12 +56,102 @@ type SlideProps = {
   onEditImage?: (asset: Asset) => void;
 };
 
+const ZOOM_SCALE = 1.9;
+
 /** `key={selectedId}` al muntar reinicia el zoom sense efectes. */
 function ViewerSlide({ current, index, items, onSelect, onClose, onEditDetails, onEditImage }: SlideProps) {
   const [zoom, setZoom] = useState<1 | 2>(1);
+  const [panY, setPanY] = useState(0);
+  const imgRef = useRef<HTMLImageElement | null>(null);
+  const zoomPortRef = useRef<HTMLDivElement | null>(null);
+  const dragRef = useRef<{ pointerId: number; startY: number; startPan: number } | null>(null);
+  const movedRef = useRef(false);
+  const suppressZoomOutClickRef = useRef(false);
+  const [isPanning, setIsPanning] = useState(false);
+
   const previewUrl = (current.files.mediumUrl || current.files.previewUrl)?.trim() ?? "";
   const takenAtText = new Date(current.takenAt).toLocaleDateString("ca-ES", { day: "numeric", month: "long", year: "numeric" });
   const locationText = current.location ? `${current.location.city}${current.location.country ? `, ${current.location.country}` : ""}` : "";
+
+  const [panBounds, setPanBounds] = useState({ min: 0, max: 0 });
+
+  const recomputePanBounds = useCallback(() => {
+    if (zoom !== 2) return;
+    const img = imgRef.current;
+    if (!img || !img.naturalHeight) return;
+    const hi = img.offsetHeight;
+    if (hi <= 0) return;
+    const scaledH = hi * ZOOM_SCALE;
+    const portH = zoomPortRef.current?.clientHeight ?? hi;
+    const extra = Math.max(0, (scaledH - portH) / 2);
+    setPanBounds({ min: -extra, max: extra });
+    setPanY((p) => Math.min(extra, Math.max(-extra, p)));
+  }, [zoom]);
+
+  useLayoutEffect(() => {
+    recomputePanBounds();
+  }, [recomputePanBounds, previewUrl, current.id]);
+
+  useEffect(() => {
+    if (zoom === 1) setPanY(0);
+  }, [zoom]);
+
+  useEffect(() => {
+    if (zoom !== 2) return;
+    const onResize = () => recomputePanBounds();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [zoom, recomputePanBounds]);
+
+  const clampPan = useCallback(
+    (y: number) => {
+      const { min, max } = panBounds;
+      return Math.min(max, Math.max(min, y));
+    },
+    [panBounds]
+  );
+
+  const onZoomPointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      if (zoom !== 2) return;
+      movedRef.current = false;
+      suppressZoomOutClickRef.current = false;
+      dragRef.current = { pointerId: e.pointerId, startY: e.clientY, startPan: panY };
+      setIsPanning(true);
+      (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
+    },
+    [zoom, panY]
+  );
+
+  const onZoomPointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (zoom !== 2 || !dragRef.current || dragRef.current.pointerId !== e.pointerId) return;
+      const dy = e.clientY - dragRef.current.startY;
+      if (Math.abs(dy) > 4) movedRef.current = true;
+      setPanY(clampPan(dragRef.current.startPan + dy));
+    },
+    [zoom, clampPan]
+  );
+
+  const onZoomPointerUp = useCallback(
+    (e: React.PointerEvent) => {
+      if (!dragRef.current || dragRef.current.pointerId !== e.pointerId) return;
+      suppressZoomOutClickRef.current = movedRef.current;
+      (e.currentTarget as HTMLDivElement).releasePointerCapture(e.pointerId);
+      dragRef.current = null;
+      setIsPanning(false);
+    },
+    []
+  );
+
+  const onZoomWheel = useCallback(
+    (e: React.WheelEvent) => {
+      if (zoom !== 2) return;
+      e.preventDefault();
+      setPanY((p) => clampPan(p - e.deltaY * 0.6));
+    },
+    [zoom, clampPan]
+  );
 
   return (
     <>
@@ -77,23 +167,42 @@ function ViewerSlide({ current, index, items, onSelect, onClose, onEditDetails, 
         </button>
         {previewUrl ? (
           <div className="viewer-media-frame">
-            {/* eslint-disable-next-line @next/next/no-img-element -- URL signades / visor */}
-            <img
-              className={`viewer-media viewer-media--framed ${zoom === 2 ? "is-zoomed" : ""}`}
-              src={previewUrl}
-              alt={current.title}
-              width={current.width || undefined}
-              height={current.height || undefined}
-              fetchPriority="high"
-              referrerPolicy="no-referrer"
-              style={{ cursor: zoom === 2 ? "zoom-out" : "default" }}
-              onClick={(e) => {
-                if (zoom === 2) {
+            <div
+              ref={zoomPortRef}
+              className={`viewer-zoom-viewport${zoom === 2 ? " viewer-zoom-viewport--active" : ""}`}
+              onPointerDown={onZoomPointerDown}
+              onPointerMove={onZoomPointerMove}
+              onPointerUp={onZoomPointerUp}
+              onPointerCancel={onZoomPointerUp}
+              onWheel={onZoomWheel}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element -- URL signades / visor */}
+              <img
+                ref={imgRef}
+                className={`viewer-media viewer-media--framed ${zoom === 2 ? "is-zoomed" : ""}`}
+                src={previewUrl}
+                alt={current.title}
+                width={current.width || undefined}
+                height={current.height || undefined}
+                fetchPriority="high"
+                referrerPolicy="no-referrer"
+                style={{
+                  cursor: zoom === 2 ? (isPanning ? "grabbing" : "grab") : "default",
+                  transform: zoom === 2 ? `scale(${ZOOM_SCALE}) translateY(${panY}px)` : undefined,
+                  transformOrigin: zoom === 2 ? "center center" : undefined
+                }}
+                onLoad={recomputePanBounds}
+                onClick={(e) => {
+                  if (zoom !== 2) return;
+                  if (suppressZoomOutClickRef.current) {
+                    suppressZoomOutClickRef.current = false;
+                    return;
+                  }
                   e.stopPropagation();
                   setZoom(1);
-                }
-              }}
-            />
+                }}
+              />
+            </div>
           </div>
         ) : (
           <div className="viewer-media-frame">

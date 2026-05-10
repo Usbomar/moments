@@ -1,6 +1,7 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import type { Asset } from "@/lib/types";
 import type { AppCollection } from "@/lib/collections";
 import { AdminAssetPickerModal } from "@/components/AdminAssetPickerModal";
@@ -13,6 +14,42 @@ import {
   parseLocationText,
   toDateInputValue
 } from "@/components/admin/adminAssetHelpers";
+import {
+  DEFAULT_PHOTO_COLUMNS,
+  DEFAULT_TAB_ORDER,
+  normalizePhotoColumnOrder,
+  normalizeTabOrder,
+  photoColumnsForDisplay,
+  reorderPhotoColumns,
+  reorderTabs,
+  STORAGE_PHOTO_COLS,
+  STORAGE_TAB_ORDER,
+  type AdminTabId,
+  type PhotoColumnKey
+} from "@/components/admin/adminDnD";
+
+const TAB_LABELS: Record<AdminTabId, string> = {
+  photos: "Fotos",
+  guest: "Convidat",
+  collections: "Col·leccions",
+  tags: "TAGS",
+  locations: "Ubicacions",
+  colors: "Colors"
+};
+
+const PHOTO_COL_CLASS: Record<PhotoColumnKey, string> = {
+  thumb: "admin-assets-col-thumb",
+  title: "admin-assets-col-title",
+  takenAt: "admin-assets-col-takenAt",
+  color: "admin-assets-col-color",
+  location: "admin-assets-col-location",
+  favorite: "admin-assets-col-favorite",
+  hiddenGuest: "admin-assets-col-hiddenGuest",
+  desc: "admin-assets-col-desc",
+  tags: "admin-assets-col-tags",
+  collections: "admin-assets-col-collections",
+  actions: "admin-assets-col-delete"
+};
 
 type AssetPickerTarget =
   | { kind: "collection"; id: string }
@@ -33,8 +70,6 @@ type Props = {
 
 type DraftPatch = Partial<Pick<Asset, "title" | "takenAt" | "favorite" | "colorHue" | "location" | "hiddenFromGuests">>;
 const CUSTOM_COLOR_STORAGE_KEY = "moments_admin_custom_colors_v1";
-type TabId = "photos" | "guest" | "collections" | "tags" | "locations" | "colors";
-
 type GuestProfileCfg = {
   guestAccessEnabled: boolean;
   guestSlug: string | null;
@@ -44,7 +79,7 @@ type GuestProfileCfg = {
 };
 
 export function AdminAssetManager({ open, assets, collections, onClose, onEdit, onEditImage, onDelete, onQuickUpdate, onRefreshCollections }: Props) {
-  const [activeTab, setActiveTab] = useState<TabId>("photos");
+  const [activeTab, setActiveTab] = useState<AdminTabId>("photos");
   const [sort, setSort] = useState<SortState[]>([{ key: "takenAt", dir: "desc" }]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(100);
@@ -73,6 +108,26 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
   const [editingCollectionDraft, setEditingCollectionDraft] = useState("");
   const [deleteCollectionId, setDeleteCollectionId] = useState<string | null>(null);
   const [assetPickerTarget, setAssetPickerTarget] = useState<AssetPickerTarget | null>(null);
+  const [tabOrder, setTabOrder] = useState<AdminTabId[]>(() => {
+    if (typeof window === "undefined") return [...DEFAULT_TAB_ORDER];
+    try {
+      const raw = localStorage.getItem(STORAGE_TAB_ORDER);
+      if (raw) return normalizeTabOrder(JSON.parse(raw));
+    } catch {
+      /* ignore */
+    }
+    return [...DEFAULT_TAB_ORDER];
+  });
+  const [photoColumnOrder, setPhotoColumnOrder] = useState<PhotoColumnKey[]>(() => {
+    if (typeof window === "undefined") return [...DEFAULT_PHOTO_COLUMNS];
+    try {
+      const raw = localStorage.getItem(STORAGE_PHOTO_COLS);
+      if (raw) return normalizePhotoColumnOrder(JSON.parse(raw));
+    } catch {
+      /* ignore */
+    }
+    return [...DEFAULT_PHOTO_COLUMNS];
+  });
   const saveTimersRef = useRef<Record<string, number>>({});
   const allColorOptions = useMemo(() => [...COLOR_PRESETS, ...customColors], [customColors]);
   const { tagStats, locationStats, tagsToAssets, locationsToAssets, assetById, sorted } = useAdminAssetStats(assets, sort);
@@ -128,6 +183,49 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
   }, [assetPickerTarget, assets.length]);
 
   const visibleAssets = useMemo(() => sorted.slice(0, visibleCount), [sorted, visibleCount]);
+
+  const visiblePhotoColumns = useMemo(
+    () => photoColumnsForDisplay(photoColumnOrder, showContent),
+    [photoColumnOrder, showContent]
+  );
+
+  const onPhotoColDragStart = useCallback((col: PhotoColumnKey) => (e: React.DragEvent) => {
+    e.dataTransfer.setData("photo-col", col);
+    e.dataTransfer.effectAllowed = "move";
+  }, []);
+
+  const onPhotoColDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+  }, []);
+
+  const onPhotoColDrop = useCallback((dropCol: PhotoColumnKey) => {
+    return (e: React.DragEvent) => {
+      e.preventDefault();
+      const from = e.dataTransfer.getData("photo-col") as PhotoColumnKey;
+      if (from && from !== dropCol) {
+        setPhotoColumnOrder((prev) => reorderPhotoColumns(prev, from, dropCol));
+      }
+    };
+  }, []);
+
+  const onTabDragStart = useCallback((tabId: AdminTabId) => (e: React.DragEvent) => {
+    e.dataTransfer.setData("admin-tab", tabId);
+    e.dataTransfer.effectAllowed = "move";
+  }, []);
+
+  const onTabDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+  }, []);
+
+  const onTabDrop = useCallback((dropTab: AdminTabId) => {
+    return (e: React.DragEvent) => {
+      e.preventDefault();
+      const from = e.dataTransfer.getData("admin-tab") as AdminTabId;
+      if (from && from !== dropTab) {
+        setTabOrder((prev) => reorderTabs(prev, from, dropTab));
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!open || activeTab !== "guest") return;
@@ -194,6 +292,24 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
     if (typeof window === "undefined") return;
     window.localStorage.setItem(CUSTOM_COLOR_STORAGE_KEY, JSON.stringify(customColors));
   }, [customColors]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.setItem(STORAGE_TAB_ORDER, JSON.stringify(tabOrder));
+    } catch {
+      /* ignore */
+    }
+  }, [tabOrder]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.setItem(STORAGE_PHOTO_COLS, JSON.stringify(photoColumnOrder));
+    } catch {
+      /* ignore */
+    }
+  }, [photoColumnOrder]);
 
   if (!open) return null;
 
@@ -446,6 +562,306 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
   const previewCanNext = previewIndex >= 0 && previewIndex < previewSourceAssets.length - 1;
   const previewSrc = previewCurrent ? (previewCurrent.files.previewUrl || previewCurrent.files.originalUrl || previewCurrent.files.thumbUrl).trim() : "";
 
+  type PhotoRowCtx = {
+    thumb: string;
+    locationText: string;
+    saveState: "idle" | "saving" | "saved" | "error";
+    isFavorite: boolean;
+    hideGuest: boolean;
+  };
+
+  const renderPhotoHeaderCell = (col: PhotoColumnKey) => {
+    const grip = (
+      <span
+        className="admin-drag-handle"
+        draggable
+        onDragStart={onPhotoColDragStart(col)}
+        onClick={(e) => e.stopPropagation()}
+        title="Arrossega per reordenar columnes"
+        aria-hidden
+      >
+        ⋮
+      </span>
+    );
+    let main: ReactNode;
+    switch (col) {
+      case "thumb":
+        main = <span>Mini</span>;
+        break;
+      case "title":
+        main = (
+          <button type="button" onClick={(e) => toggleSort("title", e.shiftKey)}>
+            Nom
+          </button>
+        );
+        break;
+      case "takenAt":
+        main = (
+          <button type="button" onClick={(e) => toggleSort("takenAt", e.shiftKey)}>
+            Data
+          </button>
+        );
+        break;
+      case "color":
+        main = (
+          <button type="button" onClick={(e) => toggleSort("color", e.shiftKey)}>
+            Color
+          </button>
+        );
+        break;
+      case "location":
+        main = (
+          <button type="button" onClick={(e) => toggleSort("location", e.shiftKey)}>
+            Ubicació
+          </button>
+        );
+        break;
+      case "favorite":
+        main = (
+          <button type="button" onClick={(e) => toggleSort("favorite", e.shiftKey)}>
+            Preferit
+          </button>
+        );
+        break;
+      case "hiddenGuest":
+        main = <span>Conv.</span>;
+        break;
+      case "desc":
+        main = <span>📝</span>;
+        break;
+      case "tags":
+        main = <span>TAGS</span>;
+        break;
+      case "collections":
+        main = <span>Col·leccions</span>;
+        break;
+      case "actions":
+        main = (
+          <>
+            <span className="admin-assets-actions-head" aria-hidden>
+              <span className="admin-assets-actions-head-edit">✎</span>
+              <span className="admin-assets-actions-head-del">×</span>
+            </span>
+            <span className="sr-only">Editar informació i eliminar</span>
+          </>
+        );
+        break;
+      default:
+        main = null;
+    }
+    const thTitle =
+      col === "hiddenGuest" ? "Ocultar als convidats" : col === "desc" ? "Descripció" : undefined;
+    return (
+      <th
+        key={col}
+        className={PHOTO_COL_CLASS[col]}
+        scope="col"
+        title={thTitle}
+        onDragOver={onPhotoColDragOver}
+        onDrop={onPhotoColDrop(col)}
+      >
+        <div className="admin-assets-th-inner">
+          {grip}
+          {main}
+        </div>
+      </th>
+    );
+  };
+
+  const renderPhotoBodyCell = (a: Asset, col: PhotoColumnKey, ctx: PhotoRowCtx) => {
+    switch (col) {
+      case "thumb":
+        return (
+          <td key={col} className={PHOTO_COL_CLASS.thumb}>
+            <div className="admin-assets-thumb-wrap">
+              <button
+                type="button"
+                className={`admin-assets-thumb-btn${ctx.isFavorite ? " admin-assets-thumb-btn--favorite" : ""}`}
+                onClick={() => {
+                  if (!ctx.thumb) return;
+                  openPreview(a, visibleAssets);
+                }}
+                aria-label={`Ampliar ${a.title}`}
+              >
+                {ctx.thumb ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- remote storage image
+                  <img src={ctx.thumb} alt={a.title} className="admin-assets-thumb" referrerPolicy="no-referrer" />
+                ) : (
+                  <span className="admin-assets-thumb admin-assets-thumb--empty">·</span>
+                )}
+              </button>
+              {ctx.thumb ? (
+                <div className="admin-assets-hover-preview" aria-hidden>
+                  {/* eslint-disable-next-line @next/next/no-img-element -- remote storage image */}
+                  <img src={ctx.thumb} alt="" referrerPolicy="no-referrer" />
+                </div>
+              ) : null}
+            </div>
+          </td>
+        );
+      case "title":
+        return (
+          <td key={col} className={PHOTO_COL_CLASS.title}>
+            <div className="admin-assets-title-cell">
+              <input
+                type="text"
+                value={draftById[a.id]?.title ?? a.title}
+                onChange={(e) => updateDraft(a, { title: e.target.value })}
+              />
+              <span className={`admin-assets-save admin-assets-save--${ctx.saveState}`}>
+                {ctx.saveState === "saving"
+                  ? "desant..."
+                  : ctx.saveState === "saved"
+                    ? "desat"
+                    : ctx.saveState === "error"
+                      ? "error"
+                      : ""}
+              </span>
+            </div>
+          </td>
+        );
+      case "takenAt":
+        return (
+          <td key={col} className={PHOTO_COL_CLASS.takenAt}>
+            <input
+              type="date"
+              value={toDateInputValue(draftById[a.id]?.takenAt ?? a.takenAt)}
+              onChange={(e) => updateDraft(a, { takenAt: fromDateInputValue(e.target.value) })}
+            />
+          </td>
+        );
+      case "color":
+        return (
+          <td key={col} className={PHOTO_COL_CLASS.color}>
+            <span className="admin-assets-inline-color">
+              <span
+                className="admin-assets-color-chip"
+                style={{
+                  backgroundColor: `hsl(${draftById[a.id]?.colorHue ?? a.colorHue ?? 0} 72% 46%)`,
+                  opacity: typeof (draftById[a.id]?.colorHue ?? a.colorHue) === "number" ? 1 : 0.2
+                }}
+                aria-hidden
+              />
+              <select
+                value={colorHueToPreset(draftById[a.id]?.colorHue ?? a.colorHue, allColorOptions)}
+                onChange={(e) => updateDraft(a, { colorHue: e.target.value ? Number(e.target.value) : null })}
+              >
+                <option value="">Sense color</option>
+                {allColorOptions.map((preset) => (
+                  <option key={preset.hue} value={preset.hue}>
+                    {preset.label}
+                  </option>
+                ))}
+              </select>
+            </span>
+          </td>
+        );
+      case "location":
+        return (
+          <td key={col} className={PHOTO_COL_CLASS.location}>
+            <input
+              type="text"
+              value={ctx.locationText}
+              placeholder="Ciudad, país"
+              onChange={(e) => {
+                const parsed = parseLocationText(e.target.value);
+                updateDraft(a, {
+                  location: parsed
+                    ? {
+                        lat: a.location?.lat ?? 0,
+                        lng: a.location?.lng ?? 0,
+                        city: parsed.city,
+                        country: parsed.country
+                      }
+                    : undefined
+                });
+              }}
+            />
+          </td>
+        );
+      case "favorite":
+        return (
+          <td key={col} className={PHOTO_COL_CLASS.favorite}>
+            <label className="admin-assets-checkbox-wrap" aria-label={`Favorito ${a.title}`}>
+              <input
+                type="checkbox"
+                checked={draftById[a.id]?.favorite ?? a.favorite}
+                onChange={(e) => updateDraft(a, { favorite: e.target.checked })}
+              />
+            </label>
+          </td>
+        );
+      case "hiddenGuest":
+        return (
+          <td key={col} className={PHOTO_COL_CLASS.hiddenGuest}>
+            <label className="admin-assets-checkbox-wrap" aria-label={`Ocultar als convidats: ${a.title}`} title="Ocultar als convidats">
+              <input
+                type="checkbox"
+                checked={ctx.hideGuest}
+                onChange={(e) => updateDraft(a, { hiddenFromGuests: e.target.checked })}
+              />
+            </label>
+          </td>
+        );
+      case "desc":
+        return (
+          <td key={col} className={PHOTO_COL_CLASS.desc}>
+            {a.description?.trim() ? "●" : ""}
+          </td>
+        );
+      case "tags":
+        return (
+          <td key={col} className={PHOTO_COL_CLASS.tags}>
+            {a.tags?.length ? "●" : ""}
+          </td>
+        );
+      case "collections":
+        return (
+          <td key={col} className={`${PHOTO_COL_CLASS.collections} admin-assets-collections-cell`}>
+            {getCollectionNames(a.id) || "—"}
+          </td>
+        );
+      case "actions":
+        return (
+          <td key={col} className={PHOTO_COL_CLASS.actions}>
+            <div className="admin-assets-row-actions">
+              <button
+                type="button"
+                className="btn btn-sm btn-ghost admin-assets-edit-info-btn"
+                onClick={() => onEdit(a)}
+                aria-label={`Editar informació: ${a.title}`}
+                title="Editar informació de la foto"
+              >
+                <svg className="admin-assets-edit-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm danger admin-assets-delete"
+                disabled={busyId === a.id}
+                onClick={async () => {
+                  if (!confirm(`Vols eliminar "${a.title}"? Aquesta acció no es pot desfer.`)) return;
+                  setBusyId(a.id);
+                  try {
+                    await onDelete(a);
+                  } finally {
+                    setBusyId(null);
+                  }
+                }}
+                aria-label={`Eliminar ${a.title}`}
+              >
+                ×
+              </button>
+            </div>
+          </td>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="modal-overlay modal-overlay--front admin-assets-overlay" role="dialog" aria-modal="true" aria-label="Configuració de la biblioteca" onClick={onClose}>
       <div className="modal-content admin-assets-modal admin-assets-modal--fullscreen" onClick={(e) => e.stopPropagation()}>
@@ -453,12 +869,22 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
           <h2>Configuració</h2>
           <div className="admin-assets-head-actions">
             <div className="admin-tabs" role="tablist" aria-label="Pestanyes de configuració">
-              <button type="button" role="tab" aria-selected={activeTab === "photos"} className={activeTab === "photos" ? "is-active" : ""} onClick={() => setActiveTab("photos")}>Fotos</button>
-              <button type="button" role="tab" aria-selected={activeTab === "guest"} className={activeTab === "guest" ? "is-active" : ""} onClick={() => setActiveTab("guest")}>Convidat</button>
-              <button type="button" role="tab" aria-selected={activeTab === "collections"} className={activeTab === "collections" ? "is-active" : ""} onClick={() => setActiveTab("collections")}>Col·leccions</button>
-              <button type="button" role="tab" aria-selected={activeTab === "tags"} className={activeTab === "tags" ? "is-active" : ""} onClick={() => setActiveTab("tags")}>TAGS</button>
-              <button type="button" role="tab" aria-selected={activeTab === "locations"} className={activeTab === "locations" ? "is-active" : ""} onClick={() => setActiveTab("locations")}>Ubicacions</button>
-              <button type="button" role="tab" aria-selected={activeTab === "colors"} className={activeTab === "colors" ? "is-active" : ""} onClick={() => setActiveTab("colors")}>Colors</button>
+              {tabOrder.map((tabId) => (
+                <div key={tabId} className="admin-tab-item" onDragOver={onTabDragOver} onDrop={onTabDrop(tabId)}>
+                  <span
+                    className="admin-tab-grip"
+                    draggable
+                    onDragStart={onTabDragStart(tabId)}
+                    title="Arrossega per reordenar pestanyes"
+                    aria-hidden
+                  >
+                    ⋮
+                  </span>
+                  <button type="button" role="tab" aria-selected={activeTab === tabId} className={activeTab === tabId ? "is-active" : ""} onClick={() => setActiveTab(tabId)}>
+                    {TAB_LABELS[tabId]}
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
           <button type="button" className="btn btn-ghost btn-sm" onClick={onClose} aria-label="Tancar">
@@ -477,35 +903,7 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
         <div className="admin-assets-table-wrap">
           <table className="admin-assets-table">
             <thead>
-              <tr>
-                <th className="admin-assets-col-thumb">Mini</th>
-                <th>
-                  <button type="button" onClick={(e) => toggleSort("title", e.shiftKey)}>Nom</button>
-                </th>
-                <th>
-                  <button type="button" onClick={(e) => toggleSort("takenAt", e.shiftKey)}>Data</button>
-                </th>
-                <th>
-                  <button type="button" onClick={(e) => toggleSort("color", e.shiftKey)}>Color</button>
-                </th>
-                <th>
-                  <button type="button" onClick={(e) => toggleSort("location", e.shiftKey)}>Ubicació</button>
-                </th>
-                <th>
-                  <button type="button" onClick={(e) => toggleSort("favorite", e.shiftKey)}>Preferit</button>
-                </th>
-                <th title="Ocultar als convidats">Conv.</th>
-                {showContent ? <th title="Descripción">📝</th> : null}
-                {showContent ? <th>TAGS</th> : null}
-                <th className="admin-assets-col-collections">Col·leccions</th>
-                <th className="admin-assets-col-delete" scope="col">
-                  <span className="admin-assets-actions-head" aria-hidden>
-                    <span className="admin-assets-actions-head-edit">✎</span>
-                    <span className="admin-assets-actions-head-del">×</span>
-                  </span>
-                  <span className="sr-only">Editar informació i eliminar</span>
-                </th>
-              </tr>
+              <tr>{visiblePhotoColumns.map((col) => renderPhotoHeaderCell(col))}</tr>
             </thead>
             <tbody>
               {visibleAssets.map((a) => {
@@ -514,150 +912,9 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
                 const saveState = savingById[a.id] ?? "idle";
                 const isFavorite = draftById[a.id]?.favorite ?? a.favorite;
                 const hideGuest = draftById[a.id]?.hiddenFromGuests ?? a.hiddenFromGuests ?? false;
+                const ctx: PhotoRowCtx = { thumb, locationText, saveState, isFavorite, hideGuest };
                 return (
-                <tr key={a.id}>
-                  <td className="admin-assets-col-thumb">
-                    <div className="admin-assets-thumb-wrap">
-                      <button
-                        type="button"
-                        className={`admin-assets-thumb-btn${isFavorite ? " admin-assets-thumb-btn--favorite" : ""}`}
-                        onClick={() => {
-                          if (!thumb) return;
-                          openPreview(a, visibleAssets);
-                        }}
-                        aria-label={`Ampliar ${a.title}`}
-                      >
-                        {thumb ? (
-                          // eslint-disable-next-line @next/next/no-img-element -- remote storage image
-                          <img src={thumb} alt={a.title} className="admin-assets-thumb" referrerPolicy="no-referrer" />
-                        ) : (
-                          <span className="admin-assets-thumb admin-assets-thumb--empty">·</span>
-                        )}
-                      </button>
-                      {thumb ? (
-                        <div className="admin-assets-hover-preview" aria-hidden>
-                          {/* eslint-disable-next-line @next/next/no-img-element -- remote storage image */}
-                          <img src={thumb} alt="" referrerPolicy="no-referrer" />
-                        </div>
-                      ) : null}
-                    </div>
-                  </td>
-                  <td>
-                    <div className="admin-assets-title-cell">
-                      <input
-                        type="text"
-                        value={draftById[a.id]?.title ?? a.title}
-                        onChange={(e) => updateDraft(a, { title: e.target.value })}
-                      />
-                      <span className={`admin-assets-save admin-assets-save--${saveState}`}>
-                        {saveState === "saving" ? "desant..." : saveState === "saved" ? "desat" : saveState === "error" ? "error" : ""}
-                      </span>
-                    </div>
-                  </td>
-                  <td>
-                    <input
-                      type="date"
-                      value={toDateInputValue(draftById[a.id]?.takenAt ?? a.takenAt)}
-                      onChange={(e) => updateDraft(a, { takenAt: fromDateInputValue(e.target.value) })}
-                    />
-                  </td>
-                  <td>
-                    <span className="admin-assets-inline-color">
-                      <span
-                        className="admin-assets-color-chip"
-                        style={{ backgroundColor: `hsl(${draftById[a.id]?.colorHue ?? a.colorHue ?? 0} 72% 46%)`, opacity: typeof (draftById[a.id]?.colorHue ?? a.colorHue) === "number" ? 1 : 0.2 }}
-                        aria-hidden
-                      />
-                    <select
-                      value={colorHueToPreset(draftById[a.id]?.colorHue ?? a.colorHue, allColorOptions)}
-                      onChange={(e) => updateDraft(a, { colorHue: e.target.value ? Number(e.target.value) : null })}
-                    >
-                      <option value="">Sense color</option>
-                      {allColorOptions.map((preset) => (
-                        <option key={preset.hue} value={preset.hue}>
-                          {preset.label}
-                        </option>
-                      ))}
-                    </select>
-                    </span>
-                  </td>
-                  <td>
-                    <input
-                      type="text"
-                      value={locationText}
-                      placeholder="Ciudad, país"
-                      onChange={(e) => {
-                        const parsed = parseLocationText(e.target.value);
-                        updateDraft(a, {
-                          location: parsed
-                            ? {
-                                lat: a.location?.lat ?? 0,
-                                lng: a.location?.lng ?? 0,
-                                city: parsed.city,
-                                country: parsed.country
-                              }
-                            : undefined
-                        });
-                      }}
-                    />
-                  </td>
-                  <td>
-                    <label className="admin-assets-checkbox-wrap" aria-label={`Favorito ${a.title}`}>
-                      <input
-                        type="checkbox"
-                        checked={draftById[a.id]?.favorite ?? a.favorite}
-                        onChange={(e) => updateDraft(a, { favorite: e.target.checked })}
-                      />
-                    </label>
-                  </td>
-                  <td>
-                    <label className="admin-assets-checkbox-wrap" aria-label={`Ocultar als convidats: ${a.title}`} title="Ocultar als convidats">
-                      <input
-                        type="checkbox"
-                        checked={hideGuest}
-                        onChange={(e) => updateDraft(a, { hiddenFromGuests: e.target.checked })}
-                      />
-                    </label>
-                  </td>
-                  {showContent ? <td>{a.description?.trim() ? "●" : ""}</td> : null}
-                  {showContent ? <td>{a.tags?.length ? "●" : ""}</td> : null}
-                  <td className="admin-assets-col-collections admin-assets-collections-cell">
-                    {getCollectionNames(a.id) || "—"}
-                  </td>
-                  <td className="admin-assets-col-delete">
-                    <div className="admin-assets-row-actions">
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-ghost admin-assets-edit-info-btn"
-                        onClick={() => onEdit(a)}
-                        aria-label={`Editar informació: ${a.title}`}
-                        title="Editar informació de la foto"
-                      >
-                        <svg className="admin-assets-edit-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                        </svg>
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-sm danger admin-assets-delete"
-                        disabled={busyId === a.id}
-                        onClick={async () => {
-                          if (!confirm(`Vols eliminar "${a.title}"? Aquesta acció no es pot desfer.`)) return;
-                          setBusyId(a.id);
-                          try {
-                            await onDelete(a);
-                          } finally {
-                            setBusyId(null);
-                          }
-                        }}
-                        aria-label={`Eliminar ${a.title}`}
-                      >
-                        ×
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+                  <tr key={a.id}>{visiblePhotoColumns.map((col) => renderPhotoBodyCell(a, col, ctx))}</tr>
                 );
               })}
             </tbody>

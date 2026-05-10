@@ -1763,21 +1763,47 @@ button.danger {
 .admin-tabs {
   display: flex;
   gap: 6px;
+  align-items: stretch;
 }
 
-.admin-tabs button {
+.admin-tab-item {
+  display: inline-flex;
+  align-items: stretch;
   border: 1px solid var(--border);
   background: var(--bg-primary);
+}
+
+.admin-tab-grip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 4px 0 6px;
+  cursor: grab;
+  user-select: none;
+  color: var(--text-tertiary);
+  font-size: 14px;
+  line-height: 1;
+}
+
+.admin-tab-grip:active {
+  cursor: grabbing;
+}
+
+.admin-tabs .admin-tab-item button {
+  border: none;
+  background: transparent;
   padding: 8px 12px;
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.02em;
 }
 
-.admin-tabs button.is-active {
+.admin-tabs .admin-tab-item button.is-active {
   background: color-mix(in srgb, var(--accent-light) 65%, var(--bg-primary));
-  border-color: var(--accent);
   color: var(--accent);
+}
+
+.admin-tabs .admin-tab-item:has(button.is-active) {
+  border-color: var(--accent);
 }
 
 .admin-assets-subhead {
@@ -1830,29 +1856,58 @@ button.danger {
   table-layout: fixed;
 }
 
-.admin-assets-table th:nth-child(2),
-.admin-assets-table td:nth-child(2) {
+.admin-assets-col-title {
   width: 300px;
 }
 
-.admin-assets-table th:nth-child(3),
-.admin-assets-table td:nth-child(3) {
+.admin-assets-col-takenAt {
   width: 130px;
 }
 
-.admin-assets-table th:nth-child(4),
-.admin-assets-table td:nth-child(4) {
+.admin-assets-col-color {
   width: 190px;
 }
 
-.admin-assets-table th:nth-child(5),
-.admin-assets-table td:nth-child(5) {
+.admin-assets-col-location {
   width: 210px;
 }
 
-.admin-assets-table th:nth-child(6),
-.admin-assets-table td:nth-child(6) {
+.admin-assets-col-favorite {
   width: 70px;
+}
+
+.admin-assets-col-hiddenGuest {
+  width: 56px;
+}
+
+.admin-assets-col-desc,
+.admin-assets-col-tags {
+  width: 42px;
+  text-align: center;
+}
+
+.admin-assets-th-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+}
+
+.admin-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 14px;
+  cursor: grab;
+  user-select: none;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  line-height: 1;
+}
+
+.admin-drag-handle:active {
+  cursor: grabbing;
 }
 
 .admin-assets-table th,

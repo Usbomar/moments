@@ -18,6 +18,8 @@ import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { loadCollections } from "@/lib/collections-storage";
 import type { AppCollection } from "@/lib/collections";
 import { AdminAssetManager } from "@/components/AdminAssetManager";
+import { GridOptionsPopover } from "@/components/GridOptionsPopover";
+import { sortAssetsForGrid, type GridDistribution, type GridSortOrder } from "@/lib/grid-library";
 
 const MapView = dynamic(() => import("@/views/MapView").then((mod) => mod.MapView), {
   ssr: false,
@@ -67,11 +69,16 @@ function TabLoadingHint({ label }: { label: string }) {
   );
 }
 
+const GRID_DIST_STORAGE = "moments-grid-distribution";
+const GRID_SORT_STORAGE = "moments-grid-sort";
+
 function HomeContent() {
   const COLLECTIONS_MIGRATED_KEY = "moments_collections_migrated_to_server_v1";
   const { filters } = useFilters();
   const searchRef = useRef<HTMLInputElement>(null);
   const [view, setView] = useState<GalleryView>("masonry");
+  const [gridDistribution, setGridDistribution] = useState<GridDistribution>("uniform");
+  const [gridSortOrder, setGridSortOrder] = useState<GridSortOrder>("taken_desc");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [imageEditorAsset, setImageEditorAsset] = useState<Asset | null>(null);
@@ -210,6 +217,26 @@ function HomeContent() {
   useEffect(() => {
     void refreshLibrary();
   }, [refreshLibrary]);
+
+  useEffect(() => {
+    try {
+      const d = window.localStorage.getItem(GRID_DIST_STORAGE) as GridDistribution | null;
+      const s = window.localStorage.getItem(GRID_SORT_STORAGE) as GridSortOrder | null;
+      if (d === "uniform" || d === "featured") setGridDistribution(d);
+      if (s === "taken_desc" || s === "taken_asc") setGridSortOrder(s);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(GRID_DIST_STORAGE, gridDistribution);
+      window.localStorage.setItem(GRID_SORT_STORAGE, gridSortOrder);
+    } catch {
+      /* ignore */
+    }
+  }, [gridDistribution, gridSortOrder]);
 
   useEffect(() => {
     if (supabaseConfigured !== true) return;
@@ -389,6 +416,7 @@ function HomeContent() {
   }, []);
 
   const viewItems = useMemo(() => library, [library]);
+  const gridCatalogItems = useMemo(() => sortAssetsForGrid(library, gridSortOrder), [library, gridSortOrder]);
   const viewerItems = useMemo(() => slideshowItems ?? viewerQueue ?? viewItems, [slideshowItems, viewerQueue, viewItems]);
 
   const libraryTagSuggestions = useMemo(() => {
@@ -420,6 +448,16 @@ function HomeContent() {
               onUploaded={handleLibraryUploaded}
               supabaseConfigured={supabaseConfigured}
               missingEnv={missingEnv}
+            />
+          ) : undefined
+        }
+        libraryGridOptionsSlot={
+          mainTab === "library" && view === "masonry" ? (
+            <GridOptionsPopover
+              distribution={gridDistribution}
+              onDistributionChange={setGridDistribution}
+              sortOrder={gridSortOrder}
+              onSortOrderChange={setGridSortOrder}
             />
           ) : undefined
         }
@@ -460,7 +498,8 @@ function HomeContent() {
                   ) : null}
                   {view === "masonry" ? (
                     <LibraryGrid
-                      items={viewItems}
+                      items={gridCatalogItems}
+                      distribution={gridDistribution}
                       onOpenModal={(asset) => setSelectedAsset(asset)}
                       onOpenViewer={openViewer}
                     />

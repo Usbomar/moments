@@ -1,0 +1,49 @@
+import type { Asset } from "@/lib/types";
+
+export type GridSortOrder = "taken_desc" | "taken_asc";
+
+export type GridDistribution = "uniform" | "featured";
+
+/** Una foto sense data de captura vàlida va al final; dins aquest grup: pujada més recent primer. */
+export function hasValidTakenAt(asset: Asset): boolean {
+  const raw = asset.takenAt?.trim();
+  if (!raw) return false;
+  const t = Date.parse(raw);
+  return !Number.isNaN(t);
+}
+
+export function compareAssetsForGrid(a: Asset, b: Asset, order: GridSortOrder): number {
+  const aOk = hasValidTakenAt(a);
+  const bOk = hasValidTakenAt(b);
+  if (aOk && !bOk) return -1;
+  if (!aOk && bOk) return 1;
+
+  if (!aOk && !bOk) {
+    const ua = Date.parse(a.uploadedAt) || 0;
+    const ub = Date.parse(b.uploadedAt) || 0;
+    if (ua !== ub) return ub - ua;
+    return a.id.localeCompare(b.id);
+  }
+
+  const ta = Date.parse(a.takenAt!) || 0;
+  const tb = Date.parse(b.takenAt!) || 0;
+  if (ta !== tb) {
+    return order === "taken_desc" ? tb - ta : ta - tb;
+  }
+  return a.id.localeCompare(b.id);
+}
+
+export function sortAssetsForGrid(assets: Asset[], order: GridSortOrder): Asset[] {
+  return [...assets].sort((a, b) => compareAssetsForGrid(a, b, order));
+}
+
+/** Com a màxim una rajola gran per bloc de 12; només entre preferides (la primera preferida del bloc). */
+export function assignFeaturedHighlights(assets: Asset[]): boolean[] {
+  const out = assets.map(() => false);
+  for (let start = 0; start < assets.length; start += 12) {
+    const slice = assets.slice(start, start + 12);
+    const rel = slice.findIndex((a) => a.favorite);
+    if (rel >= 0) out[start + rel] = true;
+  }
+  return out;
+}

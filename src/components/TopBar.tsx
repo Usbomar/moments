@@ -9,6 +9,8 @@ type Props = {
   libraryView: GalleryView;
   onLibraryViewChange: (view: GalleryView) => void;
   showLibraryViewSelector: boolean;
+  /** Només vista Quadrícula: popover minimalista d’opcions de graella. */
+  libraryGridOptionsSlot?: ReactNode;
   libraryUploadSlot?: ReactNode;
   onMenuClick: () => void;
   onAdminClick: () => void;
@@ -19,6 +21,7 @@ export function TopBar({
   libraryView,
   onLibraryViewChange,
   showLibraryViewSelector,
+  libraryGridOptionsSlot,
   libraryUploadSlot,
   onMenuClick,
   onAdminClick
@@ -50,7 +53,12 @@ export function TopBar({
         </span>
       </div>
       <div className="moments-topbar-center">
-        {showLibraryViewSelector ? <ViewSelector variant="compact" value={libraryView} onChange={onLibraryViewChange} /> : null}
+        {showLibraryViewSelector ? (
+          <div className="moments-view-toolbar">
+            <ViewSelector variant="compact" value={libraryView} onChange={onLibraryViewChange} />
+            {libraryGridOptionsSlot}
+          </div>
+        ) : null}
         <label className="moments-search-label" htmlFor="global-search">
           <span className="sr-only">Cerca</span>
           <span aria-hidden className="moments-search-icon">

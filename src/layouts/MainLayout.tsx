@@ -17,6 +17,8 @@ type Props = {
   onAdminClick: () => void;
   /** P. ex. pujada de fotos (TopBar, cluster amb les vistes) */
   libraryUploadSlot?: ReactNode;
+  /** Opcions de graella (només Quadrícula) */
+  libraryGridOptionsSlot?: ReactNode;
 };
 
 export function MainLayout({
@@ -27,6 +29,7 @@ export function MainLayout({
   onLibraryViewChange,
   searchInputRef,
   libraryUploadSlot,
+  libraryGridOptionsSlot,
   onAdminClick
 }: Props) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -72,6 +75,7 @@ export function MainLayout({
         libraryView={libraryView}
         onLibraryViewChange={onLibraryViewChange}
         showLibraryViewSelector={activeNav === "library"}
+        libraryGridOptionsSlot={activeNav === "library" ? libraryGridOptionsSlot : null}
         libraryUploadSlot={activeNav === "library" ? libraryUploadSlot : null}
         onMenuClick={openMobileDrawer}
         onAdminClick={onAdminClick}

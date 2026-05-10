@@ -1,12 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import type { Asset } from "@/lib/types";
 import { LazyImage } from "@/components/LazyImage";
+import { assignFeaturedHighlights, type GridDistribution } from "@/lib/grid-library";
 
 interface Props {
   items: Asset[];
+  /** Només lectura Quadrícula: rajoles grans només per preferides (patró per blocs). */
+  distribution?: GridDistribution;
   /** Clic al thumbnail: obre el visor a pantalla completa (prioritat sobre onOpenModal). */
   onOpenViewer?: (asset: Asset, contextItems: Asset[]) => void;
   /** Opcional: només si no hi ha onOpenViewer (p. ex. eines internes). */
@@ -34,12 +37,14 @@ const placeholderStyle: CSSProperties = {
 function LibraryTile({
   asset,
   gridItems,
+  featured,
   onOpen,
   onOpenModal,
   onOpenViewer
 }: {
   asset: Asset;
   gridItems: Asset[];
+  featured: boolean;
   onOpen?: (a: Asset) => void;
   onOpenModal?: (a: Asset) => void;
   onOpenViewer?: (a: Asset, contextItems: Asset[]) => void;
@@ -59,9 +64,11 @@ function LibraryTile({
     onOpen?.(asset);
   };
 
+  const tileClass = featured ? "tile tile--featured" : "tile";
+
   if (!thumbUrl || imgBroken) {
     return (
-      <button type="button" className="tile" onClick={handleClick}>
+      <button type="button" className={tileClass} onClick={handleClick}>
         <div style={placeholderStyle}>
           <span style={{ fontWeight: 600, color: "var(--text, #151719)" }}>{imgBroken ? "Could not load" : "No image"}</span>
           <span style={{ wordBreak: "break-word", maxWidth: "100%" }}>{asset.title}</span>
@@ -72,7 +79,7 @@ function LibraryTile({
   }
 
   return (
-    <button type="button" className="tile" onClick={handleClick}>
+    <button type="button" className={tileClass} onClick={handleClick}>
       <LazyImage
         fill
         src={thumbUrl}
@@ -89,14 +96,22 @@ function LibraryTile({
 }
 
 /** Grid of thumbnails with lazy viewport loading, gradient fallback, and onError soft boundary. */
-export function LibraryGrid({ items, onOpen, onOpenModal, onOpenViewer }: Props) {
+export function LibraryGrid({ items, distribution = "uniform", onOpen, onOpenModal, onOpenViewer }: Props) {
+  const featuredFlags = useMemo(
+    () => (distribution === "featured" ? assignFeaturedHighlights(items) : items.map(() => false)),
+    [items, distribution]
+  );
+
+  const gridClass = distribution === "featured" ? "grid grid--featured" : "grid";
+
   return (
-    <div className="grid">
-      {items.map((asset) => (
+    <div className={gridClass}>
+      {items.map((asset, index) => (
         <LibraryTile
           key={`${asset.id}:${asset.files.thumbUrl ?? ""}`}
           asset={asset}
           gridItems={items}
+          featured={featuredFlags[index] ?? false}
           onOpen={onOpen}
           onOpenModal={onOpenModal}
           onOpenViewer={onOpenViewer}

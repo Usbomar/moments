@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/server/supabase-admin";
 import { isSupabaseConfigured } from "@/lib/server/supabase-config";
+import { requireAuthUserId } from "@/lib/server/require-auth-api";
 
 async function resolveId(context: { params: Promise<{ id: string }> }) {
   const params = await context.params;
@@ -12,12 +13,16 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     if (!isSupabaseConfigured()) {
       return NextResponse.json({ error: "SUPABASE_NOT_CONFIGURED" }, { status: 503 });
     }
+    const auth = await requireAuthUserId();
+    if (auth instanceof NextResponse) return auth;
+    const { userId } = auth;
+
     const id = await resolveId(context);
     const body = (await request.json()) as { name?: string };
     const name = typeof body.name === "string" ? body.name.trim() : "";
     if (!name) return NextResponse.json({ error: "name is required" }, { status: 400 });
     const supabase = getSupabaseAdmin();
-    const { error } = await supabase.from("albums").update({ name }).eq("id", id).eq("user_id", "u-1");
+    const { error } = await supabase.from("albums").update({ name }).eq("id", id).eq("user_id", userId);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true });
   } catch (error) {
@@ -31,9 +36,13 @@ export async function DELETE(_request: Request, context: { params: Promise<{ id:
     if (!isSupabaseConfigured()) {
       return NextResponse.json({ error: "SUPABASE_NOT_CONFIGURED" }, { status: 503 });
     }
+    const auth = await requireAuthUserId();
+    if (auth instanceof NextResponse) return auth;
+    const { userId } = auth;
+
     const id = await resolveId(context);
     const supabase = getSupabaseAdmin();
-    const { error } = await supabase.from("albums").delete().eq("id", id).eq("user_id", "u-1");
+    const { error } = await supabase.from("albums").delete().eq("id", id).eq("user_id", userId);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true });
   } catch (error) {

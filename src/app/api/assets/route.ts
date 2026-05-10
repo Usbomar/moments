@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/server/supabase-admin";
 import { isSupabaseConfigured } from "@/lib/server/supabase-config";
+import { requireAuthUserId } from "@/lib/server/require-auth-api";
+import { errorJson, getRequestId, logApi, okJson } from "@/lib/server/api-observability";
 import { toAsset } from "@/lib/server/asset-map";
 
 function parseYears(raw: string | null): [number, number] | null {
@@ -17,14 +19,25 @@ function parseYears(raw: string | null): [number, number] | null {
   return [single, single];
 }
 
+function parsePositiveInt(raw: string | null, fallback: number, min: number, max: number): number {
+  const n = Number.parseInt(raw ?? "", 10);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, n));
+}
+
 export async function GET(request: Request) {
+  const requestId = getRequestId(request);
   try {
     if (!isSupabaseConfigured()) {
-      return NextResponse.json({
+      return okJson(requestId, {
         assets: [],
         supabaseConfigured: false
       });
     }
+
+    const auth = await requireAuthUserId();
+    if (auth instanceof NextResponse) return auth;
+    const { userId } = auth;
 
     const supabase = getSupabaseAdmin();
     const url = new URL(request.url);
@@ -38,6 +51,8 @@ export async function GET(request: Request) {
       .map((item) => item.trim().toLowerCase())
       .filter(Boolean);
     const q = (url.searchParams.get("q") ?? "").trim();
+    const limit = parsePositiveInt(url.searchParams.get("limit"), 200, 1, 500);
+    const offset = parsePositiveInt(url.searchParams.get("offset"), 0, 0, 1_000_000);
 
     let allowedIds: string[] | null = null;
     if (locations.length) {
@@ -46,18 +61,40 @@ export async function GET(request: Request) {
         .select("asset_id,locations!inner(city,country)")
         .in("locations.city", locations.map((label) => label.split(",")[0].trim()));
       if (locErr) return NextResponse.json({ error: locErr.message }, { status: 500 });
-      allowedIds = Array.from(new Set((locRows ?? []).map((row) => row.asset_id)));
+      const candidateLoc = Array.from(new Set((locRows ?? []).map((row) => row.asset_id)));
+      if (candidateLoc.length === 0) {
+        allowedIds = [];
+      } else {
+        const { data: ownedLoc, error: ownLocErr } = await supabase
+          .from("assets")
+          .select("id")
+          .eq("user_id", userId)
+          .in("id", candidateLoc);
+        if (ownLocErr) return NextResponse.json({ error: ownLocErr.message }, { status: 500 });
+        allowedIds = (ownedLoc ?? []).map((r) => r.id);
+      }
     }
 
     if (tags.length) {
       const { data: tagRows, error: tagErr } = await supabase.from("asset_tags").select("asset_id").in("tag", tags);
       if (tagErr) return NextResponse.json({ error: tagErr.message }, { status: 500 });
-      const tagIds = new Set((tagRows ?? []).map((row) => row.asset_id));
-      allowedIds = allowedIds == null ? Array.from(tagIds) : allowedIds.filter((id) => tagIds.has(id));
+      const candidateTag = Array.from(new Set((tagRows ?? []).map((row) => row.asset_id)));
+      if (candidateTag.length === 0) {
+        allowedIds = [];
+      } else {
+        const { data: ownedTag, error: ownTagErr } = await supabase
+          .from("assets")
+          .select("id")
+          .eq("user_id", userId)
+          .in("id", candidateTag);
+        if (ownTagErr) return NextResponse.json({ error: ownTagErr.message }, { status: 500 });
+        const tagIds = new Set((ownedTag ?? []).map((r) => r.id));
+        allowedIds = allowedIds == null ? Array.from(tagIds) : allowedIds.filter((id) => tagIds.has(id));
+      }
     }
 
     if (allowedIds && allowedIds.length === 0) {
-      return NextResponse.json({ assets: [], supabaseConfigured: true });
+      return okJson(requestId, { assets: [], supabaseConfigured: true });
     }
 
     let query = supabase
@@ -65,7 +102,12 @@ export async function GET(request: Request) {
       .select(
         "id,user_id,type,title,description,taken_at,uploaded_at,width,height,duration,favorite,asset_files(original_url,preview_url,medium_url,thumb_url,checksum,size),asset_locations(location_id,locations(lat,lng,city,country)),asset_tags(tag,origin)"
       )
+      .eq("user_id", userId)
       .order("taken_at", { ascending: false });
+
+    if (!q) {
+      query = query.range(offset, offset + limit - 1);
+    }
 
     if (years) {
       query = query
@@ -78,14 +120,19 @@ export async function GET(request: Request) {
     const { data, error } = await query;
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      logApi("error", "/api/assets", requestId, "Supabase query failed", { detail: error.message });
+      return errorJson(500, requestId, "ASSETS_QUERY_FAILED", error.message);
     }
 
     const rows = data ?? [];
     let mapped = rows.map(toAsset);
     const ids = rows.map((r) => r.id).filter(Boolean);
     if (ids.length) {
-      const { data: hueRows, error: hueErr } = await supabase.from("assets").select("id,color_hue").in("id", ids);
+      const { data: hueRows, error: hueErr } = await supabase
+        .from("assets")
+        .select("id,color_hue")
+        .eq("user_id", userId)
+        .in("id", ids);
       if (!hueErr && hueRows?.length) {
         const byId = new Map(hueRows.map((h) => [String(h.id), h.color_hue]));
         mapped = mapped.map((a) => {
@@ -108,18 +155,27 @@ export async function GET(request: Request) {
       );
     }
 
-    return NextResponse.json({
+    const filteredCount = mapped.length;
+
+    return okJson(requestId, {
       assets: mapped,
-      supabaseConfigured: true
+      supabaseConfigured: true,
+      paging: {
+        limit,
+        offset,
+        returned: filteredCount,
+        hasMore: q ? false : filteredCount >= limit
+      }
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     if (message === "SUPABASE_NOT_CONFIGURED") {
-      return NextResponse.json({
+      return okJson(requestId, {
         assets: [],
         supabaseConfigured: false
       });
     }
-    return NextResponse.json({ error: message }, { status: 500 });
+    logApi("error", "/api/assets", requestId, "Unhandled exception", { detail: message });
+    return errorJson(500, requestId, "ASSETS_UNHANDLED_ERROR", message);
   }
 }

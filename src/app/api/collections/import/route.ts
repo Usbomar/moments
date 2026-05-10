@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/server/supabase-admin";
 import { isSupabaseConfigured } from "@/lib/server/supabase-config";
+import { requireAuthUserId } from "@/lib/server/require-auth-api";
 import type { AppCollection } from "@/lib/collections";
 
 type Body = {
@@ -12,6 +13,9 @@ export async function POST(request: Request) {
     if (!isSupabaseConfigured()) {
       return NextResponse.json({ error: "SUPABASE_NOT_CONFIGURED" }, { status: 503 });
     }
+    const auth = await requireAuthUserId();
+    if (auth instanceof NextResponse) return auth;
+    const { userId } = auth;
 
     const body = (await request.json()) as Body;
     const raw = Array.isArray(body.collections) ? body.collections : [];
@@ -31,9 +35,15 @@ export async function POST(request: Request) {
         ? col.assetIds.filter((id): id is string => typeof id === "string" && id.trim().length > 0)
         : [];
 
+      const { data: existingAlbum, error: exErr } = await supabase.from("albums").select("user_id").eq("id", col.id).maybeSingle();
+      if (exErr) return NextResponse.json({ error: exErr.message }, { status: 500 });
+      if (existingAlbum && existingAlbum.user_id !== userId) {
+        return NextResponse.json({ error: "Album id already belongs to another user" }, { status: 409 });
+      }
+
       const { error: albumErr } = await supabase
         .from("albums")
-        .upsert({ id: col.id, user_id: "u-1", name }, { onConflict: "id" });
+        .upsert({ id: col.id, user_id: userId, name }, { onConflict: "id" });
       if (albumErr) return NextResponse.json({ error: albumErr.message }, { status: 500 });
 
       // Manté la font de veritat del client legacy: substitució completa de membres.
@@ -41,7 +51,11 @@ export async function POST(request: Request) {
       if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 });
 
       if (ids.length) {
-        const rows = ids.map((assetId, i) => ({ album_id: col.id, asset_id: assetId, position: i }));
+        const { data: ownedRows, error: ownErr } = await supabase.from("assets").select("id").eq("user_id", userId).in("id", ids);
+        if (ownErr) return NextResponse.json({ error: ownErr.message }, { status: 500 });
+        const owned = new Set((ownedRows ?? []).map((r) => r.id));
+        const safeIds = ids.filter((id) => owned.has(id));
+        const rows = safeIds.map((assetId, i) => ({ album_id: col.id, asset_id: assetId, position: i }));
         const { error: insErr } = await supabase.from("album_assets").insert(rows);
         if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 });
       }

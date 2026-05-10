@@ -3054,3 +3054,95 @@ textarea:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 0;
 }
+
+/* --- Autenticació --- */
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--bg-secondary);
+}
+
+.login-fallback {
+  text-align: center;
+  color: var(--muted);
+}
+
+.login-card {
+  width: min(400px, 100%);
+  padding: var(--space-5);
+  background: var(--panel);
+  border: 1px solid var(--border);
+}
+
+.login-title {
+  margin: 0 0 8px;
+  font-size: 1.5rem;
+}
+
+.login-sub {
+  margin: 0 0 16px;
+}
+
+.login-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.login-tabs button {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.login-tabs button.is-active {
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.login-submit {
+  margin-top: 4px;
+}
+
+.login-hint {
+  margin: 16px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.login-hint code {
+  font-size: 11px;
+}
+
+.moments-user-menu {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.moments-user-email {
+  font-size: 12px;
+  color: var(--text-secondary);
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.config-banner-auth {
+  margin-top: 12px;
+}

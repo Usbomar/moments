@@ -11,7 +11,7 @@ import { UploadDropzone } from "@/components/upload-dropzone";
 import { type GalleryView } from "@/components/ViewSelector";
 import { FilterProvider, useFilters } from "@/context/FilterContext";
 import { ViewErrorBoundary } from "@/components/ViewErrorBoundary";
-import { clearCache, getCached, setCached } from "@/lib/cache";
+import { clearCache } from "@/lib/cache";
 import type { EditOperation, ExportOptions } from "@/lib/image-edit-ops";
 import { MainLayout } from "@/layouts/MainLayout";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -85,40 +85,53 @@ function HomeContent() {
   const [adminCollections, setAdminCollections] = useState<AppCollection[]>([]);
   const [library, setLibrary] = useState<Asset[]>([]);
   const [loadingLibrary, setLoadingLibrary] = useState(false);
+  const [loadingMoreLibrary, setLoadingMoreLibrary] = useState(false);
+  const [libraryHasMore, setLibraryHasMore] = useState(false);
   const [libraryLoadError, setLibraryLoadError] = useState<string | null>(null);
   const [supabaseConfigured, setSupabaseConfigured] = useState<boolean | undefined>(undefined);
+  const [authConfigured, setAuthConfigured] = useState<boolean | undefined>(undefined);
   const [missingEnv, setMissingEnv] = useState<string[]>([]);
+  const [authMissingEnv, setAuthMissingEnv] = useState<string[]>([]);
   const refreshLibraryRef = useRef<() => Promise<void>>(async () => {});
   const supabaseConfiguredRef = useRef(supabaseConfigured);
   supabaseConfiguredRef.current = supabaseConfigured;
 
-  const refreshLibrary = useCallback(async () => {
-    setLoadingLibrary(true);
-    setLibraryLoadError(null);
-    try {
+  const buildAssetsParams = useCallback(
+    (offset: number, limit: number) => {
       const params = new URLSearchParams();
       params.set("years", `${filters.year[0]}-${filters.year[1]}`);
       if (filters.location.length) params.set("locations", filters.location.join(","));
       if (filters.tags.length) params.set("tags", filters.tags.join(","));
       if (filters.searchQuery.trim()) params.set("q", filters.searchQuery.trim());
+      params.set("offset", String(offset));
+      params.set("limit", String(limit));
+      return params;
+    },
+    [filters.location, filters.searchQuery, filters.tags, filters.year]
+  );
 
-      const cacheKey = `assets:v2:${params.toString()}`;
-      const cached = getCached<Asset[]>(cacheKey);
-      if (cached) {
-        setLibrary(cached);
-        return;
-      }
-
+  const refreshLibrary = useCallback(async () => {
+    setLoadingLibrary(true);
+    setLibraryLoadError(null);
+    setLibraryHasMore(false);
+    try {
+      const params = buildAssetsParams(0, 200);
       const response = await fetch(`/api/assets?${params.toString()}`, { cache: "no-store" });
       const body = (await response.json().catch(() => ({}))) as {
         assets?: Asset[];
         supabaseConfigured?: boolean;
         error?: string;
+        paging?: { hasMore?: boolean };
       };
 
       if (!response.ok) {
         setLibrary([]);
-        setLibraryLoadError(typeof body.error === "string" ? body.error : `Error ${response.status} en carregar la biblioteca`);
+        if (response.status === 401) {
+          window.location.href = `/login?next=${encodeURIComponent(`${window.location.pathname}${window.location.search}`)}`;
+          return;
+        }
+        const errMsg = typeof body.error === "string" ? body.error : `Error ${response.status} en carregar la biblioteca`;
+        setLibraryLoadError(errMsg);
         return;
       }
 
@@ -127,13 +140,47 @@ function HomeContent() {
         return;
       }
 
-      const next = body.assets ?? [];
-      setCached(cacheKey, next, 5 * 60 * 1000);
-      setLibrary(next);
+      setLibrary(body.assets ?? []);
+      setLibraryHasMore(!!body.paging?.hasMore);
     } finally {
       setLoadingLibrary(false);
     }
-  }, [filters.location, filters.searchQuery, filters.tags, filters.year]);
+  }, [buildAssetsParams]);
+
+  const loadMoreLibrary = useCallback(async () => {
+    if (loadingMoreLibrary || loadingLibrary || !libraryHasMore) return;
+    setLoadingMoreLibrary(true);
+    try {
+      const params = buildAssetsParams(library.length, 200);
+      const response = await fetch(`/api/assets?${params.toString()}`, { cache: "no-store" });
+      const body = (await response.json().catch(() => ({}))) as {
+        assets?: Asset[];
+        error?: string;
+        paging?: { hasMore?: boolean };
+      };
+      if (!response.ok) {
+        if (response.status === 401) {
+          window.location.href = `/login?next=${encodeURIComponent(`${window.location.pathname}${window.location.search}`)}`;
+          return;
+        }
+        setLibraryLoadError(body.error ?? "Error carregant més fotos.");
+        return;
+      }
+
+      const chunk = body.assets ?? [];
+      setLibrary((prev) => {
+        const known = new Set(prev.map((x) => x.id));
+        const merged = [...prev];
+        for (const item of chunk) {
+          if (!known.has(item.id)) merged.push(item);
+        }
+        return merged;
+      });
+      setLibraryHasMore(!!body.paging?.hasMore);
+    } finally {
+      setLoadingMoreLibrary(false);
+    }
+  }, [buildAssetsParams, library.length, libraryHasMore, loadingLibrary, loadingMoreLibrary]);
 
   refreshLibraryRef.current = refreshLibrary;
 
@@ -145,10 +192,19 @@ function HomeContent() {
   useEffect(() => {
     void fetch("/api/config", { cache: "no-store" })
       .then((r) => r.json())
-      .then((b: { supabaseConfigured?: boolean; missingEnv?: string[] }) => {
-        setSupabaseConfigured(!!b.supabaseConfigured);
-        setMissingEnv(b.missingEnv ?? []);
-      });
+      .then(
+        (b: {
+          supabaseConfigured?: boolean;
+          authConfigured?: boolean;
+          missingEnv?: string[];
+          authMissingEnv?: string[];
+        }) => {
+          setSupabaseConfigured(!!b.supabaseConfigured);
+          setAuthConfigured(!!b.authConfigured);
+          setMissingEnv(b.missingEnv ?? []);
+          setAuthMissingEnv(b.authMissingEnv ?? []);
+        }
+      );
   }, []);
 
   useEffect(() => {
@@ -264,6 +320,10 @@ function HomeContent() {
   const refreshAdminCollections = useCallback(async () => {
     const res = await fetch("/api/collections", { cache: "no-store" });
     const body = (await res.json().catch(() => ({}))) as { collections?: AppCollection[] };
+    if (res.status === 401) {
+      window.location.href = `/login?next=${encodeURIComponent(`${window.location.pathname}${window.location.search}`)}`;
+      return;
+    }
     if (res.ok) setAdminCollections(body.collections ?? []);
   }, []);
 
@@ -377,6 +437,12 @@ function HomeContent() {
                   </span>
                 </p>
               ) : null}
+              {supabaseConfigured === true && authConfigured === false ? (
+                <div className="config-banner config-banner-auth" role="status">
+                  Falta configurar l’autenticació: afegeix <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> al <code>.env.local</code>
+                  {authMissingEnv.length ? ` (${authMissingEnv.join(", ")})` : ""}.
+                </div>
+              ) : null}
               {!loadingLibrary && library.length === 0 && supabaseConfigured === true && !libraryLoadError ? (
                 <p className="modal-muted" style={{ marginTop: 12 }}>
                   No hi ha fotos que coincideixin amb els filtres (o la biblioteca és buida). Prova d’eixamplar l’interval d’anys o
@@ -424,6 +490,18 @@ function HomeContent() {
                   ) : null}
                 </div>
               </ViewErrorBoundary>
+              {libraryHasMore ? (
+                <div style={{ marginTop: 14, display: "flex", justifyContent: "center" }}>
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    disabled={loadingMoreLibrary}
+                    onClick={() => void loadMoreLibrary()}
+                  >
+                    {loadingMoreLibrary ? "Carregant més..." : "Carregar més fotos"}
+                  </button>
+                </div>
+              ) : null}
             </>
           ) : null}
           {mainTab === "collections" ? (

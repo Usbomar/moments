@@ -4,6 +4,15 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { Asset } from "@/lib/types";
 import type { AppCollection } from "@/lib/collections";
 import { AdminAssetPickerModal } from "@/components/AdminAssetPickerModal";
+import { useAdminAssetStats, type SortState, type SortKey } from "@/components/admin/useAdminAssetStats";
+import {
+  COLOR_PRESETS,
+  colorHueToPreset,
+  fromDateInputValue,
+  hexToHue,
+  parseLocationText,
+  toDateInputValue
+} from "@/components/admin/adminAssetHelpers";
 
 type AssetPickerTarget =
   | { kind: "collection"; id: string }
@@ -22,95 +31,9 @@ type Props = {
   onRefreshCollections?: () => Promise<void>;
 };
 
-type SortKey = "title" | "takenAt" | "color" | "location" | "favorite";
-type SortState = { key: SortKey; dir: "asc" | "desc" };
 type DraftPatch = Partial<Pick<Asset, "title" | "takenAt" | "favorite" | "colorHue" | "location">>;
-
-const COLOR_PRESETS: Array<{ label: string; hue: number }> = [
-  { label: "Rojo", hue: 0 },
-  { label: "Rojo anaranjado", hue: 15 },
-  { label: "Naranja", hue: 30 },
-  { label: "Ámbar", hue: 45 },
-  { label: "Amarillo", hue: 60 },
-  { label: "Lima", hue: 75 },
-  { label: "Verde lima", hue: 95 },
-  { label: "Verde", hue: 120 },
-  { label: "Verde menta", hue: 145 },
-  { label: "Turquesa", hue: 165 },
-  { label: "Cian", hue: 180 },
-  { label: "Azul cielo", hue: 200 },
-  { label: "Azul", hue: 220 },
-  { label: "Índigo", hue: 240 },
-  { label: "Violeta", hue: 275 },
-  { label: "Púrpura", hue: 290 },
-  { label: "Magenta", hue: 310 },
-  { label: "Rosa", hue: 330 },
-  { label: "Coral", hue: 345 },
-  { label: "Marrón", hue: 24 }
-];
 const CUSTOM_COLOR_STORAGE_KEY = "moments_admin_custom_colors_v1";
 type TabId = "photos" | "collections" | "tags" | "locations" | "colors";
-
-function cmpText(a: string, b: string): number {
-  return a.localeCompare(b, "es", { sensitivity: "base", numeric: true });
-}
-
-function toDateInputValue(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function fromDateInputValue(value: string): string {
-  const d = new Date(`${value}T12:00:00`);
-  if (Number.isNaN(d.getTime())) return new Date().toISOString();
-  return d.toISOString();
-}
-
-function parseLocationText(value: string) {
-  const text = value.trim();
-  if (!text) return undefined;
-  const [city = "", country = ""] = text.split(",").map((s) => s.trim());
-  return { city, country };
-}
-
-function colorHueToPreset(hue: number | null | undefined, options: Array<{ label: string; hue: number }>): string {
-  if (typeof hue !== "number") return "";
-  let closest = options[0] ?? COLOR_PRESETS[0]!;
-  let bestDistance = Number.POSITIVE_INFINITY;
-  for (const preset of options) {
-    const direct = Math.abs(preset.hue - hue);
-    const wrapped = 360 - direct;
-    const distance = Math.min(direct, wrapped);
-    if (distance < bestDistance) {
-      bestDistance = distance;
-      closest = preset;
-    }
-  }
-  return String(closest.hue);
-}
-
-function hexToHue(hex: string): number | null {
-  const clean = hex.trim();
-  const valid = /^#([0-9a-f]{6})$/i.test(clean);
-  if (!valid) return null;
-  const r = Number.parseInt(clean.slice(1, 3), 16) / 255;
-  const g = Number.parseInt(clean.slice(3, 5), 16) / 255;
-  const b = Number.parseInt(clean.slice(5, 7), 16) / 255;
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const delta = max - min;
-  if (delta === 0) return 0;
-  let hue = 0;
-  if (max === r) hue = ((g - b) / delta) % 6;
-  else if (max === g) hue = (b - r) / delta + 2;
-  else hue = (r - g) / delta + 4;
-  const deg = Math.round(hue * 60);
-  return deg < 0 ? deg + 360 : deg;
-}
 
 export function AdminAssetManager({ open, assets, collections, onClose, onEdit, onEditImage, onDelete, onQuickUpdate, onRefreshCollections }: Props) {
   const [activeTab, setActiveTab] = useState<TabId>("photos");
@@ -139,59 +62,7 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
   const [assetPickerTarget, setAssetPickerTarget] = useState<AssetPickerTarget | null>(null);
   const saveTimersRef = useRef<Record<string, number>>({});
   const allColorOptions = useMemo(() => [...COLOR_PRESETS, ...customColors], [customColors]);
-  const tagStats = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const asset of assets) {
-      const seen = new Set<string>();
-      for (const raw of asset.tags ?? []) {
-        const tag = raw.trim().toLowerCase();
-        if (!tag || seen.has(tag)) continue;
-        seen.add(tag);
-        counts.set(tag, (counts.get(tag) ?? 0) + 1);
-      }
-    }
-    return [...counts.entries()]
-      .map(([value, total]) => ({ value, total }))
-      .sort((a, b) => a.value.localeCompare(b.value, "ca", { sensitivity: "base", numeric: true }));
-  }, [assets]);
-  const locationStats = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const asset of assets) {
-      const city = asset.location?.city?.trim() ?? "";
-      const country = asset.location?.country?.trim() ?? "";
-      const key = [city, country].filter(Boolean).join(", ");
-      if (!key) continue;
-      counts.set(key, (counts.get(key) ?? 0) + 1);
-    }
-    return [...counts.entries()]
-      .map(([value, total]) => ({ value, total }))
-      .sort((a, b) => a.value.localeCompare(b.value, "ca", { sensitivity: "base", numeric: true }));
-  }, [assets]);
-  const tagsToAssets = useMemo(() => {
-    const map = new Map<string, Asset[]>();
-    for (const asset of assets) {
-      for (const tagRaw of asset.tags ?? []) {
-        const tag = tagRaw.trim().toLowerCase();
-        if (!tag) continue;
-        const arr = map.get(tag) ?? [];
-        arr.push(asset);
-        map.set(tag, arr);
-      }
-    }
-    return map;
-  }, [assets]);
-  const locationsToAssets = useMemo(() => {
-    const map = new Map<string, Asset[]>();
-    for (const asset of assets) {
-      const key = [asset.location?.city?.trim() ?? "", asset.location?.country?.trim() ?? ""].filter(Boolean).join(", ");
-      if (!key) continue;
-      const arr = map.get(key) ?? [];
-      arr.push(asset);
-      map.set(key, arr);
-    }
-    return map;
-  }, [assets]);
-  const assetById = useMemo(() => new Map(assets.map((asset) => [asset.id, asset])), [assets]);
+  const { tagStats, locationStats, tagsToAssets, locationsToAssets, assetById, sorted } = useAdminAssetStats(assets, sort);
 
   const pickerAvailableAssets = useMemo(() => {
     if (!assetPickerTarget) return [];
@@ -242,36 +113,6 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
     if (assetPickerTarget.kind === "tag") return "Totes les fotos ja tenen aquest tag.";
     return "Totes les fotos ja tenen aquesta ubicació.";
   }, [assetPickerTarget, assets.length]);
-
-  const sorted = useMemo(() => {
-    const list = [...assets];
-    list.sort((a, b) => {
-      for (const s of sort) {
-        let left = "";
-        let right = "";
-        if (s.key === "title") {
-          left = a.title ?? "";
-          right = b.title ?? "";
-        } else if (s.key === "takenAt") {
-          left = a.takenAt ?? "";
-          right = b.takenAt ?? "";
-        } else if (s.key === "location") {
-          left = `${a.location?.city ?? ""}, ${a.location?.country ?? ""}`;
-          right = `${b.location?.city ?? ""}, ${b.location?.country ?? ""}`;
-        } else if (s.key === "color") {
-          left = typeof a.colorHue === "number" ? String(a.colorHue) : "";
-          right = typeof b.colorHue === "number" ? String(b.colorHue) : "";
-        } else {
-          left = a.favorite ? "1" : "0";
-          right = b.favorite ? "1" : "0";
-        }
-        const res = cmpText(left, right);
-        if (res !== 0) return s.dir === "asc" ? res : -res;
-      }
-      return 0;
-    });
-    return list;
-  }, [assets, sort]);
 
   const visibleAssets = useMemo(() => sorted.slice(0, visibleCount), [sorted, visibleCount]);
 

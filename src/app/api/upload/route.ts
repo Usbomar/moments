@@ -11,6 +11,8 @@ import {
 } from "@/lib/server/storage-utils";
 import { extractExif } from "@/lib/exif-extractor";
 import type { MediaType } from "@/lib/types";
+import { requireAuthUserId } from "@/lib/server/require-auth-api";
+import { errorJson, getRequestId, logApi, okJson } from "@/lib/server/api-observability";
 
 const SIGNED_URL_TTL = 60 * 60 * 24 * 365 * 5;
 
@@ -29,23 +31,26 @@ function fullSizePhotoWebpQuality(maxDim: number, sourceFileBytes: number): numb
 }
 
 export async function POST(request: Request) {
+  const requestId = getRequestId(request);
   try {
     const form = await request.formData();
     const file = form.get("file");
     if (!(file instanceof File)) {
-      return NextResponse.json({ error: "Missing file field" }, { status: 400 });
+      return errorJson(400, requestId, "MISSING_FILE_FIELD", "Missing file field");
     }
 
     if (!isSupabaseConfigured()) {
-      return NextResponse.json(
-        {
-          error: "SUPABASE_NOT_CONFIGURED",
-          message:
-            "Supabase no està configurat. Crea un fitxer .env.local amb NEXT_PUBLIC_SUPABASE_URL (o SUPABASE_URL) i SUPABASE_SERVICE_ROLE_KEY (veure .env.example)."
-        },
-        { status: 503 }
+      return errorJson(
+        503,
+        requestId,
+        "SUPABASE_NOT_CONFIGURED",
+        "Supabase no està configurat. Crea un fitxer .env.local amb NEXT_PUBLIC_SUPABASE_URL (o SUPABASE_URL) i SUPABASE_SERVICE_ROLE_KEY (veure .env.example)."
       );
     }
+
+    const auth = await requireAuthUserId();
+    if (auth instanceof NextResponse) return auth;
+    const { userId } = auth;
 
     const processed = await processUpload({
       filename: file.name,
@@ -61,24 +66,42 @@ export async function POST(request: Request) {
       (typeof forceRaw === "string" && forceRaw.toLowerCase() === "true");
 
     if (!force) {
-      const { data: dupRow, error: dupErr } = await supabase
+      const { data: dupCandidates, error: dupErr } = await supabase
         .from("asset_files")
         .select("asset_id")
         .eq("checksum", processed.checksum)
-        .limit(1)
-        .maybeSingle();
+        .limit(50);
 
       if (dupErr) {
-        return NextResponse.json({ error: dupErr.message }, { status: 500 });
+        logApi("error", "/api/upload", requestId, "Duplicate detection failed", { detail: dupErr.message });
+        return errorJson(500, requestId, "UPLOAD_DUPLICATE_CHECK_FAILED", dupErr.message);
       }
-      if (dupRow?.asset_id) {
-        return NextResponse.json(
+      const candidateIds = Array.from(new Set((dupCandidates ?? []).map((r) => r.asset_id).filter(Boolean)));
+      let duplicateAssetId: string | null = null;
+      if (candidateIds.length) {
+        const { data: ownedDup, error: ownDupErr } = await supabase
+          .from("assets")
+          .select("id")
+          .eq("user_id", userId)
+          .in("id", candidateIds)
+          .limit(1)
+          .maybeSingle();
+        if (ownDupErr) {
+          logApi("error", "/api/upload", requestId, "Owned duplicate check failed", { detail: ownDupErr.message });
+          return errorJson(500, requestId, "UPLOAD_DUPLICATE_OWNERSHIP_FAILED", ownDupErr.message);
+        }
+        duplicateAssetId = ownedDup?.id ?? null;
+      }
+      if (duplicateAssetId) {
+        return errorJson(
+          409,
+          requestId,
+          "UPLOAD_DUPLICATE",
+          `This photo already exists (ID: ${duplicateAssetId}). Upload cancelled.`,
           {
-            error: `This photo already exists (ID: ${dupRow.asset_id}). Upload cancelled.`,
             isDuplicate: true,
-            duplicateAssetId: dupRow.asset_id
-          },
-          { status: 409 }
+            duplicateAssetId
+          }
         );
       }
     }
@@ -208,7 +231,7 @@ export async function POST(request: Request) {
 
       const { error: assetError } = await supabase.from("assets").insert({
         id,
-        user_id: "u-1",
+        user_id: userId,
         type: mediaType,
         title: file.name,
         taken_at: takenAtIso,
@@ -237,7 +260,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: fileError.message }, { status: 500 });
       }
 
-      return NextResponse.json({
+      return okJson(requestId, {
         id,
         originalUrl,
         previewUrl,
@@ -292,7 +315,7 @@ export async function POST(request: Request) {
 
     const { error: assetError } = await supabase.from("assets").insert({
       id,
-      user_id: "u-1",
+      user_id: userId,
       type: mediaType,
       title: file.name,
       taken_at: takenAtIso,
@@ -321,7 +344,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: fileError.message }, { status: 500 });
     }
 
-    return NextResponse.json({
+    return okJson(requestId, {
       id,
       originalUrl,
       previewUrl,
@@ -332,6 +355,7 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    logApi("error", "/api/upload", requestId, "Unhandled exception", { detail: message });
+    return errorJson(500, requestId, "UPLOAD_UNHANDLED_ERROR", message);
   }
 }

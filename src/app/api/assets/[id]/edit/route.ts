@@ -27,6 +27,7 @@ import { extractStoragePath, generateSignedUrls } from "@/lib/server/storage-uti
 import { objectPathFromSignedUrl } from "@/lib/server/signed-url-path";
 import { getStorageBucket, getSupabaseAdmin } from "@/lib/server/supabase-admin";
 import { isSupabaseConfigured } from "@/lib/server/supabase-config";
+import { requireAuthUserId } from "@/lib/server/require-auth-api";
 
 const SIGNED_URL_TTL = 60 * 60 * 24 * 365 * 5;
 
@@ -53,6 +54,10 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     if (!isSupabaseConfigured()) {
       return NextResponse.json({ error: "SUPABASE_NOT_CONFIGURED" }, { status: 503 });
     }
+
+    const auth = await requireAuthUserId();
+    if (auth instanceof NextResponse) return auth;
+    const { userId } = auth;
 
     const id = await resolveId(context);
     let body: Body;
@@ -103,7 +108,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 
     if (rowErr) return NextResponse.json({ error: rowErr.message }, { status: 500 });
     if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    if (row.user_id !== "u-1") {
+    if (row.user_id !== userId) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     if (row.type !== "photo") {
@@ -214,7 +219,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       .from("assets")
       .update({ width, height, uploaded_at: uploadedAt })
       .eq("id", id)
-      .eq("user_id", "u-1");
+      .eq("user_id", userId);
     if (upAsset) return NextResponse.json({ error: upAsset.message }, { status: 500 });
 
     const { error: upFiles } = await supabase

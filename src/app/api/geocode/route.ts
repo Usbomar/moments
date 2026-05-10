@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAuthUserId } from "@/lib/server/require-auth-api";
 
 const NOMINATIM = "https://nominatim.openstreetmap.org/search";
 
@@ -65,6 +66,9 @@ function pickCountry(addr: Record<string, string> | undefined): string {
 }
 
 export async function GET(req: NextRequest) {
+  const auth = await requireAuthUserId();
+  if (auth instanceof NextResponse) return auth;
+
   const q = req.nextUrl.searchParams.get("q")?.trim();
   if (!q || q.length > 280) {
     return NextResponse.json({ error: "invalid q" }, { status: 400 });

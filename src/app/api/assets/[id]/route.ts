@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/server/supabase-admin";
 import { getStorageBucket } from "@/lib/server/supabase-admin";
 import { isSupabaseConfigured } from "@/lib/server/supabase-config";
+import { requireAuthUserId } from "@/lib/server/require-auth-api";
 import { toAsset } from "@/lib/server/asset-map";
 import { objectPathFromSignedUrl } from "@/lib/server/signed-url-path";
 
@@ -31,6 +32,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       return NextResponse.json({ error: "SUPABASE_NOT_CONFIGURED" }, { status: 503 });
     }
 
+    const auth = await requireAuthUserId();
+    if (auth instanceof NextResponse) return auth;
+    const { userId } = auth;
+
     const id = await resolveParams(context);
     const body = (await request.json()) as PatchBody;
 
@@ -46,7 +51,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const { data: existing, error: existingErr } = await supabase.from("assets").select("id,user_id").eq("id", id).maybeSingle();
     if (existingErr) return NextResponse.json({ error: existingErr.message }, { status: 500 });
     if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    if (existing.user_id !== "u-1") {
+    if (existing.user_id !== userId) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -70,11 +75,11 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       }
     }
 
-    let { error: updateErr } = await supabase.from("assets").update(patch).eq("id", id).eq("user_id", "u-1");
+    let { error: updateErr } = await supabase.from("assets").update(patch).eq("id", id).eq("user_id", userId);
     if (updateErr && /color_hue/i.test(updateErr.message) && "color_hue" in patch) {
       const rest = { ...patch };
       delete rest.color_hue;
-      const retry = await supabase.from("assets").update(rest).eq("id", id).eq("user_id", "u-1");
+      const retry = await supabase.from("assets").update(rest).eq("id", id).eq("user_id", userId);
       updateErr = retry.error;
     }
     if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
@@ -130,6 +135,10 @@ export async function DELETE(_request: Request, context: { params: Promise<{ id:
     if (!isSupabaseConfigured()) {
       return NextResponse.json({ error: "SUPABASE_NOT_CONFIGURED" }, { status: 503 });
     }
+    const auth = await requireAuthUserId();
+    if (auth instanceof NextResponse) return auth;
+    const { userId } = auth;
+
     const id = await resolveParams(context);
     const supabase = getSupabaseAdmin();
 
@@ -140,7 +149,7 @@ export async function DELETE(_request: Request, context: { params: Promise<{ id:
       .maybeSingle();
     if (existingErr) return NextResponse.json({ error: existingErr.message }, { status: 500 });
     if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    if (existing.user_id !== "u-1") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    if (existing.user_id !== userId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const { data: fileRow } = await supabase
       .from("asset_files")
@@ -160,7 +169,7 @@ export async function DELETE(_request: Request, context: { params: Promise<{ id:
       await supabase.storage.from(bucket).remove(objectPaths);
     }
 
-    const { error: delErr } = await supabase.from("assets").delete().eq("id", id).eq("user_id", "u-1");
+    const { error: delErr } = await supabase.from("assets").delete().eq("id", id).eq("user_id", userId);
     if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 });
     return NextResponse.json({ ok: true });
   } catch (error) {

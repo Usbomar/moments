@@ -6,17 +6,20 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "test": "vitest run",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "analyze": "cross-env ANALYZE=true next build",
     "supabase:start": "npx supabase@latest start",
     "supabase:stop": "npx supabase@latest stop",
-    "env:local": "node scripts/write-env-local.cjs"
+    "env:local": "node scripts/write-env-local.cjs",
+    "migrate:legacy-user": "node scripts/migrate-legacy-user.cjs"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.102.1",
     "leaflet": "^1.9.4",
     "next": "^16.2.3",
@@ -38,6 +41,7 @@
     "cross-env": "^10.1.0",
     "eslint": "^9.39.4",
     "eslint-config-next": "^16.2.3",
-    "typescript": "^6.0.2"
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.5"
   }
 }

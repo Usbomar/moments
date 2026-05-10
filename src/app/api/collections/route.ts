@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/server/supabase-admin";
 import { isSupabaseConfigured } from "@/lib/server/supabase-config";
+import { requireAuthUserId } from "@/lib/server/require-auth-api";
 import type { AppCollection } from "@/lib/collections";
 
 type AlbumRow = {
@@ -26,11 +27,15 @@ export async function GET() {
     if (!isSupabaseConfigured()) {
       return NextResponse.json({ collections: [], supabaseConfigured: false });
     }
+    const auth = await requireAuthUserId();
+    if (auth instanceof NextResponse) return auth;
+    const { userId } = auth;
+
     const supabase = getSupabaseAdmin();
     const { data, error } = await supabase
       .from("albums")
       .select("id,name,album_assets(asset_id,position)")
-      .eq("user_id", "u-1")
+      .eq("user_id", userId)
       .order("name", { ascending: true });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     const collections = ((data ?? []) as AlbumRow[]).map(mapAlbum);
@@ -46,12 +51,16 @@ export async function POST(request: Request) {
     if (!isSupabaseConfigured()) {
       return NextResponse.json({ error: "SUPABASE_NOT_CONFIGURED" }, { status: 503 });
     }
+    const auth = await requireAuthUserId();
+    if (auth instanceof NextResponse) return auth;
+    const { userId } = auth;
+
     const body = (await request.json()) as { name?: string };
     const name = typeof body.name === "string" ? body.name.trim() : "";
     if (!name) return NextResponse.json({ error: "name is required" }, { status: 400 });
     const supabase = getSupabaseAdmin();
     const id = crypto.randomUUID();
-    const { error } = await supabase.from("albums").insert({ id, user_id: "u-1", name });
+    const { error } = await supabase.from("albums").insert({ id, user_id: userId, name });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({
       collection: {

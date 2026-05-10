@@ -268,16 +268,6 @@ button.active {
   max-width: 100%;
 }
 
-.viewer-zoom-viewport {
-  display: block;
-  max-width: 100%;
-}
-
-.viewer-zoom-viewport--active {
-  overflow: hidden;
-  touch-action: none;
-}
-
 .viewer-media--framed {
   max-width: calc(min(90vw, 1080px) - 20px);
   max-height: calc(90vh - 120px);
@@ -287,11 +277,7 @@ button.active {
   margin: 0 auto;
 }
 
-/* Zoom x2: el transform ve des de l'estil inline (pan + scale) al visor */
-.viewer-media--framed.is-zoomed {
-  transform-origin: center center;
-}
-
+.viewer-media--framed.is-zoomed,
 .admin-assets-preview-image.is-zoomed {
   transform: scale(1.9);
   transform-origin: center center;

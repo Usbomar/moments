@@ -181,6 +181,26 @@ button.active {
   background: var(--bg-secondary);
 }
 
+/* Dins el marc unificat: la X ha de fusionar-se amb el fons del marc (sense caixa grisa) i ocupar poc espai */
+.viewer-content-frame .viewer-close {
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.viewer-content-frame .viewer-close:hover {
+  background: color-mix(in srgb, var(--panel) 90%, var(--text-primary) 10%);
+}
+
 /* Slider: imatge i barra de controls en blocs separats (res de controls sobre la foto) */
 .slider-view-stack {
   display: flex;
@@ -241,7 +261,7 @@ button.active {
 .viewer-media-frame {
   display: block;
   margin: 0;
-  padding: 10px 10px 0;
+  padding: 28px 10px 0;
   border: 0;
   background: transparent;
   box-sizing: border-box;

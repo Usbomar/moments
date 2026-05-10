@@ -1,16 +1,25 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { GridDistribution, GridSortOrder } from "@/lib/grid-library";
+import type { FeaturedTileSize, GridDistribution, GridSortOrder } from "@/lib/grid-library";
 
 type Props = {
   distribution: GridDistribution;
   onDistributionChange: (v: GridDistribution) => void;
   sortOrder: GridSortOrder;
   onSortOrderChange: (v: GridSortOrder) => void;
+  featuredTileSize: FeaturedTileSize;
+  onFeaturedTileSizeChange: (v: FeaturedTileSize) => void;
 };
 
-export function GridOptionsPopover({ distribution, onDistributionChange, sortOrder, onSortOrderChange }: Props) {
+export function GridOptionsPopover({
+  distribution,
+  onDistributionChange,
+  sortOrder,
+  onSortOrderChange,
+  featuredTileSize,
+  onFeaturedTileSizeChange
+}: Props) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -71,6 +80,38 @@ export function GridOptionsPopover({ distribution, onDistributionChange, sortOrd
               <span>Preferides destacades</span>
             </label>
           </fieldset>
+          {distribution === "featured" ? (
+            <fieldset className="grid-options-fieldset">
+              <legend>Mida rajola preferida</legend>
+              <label className="grid-options-row">
+                <input
+                  type="radio"
+                  name="grid-featured-size"
+                  checked={featuredTileSize === "compact"}
+                  onChange={() => onFeaturedTileSizeChange("compact")}
+                />
+                <span>Petita (graella més densa)</span>
+              </label>
+              <label className="grid-options-row">
+                <input
+                  type="radio"
+                  name="grid-featured-size"
+                  checked={featuredTileSize === "balanced"}
+                  onChange={() => onFeaturedTileSizeChange("balanced")}
+                />
+                <span>Mitjana</span>
+              </label>
+              <label className="grid-options-row">
+                <input
+                  type="radio"
+                  name="grid-featured-size"
+                  checked={featuredTileSize === "prominent"}
+                  onChange={() => onFeaturedTileSizeChange("prominent")}
+                />
+                <span>Gran (preferida més visible)</span>
+              </label>
+            </fieldset>
+          ) : null}
           <fieldset className="grid-options-fieldset">
             <legend>Ordre (data de captura)</legend>
             <label className="grid-options-row">

@@ -4,12 +4,14 @@ import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import type { Asset } from "@/lib/types";
 import { LazyImage } from "@/components/LazyImage";
-import { assignFeaturedHighlights, type GridDistribution } from "@/lib/grid-library";
+import { assignFeaturedHighlights, type FeaturedTileSize, type GridDistribution } from "@/lib/grid-library";
 
 interface Props {
   items: Asset[];
   /** Només lectura Quadrícula: rajoles grans només per preferides (patró per blocs). */
   distribution?: GridDistribution;
+  /** Només amb `distribution="featured"`: densitat de la graella i mida relativa de la rajola destacada. */
+  featuredTileSize?: FeaturedTileSize;
   /** Clic al thumbnail: obre el visor a pantalla completa (prioritat sobre onOpenModal). */
   onOpenViewer?: (asset: Asset, contextItems: Asset[]) => void;
   /** Opcional: només si no hi ha onOpenViewer (p. ex. eines internes). */
@@ -96,13 +98,30 @@ function LibraryTile({
 }
 
 /** Grid of thumbnails with lazy viewport loading, gradient fallback, and onError soft boundary. */
-export function LibraryGrid({ items, distribution = "uniform", onOpen, onOpenModal, onOpenViewer }: Props) {
+export function LibraryGrid({
+  items,
+  distribution = "uniform",
+  featuredTileSize = "balanced",
+  onOpen,
+  onOpenModal,
+  onOpenViewer
+}: Props) {
   const featuredFlags = useMemo(
     () => (distribution === "featured" ? assignFeaturedHighlights(items) : items.map(() => false)),
     [items, distribution]
   );
 
-  const gridClass = distribution === "featured" ? "grid grid--featured" : "grid";
+  const featuredSizeClass =
+    distribution === "featured"
+      ? featuredTileSize === "compact"
+        ? "grid--featured-compact"
+        : featuredTileSize === "prominent"
+          ? "grid--featured-prominent"
+          : "grid--featured-balanced"
+      : "";
+
+  const gridClass =
+    distribution === "featured" ? ["grid", "grid--featured", featuredSizeClass].filter(Boolean).join(" ") : "grid";
 
   return (
     <div className={gridClass}>

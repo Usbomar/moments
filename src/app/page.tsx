@@ -19,7 +19,13 @@ import { loadCollections } from "@/lib/collections-storage";
 import type { AppCollection } from "@/lib/collections";
 import { AdminAssetManager } from "@/components/AdminAssetManager";
 import { GridOptionsPopover } from "@/components/GridOptionsPopover";
-import { sortAssetsForGrid, type GridDistribution, type GridSortOrder } from "@/lib/grid-library";
+import {
+  normalizeFeaturedTileSize,
+  sortAssetsForGrid,
+  type FeaturedTileSize,
+  type GridDistribution,
+  type GridSortOrder
+} from "@/lib/grid-library";
 
 const MapView = dynamic(() => import("@/views/MapView").then((mod) => mod.MapView), {
   ssr: false,
@@ -71,6 +77,7 @@ function TabLoadingHint({ label }: { label: string }) {
 
 const GRID_DIST_STORAGE = "moments-grid-distribution";
 const GRID_SORT_STORAGE = "moments-grid-sort";
+const GRID_FEATURED_TILE_STORAGE = "moments-grid-featured-tile-size";
 
 function HomeContent() {
   const COLLECTIONS_MIGRATED_KEY = "moments_collections_migrated_to_server_v1";
@@ -78,6 +85,7 @@ function HomeContent() {
   const searchRef = useRef<HTMLInputElement>(null);
   const [view, setView] = useState<GalleryView>("masonry");
   const [gridDistribution, setGridDistribution] = useState<GridDistribution>("uniform");
+  const [featuredTileSize, setFeaturedTileSize] = useState<FeaturedTileSize>("balanced");
   const [gridSortOrder, setGridSortOrder] = useState<GridSortOrder>("taken_desc");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
@@ -222,8 +230,10 @@ function HomeContent() {
     try {
       const d = window.localStorage.getItem(GRID_DIST_STORAGE) as GridDistribution | null;
       const s = window.localStorage.getItem(GRID_SORT_STORAGE) as GridSortOrder | null;
+      const fts = window.localStorage.getItem(GRID_FEATURED_TILE_STORAGE);
       if (d === "uniform" || d === "featured") setGridDistribution(d);
       if (s === "taken_desc" || s === "taken_asc") setGridSortOrder(s);
+      setFeaturedTileSize(normalizeFeaturedTileSize(fts));
     } catch {
       /* ignore */
     }
@@ -233,10 +243,11 @@ function HomeContent() {
     try {
       window.localStorage.setItem(GRID_DIST_STORAGE, gridDistribution);
       window.localStorage.setItem(GRID_SORT_STORAGE, gridSortOrder);
+      window.localStorage.setItem(GRID_FEATURED_TILE_STORAGE, featuredTileSize);
     } catch {
       /* ignore */
     }
-  }, [gridDistribution, gridSortOrder]);
+  }, [gridDistribution, gridSortOrder, featuredTileSize]);
 
   useEffect(() => {
     if (supabaseConfigured !== true) return;
@@ -459,6 +470,8 @@ function HomeContent() {
               onDistributionChange={setGridDistribution}
               sortOrder={gridSortOrder}
               onSortOrderChange={setGridSortOrder}
+              featuredTileSize={featuredTileSize}
+              onFeaturedTileSizeChange={setFeaturedTileSize}
             />
           ) : undefined
         }
@@ -501,6 +514,7 @@ function HomeContent() {
                     <LibraryGrid
                       items={gridCatalogItems}
                       distribution={gridDistribution}
+                      featuredTileSize={featuredTileSize}
                       onOpenModal={(asset) => setSelectedAsset(asset)}
                       onOpenViewer={openViewer}
                     />

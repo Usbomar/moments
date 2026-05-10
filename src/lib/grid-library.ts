@@ -4,6 +4,14 @@ export type GridSortOrder = "taken_desc" | "taken_asc";
 
 export type GridDistribution = "uniform" | "featured";
 
+/** Mida relativa de la rajola preferida en mode «Preferides destacades» (graella de 3–6 columnes). */
+export type FeaturedTileSize = "compact" | "balanced" | "prominent";
+
+export function normalizeFeaturedTileSize(raw: unknown): FeaturedTileSize {
+  if (raw === "compact" || raw === "balanced" || raw === "prominent") return raw;
+  return "balanced";
+}
+
 /** Una foto sense data de captura vàlida va al final; dins aquest grup: pujada més recent primer. */
 export function hasValidTakenAt(asset: Asset): boolean {
   const raw = asset.takenAt?.trim();

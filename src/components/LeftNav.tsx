@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 
 export type MainNavTab = "library" | "map" | "collections" | "memories" | "analytics";
 
@@ -23,6 +24,7 @@ type Props = {
 
 export function LeftNav({ active, onChange, collapsed, onToggleCollapse, mobileOpen, onMobileClose }: Props) {
   const [isNarrow, setIsNarrow] = useState(false);
+  const [sessionEmail, setSessionEmail] = useState<string | null>(null);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 767px)");
@@ -30,6 +32,28 @@ export function LeftNav({ active, onChange, collapsed, onToggleCollapse, mobileO
     apply();
     mq.addEventListener("change", apply);
     return () => mq.removeEventListener("change", apply);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/auth/session", { cache: "no-store" });
+        const body = (await res.json()) as { user?: { email?: string } | null };
+        if (!cancelled) setSessionEmail(body.user?.email?.trim() || null);
+      } catch {
+        if (!cancelled) setSessionEmail(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const onSignOut = useCallback(async () => {
+    const supabase = createBrowserSupabaseClient();
+    await supabase.auth.signOut();
+    window.location.href = "/login";
   }, []);
 
   const select = useCallback(
@@ -54,6 +78,14 @@ export function LeftNav({ active, onChange, collapsed, onToggleCollapse, mobileO
     <>
       {isNarrow && mobileOpen ? <button type="button" className="moments-drawer-backdrop" aria-label="Tancar menú" onClick={onMobileClose} /> : null}
       <aside className={navClass} aria-label="Navegació principal">
+        {sessionEmail ? (
+          <div className="moments-sidenav-user" title={sessionEmail}>
+            <p className="moments-sidenav-user-email">{sessionEmail}</p>
+            <button type="button" className="moments-sidenav-signout" onClick={() => void onSignOut()}>
+              Tancar sessió
+            </button>
+          </div>
+        ) : null}
         <div className="moments-sidenav-head">
           {!isNarrow ? (
             <button type="button" className="btn btn-ghost btn-sm" onClick={onToggleCollapse} aria-expanded={!collapsed} aria-label="Plegar barra lateral">

@@ -10,7 +10,12 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "Moments",
-  description: "Modern photo management app"
+  description: "Modern photo management app",
+  icons: {
+    icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
+    shortcut: "/favicon.svg",
+    apple: [{ url: "/favicon.svg", type: "image/svg+xml" }]
+  }
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

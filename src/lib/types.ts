@@ -29,6 +29,8 @@ export interface Asset {
   height: number;
   duration?: number;
   favorite: boolean;
+  /** Si és true, la foto no es mostra als convidats (per defecte false: visible). */
+  hiddenFromGuests?: boolean;
   albumIds: string[];
   peopleIds: string[];
   tags: string[];

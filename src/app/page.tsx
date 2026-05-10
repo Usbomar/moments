@@ -397,6 +397,7 @@ function HomeContent() {
         tags: updated.tags,
         taken_at: updated.takenAt,
         favorite: updated.favorite,
+        hidden_from_guests: updated.hiddenFromGuests === true,
         color_hue: updated.colorHue ?? null,
         location: updated.location ?? null
       })

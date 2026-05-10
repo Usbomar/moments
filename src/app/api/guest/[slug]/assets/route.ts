@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/server/supabase-admin";
 import { isSupabaseConfigured } from "@/lib/server/supabase-config";
-import { requireAuthUserId } from "@/lib/server/require-auth-api";
 import { errorJson, getRequestId, logApi, okJson } from "@/lib/server/api-observability";
 import { toAsset } from "@/lib/server/asset-map";
+import { normalizeGuestSlug } from "@/lib/guest-slug";
 
 function parseYears(raw: string | null): [number, number] | null {
   if (!raw) return null;
@@ -25,84 +25,45 @@ function parsePositiveInt(raw: string | null, fallback: number, min: number, max
   return Math.min(max, Math.max(min, n));
 }
 
-export async function GET(request: Request) {
+export async function GET(request: Request, context: { params: Promise<{ slug: string }> }) {
   const requestId = getRequestId(request);
   try {
     if (!isSupabaseConfigured()) {
-      return okJson(requestId, {
-        assets: [],
-        supabaseConfigured: false
-      });
+      return okJson(requestId, { assets: [], supabaseConfigured: false });
     }
 
-    const auth = await requireAuthUserId();
-    if (auth instanceof NextResponse) return auth;
-    const { userId } = auth;
+    const { slug: raw } = await context.params;
+    const slug = normalizeGuestSlug(raw || "");
+    if (!slug) {
+      return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
+    }
 
     const supabase = getSupabaseAdmin();
+    const { data: profile, error: pErr } = await supabase
+      .from("profiles")
+      .select("id,guest_access_enabled")
+      .eq("guest_slug", slug)
+      .maybeSingle();
+
+    if (pErr) return errorJson(500, requestId, "PROFILE_QUERY_FAILED", pErr.message);
+    if (!profile || profile.guest_access_enabled !== true) {
+      return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
+    }
+
+    const ownerId = profile.id as string;
     const url = new URL(request.url);
     const years = parseYears(url.searchParams.get("years"));
-    const locations = (url.searchParams.get("locations") ?? "")
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean);
-    const tags = (url.searchParams.get("tags") ?? "")
-      .split(",")
-      .map((item) => item.trim().toLowerCase())
-      .filter(Boolean);
     const q = (url.searchParams.get("q") ?? "").trim();
     const limit = parsePositiveInt(url.searchParams.get("limit"), 200, 1, 500);
     const offset = parsePositiveInt(url.searchParams.get("offset"), 0, 0, 1_000_000);
-
-    let allowedIds: string[] | null = null;
-    if (locations.length) {
-      const { data: locRows, error: locErr } = await supabase
-        .from("asset_locations")
-        .select("asset_id,locations!inner(city,country)")
-        .in("locations.city", locations.map((label) => label.split(",")[0].trim()));
-      if (locErr) return NextResponse.json({ error: locErr.message }, { status: 500 });
-      const candidateLoc = Array.from(new Set((locRows ?? []).map((row) => row.asset_id)));
-      if (candidateLoc.length === 0) {
-        allowedIds = [];
-      } else {
-        const { data: ownedLoc, error: ownLocErr } = await supabase
-          .from("assets")
-          .select("id")
-          .eq("user_id", userId)
-          .in("id", candidateLoc);
-        if (ownLocErr) return NextResponse.json({ error: ownLocErr.message }, { status: 500 });
-        allowedIds = (ownedLoc ?? []).map((r) => r.id);
-      }
-    }
-
-    if (tags.length) {
-      const { data: tagRows, error: tagErr } = await supabase.from("asset_tags").select("asset_id").in("tag", tags);
-      if (tagErr) return NextResponse.json({ error: tagErr.message }, { status: 500 });
-      const candidateTag = Array.from(new Set((tagRows ?? []).map((row) => row.asset_id)));
-      if (candidateTag.length === 0) {
-        allowedIds = [];
-      } else {
-        const { data: ownedTag, error: ownTagErr } = await supabase
-          .from("assets")
-          .select("id")
-          .eq("user_id", userId)
-          .in("id", candidateTag);
-        if (ownTagErr) return NextResponse.json({ error: ownTagErr.message }, { status: 500 });
-        const tagIds = new Set((ownedTag ?? []).map((r) => r.id));
-        allowedIds = allowedIds == null ? Array.from(tagIds) : allowedIds.filter((id) => tagIds.has(id));
-      }
-    }
-
-    if (allowedIds && allowedIds.length === 0) {
-      return okJson(requestId, { assets: [], supabaseConfigured: true });
-    }
 
     let query = supabase
       .from("assets")
       .select(
         "id,user_id,type,title,description,taken_at,uploaded_at,width,height,duration,favorite,hidden_from_guests,asset_files(original_url,preview_url,medium_url,thumb_url,checksum,size),asset_locations(location_id,locations(lat,lng,city,country)),asset_tags(tag,origin)"
       )
-      .eq("user_id", userId)
+      .eq("user_id", ownerId)
+      .eq("hidden_from_guests", false)
       .order("taken_at", { ascending: false });
 
     if (!q) {
@@ -114,13 +75,10 @@ export async function GET(request: Request) {
         .gte("taken_at", `${years[0]}-01-01T00:00:00.000Z`)
         .lte("taken_at", `${years[1]}-12-31T23:59:59.999Z`);
     }
-    if (allowedIds) {
-      query = query.in("id", allowedIds);
-    }
-    const { data, error } = await query;
 
+    const { data, error } = await query;
     if (error) {
-      logApi("error", "/api/assets", requestId, "Supabase query failed", { detail: error.message });
+      logApi("error", "/api/guest/.../assets", requestId, "Supabase query failed", { detail: error.message });
       return errorJson(500, requestId, "ASSETS_QUERY_FAILED", error.message);
     }
 
@@ -131,7 +89,7 @@ export async function GET(request: Request) {
       const { data: hueRows, error: hueErr } = await supabase
         .from("assets")
         .select("id,color_hue")
-        .eq("user_id", userId)
+        .eq("user_id", ownerId)
         .in("id", ids);
       if (!hueErr && hueRows?.length) {
         const byId = new Map(hueRows.map((h) => [String(h.id), h.color_hue]));
@@ -143,6 +101,7 @@ export async function GET(request: Request) {
         });
       }
     }
+
     if (q) {
       const lower = q.toLowerCase();
       mapped = mapped.filter(
@@ -169,13 +128,7 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
-    if (message === "SUPABASE_NOT_CONFIGURED") {
-      return okJson(requestId, {
-        assets: [],
-        supabaseConfigured: false
-      });
-    }
-    logApi("error", "/api/assets", requestId, "Unhandled exception", { detail: message });
+    logApi("error", "/api/guest/.../assets", requestId, "Unhandled exception", { detail: message });
     return errorJson(500, requestId, "ASSETS_UNHANDLED_ERROR", message);
   }
 }

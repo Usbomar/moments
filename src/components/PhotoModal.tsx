@@ -66,6 +66,7 @@ export function PhotoModal({ asset, onClose, onSave, libraryTagSuggestions = [],
   const [locationText, setLocationText] = useState(() => formatLocationText(asset?.location));
   const [pickedLocation, setPickedLocation] = useState<LocationInfo | undefined>(() => asset?.location);
   const [favorite, setFavorite] = useState(() => asset?.favorite ?? false);
+  const [hiddenFromGuests, setHiddenFromGuests] = useState(() => asset?.hiddenFromGuests ?? false);
   const [colorHue, setColorHue] = useState<number | null>(() =>
     typeof asset?.colorHue === "number" && Number.isFinite(asset.colorHue) ? Math.min(359, Math.max(0, Math.round(asset.colorHue))) : null
   );
@@ -108,6 +109,7 @@ export function PhotoModal({ asset, onClose, onSave, libraryTagSuggestions = [],
     setLocationText(formatLocationText(asset.location));
     setPickedLocation(asset.location);
     setFavorite(asset.favorite ?? false);
+    setHiddenFromGuests(asset.hiddenFromGuests ?? false);
     setColorHue(
       typeof asset.colorHue === "number" && Number.isFinite(asset.colorHue)
         ? Math.min(359, Math.max(0, Math.round(asset.colorHue)))
@@ -229,6 +231,7 @@ export function PhotoModal({ asset, onClose, onSave, libraryTagSuggestions = [],
         tags: [...tags],
         takenAt: fromDateInputValue(dateValue),
         favorite,
+        hiddenFromGuests,
         location,
         files: asset.files
       };
@@ -237,7 +240,7 @@ export function PhotoModal({ asset, onClose, onSave, libraryTagSuggestions = [],
       await onSave(updated);
       onClose();
     })();
-  }, [asset, colorHue, dateValue, description, favorite, locationText, onClose, onSave, pickedLocation, tags, title]);
+  }, [asset, colorHue, dateValue, description, favorite, hiddenFromGuests, locationText, onClose, onSave, pickedLocation, tags, title]);
 
   const toggleCollectionMembership = useCallback(
     async (collectionId: string, checked: boolean) => {
@@ -648,6 +651,15 @@ export function PhotoModal({ asset, onClose, onSave, libraryTagSuggestions = [],
           <label htmlFor="photo-fav" style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
             <input id="photo-fav" type="checkbox" checked={favorite} onChange={(e) => setFavorite(e.target.checked)} />
             Preferit
+          </label>
+          <label htmlFor="photo-hide-guest" style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+            <input
+              id="photo-hide-guest"
+              type="checkbox"
+              checked={hiddenFromGuests}
+              onChange={(e) => setHiddenFromGuests(e.target.checked)}
+            />
+            Ocultar als convidats
           </label>
         </div>
 

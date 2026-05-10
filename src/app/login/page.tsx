@@ -86,6 +86,10 @@ function LoginForm() {
           </button>
         </form>
 
+        <p className="login-guest-link">
+          <a href="/guest">Entrar com a convidat</a>
+        </p>
+
         <p className="modal-muted login-hint">
           Configuració: <code>NEXT_PUBLIC_SUPABASE_URL</code>, <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> i <code>SUPABASE_SERVICE_ROLE_KEY</code> al fitxer <code>.env.local</code>. Aplica la migració SQL d’auth/RLS a Supabase.
         </p>

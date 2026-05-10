@@ -41,6 +41,7 @@ export async function updateSession(request: NextRequest) {
   }
 
   const isAuthRoute = pathname.startsWith("/login") || pathname.startsWith("/auth");
+  const isGuestPublicRoute = pathname === "/guest" || pathname.startsWith("/g/");
   const isPublicAsset =
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon") ||
@@ -50,7 +51,7 @@ export async function updateSession(request: NextRequest) {
     return supabaseResponse;
   }
 
-  if (!user && !isAuthRoute) {
+  if (!user && !isAuthRoute && !isGuestPublicRoute) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/login";
     redirectUrl.searchParams.set("next", `${pathname}${request.nextUrl.search}`);

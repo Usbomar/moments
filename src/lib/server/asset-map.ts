@@ -85,6 +85,7 @@ export function toAsset(row: {
   height: number;
   duration: number | null;
   favorite: boolean;
+  hidden_from_guests?: boolean | null;
   color_hue?: number | null;
   asset_files: AssetFilesNested;
   asset_locations: LocationNested;
@@ -125,6 +126,7 @@ export function toAsset(row: {
     height: row.height,
     duration: row.duration ?? undefined,
     favorite: row.favorite,
+    hiddenFromGuests: row.hidden_from_guests === true,
     albumIds: [],
     peopleIds: [],
     tags,

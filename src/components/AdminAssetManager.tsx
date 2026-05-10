@@ -31,9 +31,17 @@ type Props = {
   onRefreshCollections?: () => Promise<void>;
 };
 
-type DraftPatch = Partial<Pick<Asset, "title" | "takenAt" | "favorite" | "colorHue" | "location">>;
+type DraftPatch = Partial<Pick<Asset, "title" | "takenAt" | "favorite" | "colorHue" | "location" | "hiddenFromGuests">>;
 const CUSTOM_COLOR_STORAGE_KEY = "moments_admin_custom_colors_v1";
-type TabId = "photos" | "collections" | "tags" | "locations" | "colors";
+type TabId = "photos" | "guest" | "collections" | "tags" | "locations" | "colors";
+
+type GuestProfileCfg = {
+  guestAccessEnabled: boolean;
+  guestSlug: string | null;
+  showInGuestDirectory: boolean;
+  guestDisplayName: string;
+  guestUrl: string | null;
+};
 
 export function AdminAssetManager({ open, assets, collections, onClose, onEdit, onEditImage, onDelete, onQuickUpdate, onRefreshCollections }: Props) {
   const [activeTab, setActiveTab] = useState<TabId>("photos");
@@ -56,6 +64,11 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
   const [editingTagName, setEditingTagName] = useState<Record<string, string>>({});
   const [editingLocationName, setEditingLocationName] = useState<Record<string, string>>({});
   const [newCollectionName, setNewCollectionName] = useState("");
+  const [guestCfg, setGuestCfg] = useState<GuestProfileCfg | null>(null);
+  const [guestLoading, setGuestLoading] = useState(false);
+  const [guestSaving, setGuestSaving] = useState(false);
+  const [guestErr, setGuestErr] = useState<string | null>(null);
+  const [guestSlugDraft, setGuestSlugDraft] = useState("");
   const [editingCollectionId, setEditingCollectionId] = useState<string | null>(null);
   const [editingCollectionDraft, setEditingCollectionDraft] = useState("");
   const [deleteCollectionId, setDeleteCollectionId] = useState<string | null>(null);
@@ -115,6 +128,36 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
   }, [assetPickerTarget, assets.length]);
 
   const visibleAssets = useMemo(() => sorted.slice(0, visibleCount), [sorted, visibleCount]);
+
+  useEffect(() => {
+    if (!open || activeTab !== "guest") return;
+    setGuestLoading(true);
+    setGuestErr(null);
+    void (async () => {
+      try {
+        const res = await fetch("/api/profile/guest", { cache: "no-store" });
+        const body = (await res.json()) as GuestProfileCfg & { error?: string };
+        if (!res.ok) {
+          setGuestErr(body.error ?? "No s’han pogut carregar les opcions.");
+          setGuestCfg(null);
+          return;
+        }
+        setGuestCfg({
+          guestAccessEnabled: body.guestAccessEnabled,
+          guestSlug: body.guestSlug,
+          showInGuestDirectory: body.showInGuestDirectory,
+          guestDisplayName: body.guestDisplayName,
+          guestUrl: body.guestUrl
+        });
+        setGuestSlugDraft(body.guestSlug?.trim() ?? "");
+      } catch {
+        setGuestErr("Error de connexió.");
+        setGuestCfg(null);
+      } finally {
+        setGuestLoading(false);
+      }
+    })();
+  }, [open, activeTab]);
 
   useEffect(() => {
     setVisibleCount(100);
@@ -411,6 +454,7 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
           <div className="admin-assets-head-actions">
             <div className="admin-tabs" role="tablist" aria-label="Pestanyes de configuració">
               <button type="button" role="tab" aria-selected={activeTab === "photos"} className={activeTab === "photos" ? "is-active" : ""} onClick={() => setActiveTab("photos")}>Fotos</button>
+              <button type="button" role="tab" aria-selected={activeTab === "guest"} className={activeTab === "guest" ? "is-active" : ""} onClick={() => setActiveTab("guest")}>Convidat</button>
               <button type="button" role="tab" aria-selected={activeTab === "collections"} className={activeTab === "collections" ? "is-active" : ""} onClick={() => setActiveTab("collections")}>Col·leccions</button>
               <button type="button" role="tab" aria-selected={activeTab === "tags"} className={activeTab === "tags" ? "is-active" : ""} onClick={() => setActiveTab("tags")}>TAGS</button>
               <button type="button" role="tab" aria-selected={activeTab === "locations"} className={activeTab === "locations" ? "is-active" : ""} onClick={() => setActiveTab("locations")}>Ubicacions</button>
@@ -450,6 +494,7 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
                 <th>
                   <button type="button" onClick={(e) => toggleSort("favorite", e.shiftKey)}>Preferit</button>
                 </th>
+                <th title="Ocultar als convidats">Conv.</th>
                 {showContent ? <th title="Descripción">📝</th> : null}
                 {showContent ? <th>TAGS</th> : null}
                 <th className="admin-assets-col-collections">Col·leccions</th>
@@ -468,6 +513,7 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
                 const locationText = `${draftById[a.id]?.location?.city ?? a.location?.city ?? ""}${(draftById[a.id]?.location?.country ?? a.location?.country) ? `, ${draftById[a.id]?.location?.country ?? a.location?.country ?? ""}` : ""}`;
                 const saveState = savingById[a.id] ?? "idle";
                 const isFavorite = draftById[a.id]?.favorite ?? a.favorite;
+                const hideGuest = draftById[a.id]?.hiddenFromGuests ?? a.hiddenFromGuests ?? false;
                 return (
                 <tr key={a.id}>
                   <td className="admin-assets-col-thumb">
@@ -564,6 +610,15 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
                       />
                     </label>
                   </td>
+                  <td>
+                    <label className="admin-assets-checkbox-wrap" aria-label={`Ocultar als convidats: ${a.title}`} title="Ocultar als convidats">
+                      <input
+                        type="checkbox"
+                        checked={hideGuest}
+                        onChange={(e) => updateDraft(a, { hiddenFromGuests: e.target.checked })}
+                      />
+                    </label>
+                  </td>
                   {showContent ? <td>{a.description?.trim() ? "●" : ""}</td> : null}
                   {showContent ? <td>{a.tags?.length ? "●" : ""}</td> : null}
                   <td className="admin-assets-col-collections admin-assets-collections-cell">
@@ -616,6 +671,173 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
           ) : null}
         </div>
         </>
+        ) : null}
+
+        {activeTab === "guest" ? (
+          <div className="guest-settings-panel">
+            {guestLoading ? <p className="modal-muted">Carregant…</p> : null}
+            {guestErr ? (
+              <p className="modal-error" role="alert">
+                {guestErr}
+              </p>
+            ) : null}
+            {!guestLoading && guestCfg ? (
+              <>
+                <fieldset>
+                  <legend>Compartició</legend>
+                  <label className="guest-settings-row">
+                    <input
+                      type="checkbox"
+                      checked={guestCfg.guestAccessEnabled}
+                      disabled={guestSaving}
+                      onChange={(e) =>
+                        setGuestCfg((g) =>
+                          g ? { ...g, guestAccessEnabled: e.target.checked } : g
+                        )
+                      }
+                    />
+                    <span>Permetre accés com a convidat (enllaç públic de només lectura)</span>
+                  </label>
+                  <label className="guest-settings-row">
+                    <input
+                      type="checkbox"
+                      checked={guestCfg.showInGuestDirectory}
+                      disabled={guestSaving || !guestCfg.guestAccessEnabled}
+                      onChange={(e) =>
+                        setGuestCfg((g) =>
+                          g ? { ...g, showInGuestDirectory: e.target.checked } : g
+                        )
+                      }
+                    />
+                    <span>Apareixer al directori de convidats (nom sense correu)</span>
+                  </label>
+                  <label className="guest-settings-row" style={{ flexDirection: "column", alignItems: "stretch" }}>
+                    <span>Nom visible al directori</span>
+                    <input
+                      type="text"
+                      value={guestCfg.guestDisplayName}
+                      disabled={guestSaving}
+                      placeholder="Per exemple: Família Garcia"
+                      onChange={(e) =>
+                        setGuestCfg((g) => (g ? { ...g, guestDisplayName: e.target.value } : g))
+                      }
+                    />
+                  </label>
+                  <label className="guest-settings-row" style={{ flexDirection: "column", alignItems: "stretch" }}>
+                    <span>Identificador d’enllaç (slug)</span>
+                    <input
+                      type="text"
+                      value={guestSlugDraft}
+                      disabled={guestSaving}
+                      placeholder="minúscules, números i guions"
+                      onChange={(e) => setGuestSlugDraft(e.target.value.toLowerCase())}
+                    />
+                  </label>
+                </fieldset>
+                <div className="guest-settings-actions">
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    disabled={guestSaving}
+                    onClick={() =>
+                      void (async () => {
+                        if (!guestCfg) return;
+                        setGuestSaving(true);
+                        setGuestErr(null);
+                        try {
+                          const res = await fetch("/api/profile/guest", {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              guest_access_enabled: guestCfg.guestAccessEnabled,
+                              show_in_guest_directory: guestCfg.showInGuestDirectory,
+                              guest_display_name: guestCfg.guestDisplayName.trim() || null,
+                              guest_slug: guestSlugDraft.trim() || null
+                            })
+                          });
+                          const body = (await res.json()) as GuestProfileCfg & { error?: string };
+                          if (!res.ok) {
+                            setGuestErr(body.error ?? "Error en desar.");
+                            return;
+                          }
+                          setGuestCfg({
+                            guestAccessEnabled: body.guestAccessEnabled,
+                            guestSlug: body.guestSlug,
+                            showInGuestDirectory: body.showInGuestDirectory,
+                            guestDisplayName: body.guestDisplayName,
+                            guestUrl: body.guestUrl
+                          });
+                          setGuestSlugDraft(body.guestSlug?.trim() ?? "");
+                        } catch {
+                          setGuestErr("Error en desar.");
+                        } finally {
+                          setGuestSaving(false);
+                        }
+                      })()
+                    }
+                  >
+                    {guestSaving ? "Desant…" : "Desar"}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    disabled={guestSaving || !guestCfg.guestAccessEnabled}
+                    onClick={() =>
+                      void (async () => {
+                        setGuestSaving(true);
+                        setGuestErr(null);
+                        try {
+                          const res = await fetch("/api/profile/guest", {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ regenerate_guest_slug: true })
+                          });
+                          const body = (await res.json()) as GuestProfileCfg & { error?: string };
+                          if (!res.ok) {
+                            setGuestErr(body.error ?? "Error.");
+                            return;
+                          }
+                          setGuestCfg({
+                            guestAccessEnabled: body.guestAccessEnabled,
+                            guestSlug: body.guestSlug,
+                            showInGuestDirectory: body.showInGuestDirectory,
+                            guestDisplayName: body.guestDisplayName,
+                            guestUrl: body.guestUrl
+                          });
+                          setGuestSlugDraft(body.guestSlug?.trim() ?? "");
+                        } catch {
+                          setGuestErr("Error.");
+                        } finally {
+                          setGuestSaving(false);
+                        }
+                      })()
+                    }
+                  >
+                    Nou enllaç aleatori
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-ghost"
+                    disabled={guestSaving || !guestCfg.guestUrl}
+                    onClick={() => {
+                      if (guestCfg?.guestUrl) void navigator.clipboard.writeText(guestCfg.guestUrl);
+                    }}
+                  >
+                    Copiar URL
+                  </button>
+                </div>
+                {guestCfg.guestUrl ? (
+                  <p className="modal-muted" style={{ marginTop: 12, wordBreak: "break-all", fontSize: 12 }}>
+                    {guestCfg.guestUrl}
+                  </p>
+                ) : (
+                  <p className="modal-muted" style={{ marginTop: 12, fontSize: 12 }}>
+                    Activa l’accés i desar per generar un enllaç.
+                  </p>
+                )}
+              </>
+            ) : null}
+          </div>
         ) : null}
 
         {activeTab === "collections" ? (

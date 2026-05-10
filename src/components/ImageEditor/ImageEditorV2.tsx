@@ -14,6 +14,7 @@ import {
 import type { Asset } from "@/lib/types";
 import { analyzeHistogram, applyOperationsToCanvas } from "@/lib/client/canvas-image-ops";
 import { MAX_EDIT_HISTORY_CLIENT, type EditOperation, type ExportOptions } from "@/lib/image-edit-ops";
+import { CropEditor } from "@/components/ImageEditor/CropEditor";
 
 type AdjustmentDraft = {
   brightness: number;
@@ -46,8 +47,6 @@ function draftToPreviewOp(d: AdjustmentDraft): EditOperation | null {
     sharpen: d.sharpen
   };
 }
-import { Histogram } from "@/components/ImageEditor/Histogram";
-import { CropEditor } from "@/components/ImageEditor/CropEditor";
 
 function clamp(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, n));
@@ -109,23 +108,6 @@ function estimateMb(w: number, h: number, webpQuality: number): number {
   return (Math.max(1, w) * Math.max(1, h) * 0.28 * q) / (1024 * 1024);
 }
 
-function sampleImageDataFromCanvas(canvas: HTMLCanvasElement): ImageData | null {
-  const w = canvas.width;
-  const h = canvas.height;
-  if (w === 0 || h === 0) return null;
-  const maxEdge = 200;
-  const sc = Math.min(1, maxEdge / Math.max(w, h));
-  const sw = Math.max(1, Math.round(w * sc));
-  const sh = Math.max(1, Math.round(h * sc));
-  const s = document.createElement("canvas");
-  s.width = sw;
-  s.height = sh;
-  const c = s.getContext("2d");
-  if (!c) return null;
-  c.drawImage(canvas, 0, 0, w, h, 0, 0, sw, sh);
-  return c.getImageData(0, 0, sw, sh);
-}
-
 class EditorCanvasBoundary extends Component<{ children: ReactNode }, { err: string | null }> {
   state = { err: null };
   static getDerivedStateFromError(error: Error) {
@@ -168,9 +150,8 @@ export function ImageEditorV2({ asset, onDiscard, onSave }: Props) {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [panMode, setPanMode] = useState(false);
   const [dragPan, setDragPan] = useState<{ active: boolean; sx: number; sy: number; ox: number; oy: number } | null>(null);
-  const [toolTab, setToolTab] = useState<"adjust" | "detail" | "geometry" | "export">("adjust");
+  const [toolTab, setToolTab] = useState<"adjust" | "detail" | "geometry" | "crop" | "export">("adjust");
   const [draftAdjust, setDraftAdjust] = useState<AdjustmentDraft>(INITIAL_ADJUSTMENT_DRAFT);
-  const [histData, setHistData] = useState<ImageData | null>(null);
   const [cropOpen, setCropOpen] = useState(false);
   const [cropSnapshot, setCropSnapshot] = useState<HTMLCanvasElement | null>(null);
   const [cropAspectKey, setCropAspectKey] = useState<"free" | "1" | "4:3" | "16:9" | "3:2">("free");
@@ -241,8 +222,6 @@ export function ImageEditorV2({ asset, onDiscard, onSave }: Props) {
         ctx.drawImage(out, 0, 0);
         queueMicrotask(() => setPreviewDims({ w: out.width, h: out.height }));
       }
-      const sampled = sampleImageDataFromCanvas(canvas);
-      queueMicrotask(() => setHistData(sampled));
     } catch {
       /* evita loop */
     }
@@ -504,6 +483,7 @@ export function ImageEditorV2({ asset, onDiscard, onSave }: Props) {
                   ["adjust", "Llum i color"],
                   ["detail", "Detall"],
                   ["geometry", "Geometria"],
+                  ["crop", "Retall"],
                   ["export", "Export"]
                 ] as const
               ).map(([id, label]) => (
@@ -596,7 +576,7 @@ export function ImageEditorV2({ asset, onDiscard, onSave }: Props) {
 
               {toolTab === "geometry" ? (
                 <div className="editor-v2-panel-stack">
-                  <p className="editor-v2-panel-hint">Gira la imatge o retalla amb rectangle tipus Photoshop (vores, cantonades, moure dins l’àrea).</p>
+                  <p className="editor-v2-panel-hint">Gira la imatge en increments de 90°. El retall amb rectangle està a la pestanya «Retall».</p>
                   <div className="editor-v2-btn-row editor-v2-btn-row--seg">
                     <button type="button" className="btn btn-sm" onClick={() => addOp({ type: "rotate", angle: 90 })}>
                       90°
@@ -608,6 +588,15 @@ export function ImageEditorV2({ asset, onDiscard, onSave }: Props) {
                       270°
                     </button>
                   </div>
+                </div>
+              ) : null}
+
+              {toolTab === "crop" ? (
+                <div className="editor-v2-panel-stack">
+                  <p className="editor-v2-panel-hint">
+                    Retall tipus Photoshop: rectangle amb cantonades per redimensionar, mou l’àrea dins la imatge i vores fosques fora. Fora del rectangle,
+                    arrossega per dibuixar una àrea nova.
+                  </p>
                   <div className="editor-v2-field">
                     <label htmlFor="v2-crop-aspect">Proporció del retall</label>
                     <select
@@ -624,7 +613,7 @@ export function ImageEditorV2({ asset, onDiscard, onSave }: Props) {
                     </select>
                   </div>
                   <button type="button" className="btn btn-primary editor-v2-full-btn" onClick={beginCrop}>
-                    Retallar…
+                    Obrir retall…
                   </button>
                 </div>
               ) : null}
@@ -656,11 +645,6 @@ export function ImageEditorV2({ asset, onDiscard, onSave }: Props) {
                   </div>
                 </div>
               ) : null}
-            </div>
-
-            <div className="editor-v2-histogram-block">
-              <span className="editor-v2-histogram-label">Histograma</span>
-              <Histogram imageData={histData} width={200} height={100} />
             </div>
           </aside>
         </div>

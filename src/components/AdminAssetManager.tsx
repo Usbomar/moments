@@ -128,6 +128,14 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
   const [editingLocationName, setEditingLocationName] = useState<Record<string, string>>({});
   const [addAssetByTag, setAddAssetByTag] = useState<Record<string, string>>({});
   const [addAssetByLocation, setAddAssetByLocation] = useState<Record<string, string>>({});
+  const [newCollectionName, setNewCollectionName] = useState("");
+  const [editingCollectionId, setEditingCollectionId] = useState<string | null>(null);
+  const [editingCollectionDraft, setEditingCollectionDraft] = useState("");
+  const [deleteCollectionId, setDeleteCollectionId] = useState<string | null>(null);
+  const [addPhotosForCollectionId, setAddPhotosForCollectionId] = useState<string | null>(null);
+  const [addPhotosQuery, setAddPhotosQuery] = useState("");
+  const [addPhotosSelectedIds, setAddPhotosSelectedIds] = useState<string[]>([]);
+  const [addPhotosBusy, setAddPhotosBusy] = useState(false);
   const saveTimersRef = useRef<Record<string, number>>({});
   const allColorOptions = useMemo(() => [...COLOR_PRESETS, ...customColors], [customColors]);
   const tagStats = useMemo(() => {
@@ -183,6 +191,27 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
     return map;
   }, [assets]);
   const assetById = useMemo(() => new Map(assets.map((asset) => [asset.id, asset])), [assets]);
+
+  const addPhotosTarget = useMemo(
+    () => collections.find((c) => c.id === addPhotosForCollectionId) ?? null,
+    [collections, addPhotosForCollectionId]
+  );
+
+  const addPhotosAvailableFiltered = useMemo(() => {
+    if (!addPhotosTarget) return [];
+    const member = new Set(addPhotosTarget.assetIds);
+    let list = assets.filter((a) => !member.has(a.id));
+    const q = addPhotosQuery.trim().toLowerCase();
+    if (q) {
+      list = list.filter((a) => {
+        const title = (a.title ?? "").toLowerCase();
+        const dateStr = (a.takenAt ?? "").slice(0, 10);
+        return title.includes(q) || dateStr.includes(q);
+      });
+    }
+    list.sort((a, b) => cmpText(b.takenAt ?? "", a.takenAt ?? ""));
+    return list;
+  }, [assets, addPhotosTarget, addPhotosQuery]);
 
   const sorted = useMemo(() => {
     const list = [...assets];
@@ -251,6 +280,22 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
     if (typeof window === "undefined") return;
     window.localStorage.setItem(CUSTOM_COLOR_STORAGE_KEY, JSON.stringify(customColors));
   }, [customColors]);
+
+  useEffect(() => {
+    if (addPhotosForCollectionId) {
+      setAddPhotosQuery("");
+      setAddPhotosSelectedIds([]);
+    }
+  }, [addPhotosForCollectionId]);
+
+  useEffect(() => {
+    if (!addPhotosForCollectionId) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setAddPhotosForCollectionId(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [addPhotosForCollectionId]);
 
   if (!open) return null;
 
@@ -391,6 +436,86 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
     if (!res.ok) return;
     if (onRefreshCollections) await onRefreshCollections();
   };
+
+  const handleCreateCollection = async () => {
+    const name = newCollectionName.trim();
+    if (!name) return;
+    const res = await fetch("/api/collections", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name })
+    });
+    if (!res.ok) return;
+    setNewCollectionName("");
+    await onRefreshCollections?.();
+  };
+
+  const commitRenameCollection = async () => {
+    if (!editingCollectionId) return;
+    const name = editingCollectionDraft.trim();
+    if (!name) return;
+    const res = await fetch(`/api/collections/${editingCollectionId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name })
+    });
+    if (!res.ok) return;
+    setEditingCollectionId(null);
+    await onRefreshCollections?.();
+  };
+
+  const confirmDeleteCollection = async () => {
+    if (!deleteCollectionId) return;
+    const removedId = deleteCollectionId;
+    const res = await fetch(`/api/collections/${removedId}`, { method: "DELETE" });
+    if (!res.ok) return;
+    setDeleteCollectionId(null);
+    setOpenCollectionRows((prev) => {
+      const next = { ...prev };
+      delete next[removedId];
+      return next;
+    });
+    if (addPhotosForCollectionId === removedId) setAddPhotosForCollectionId(null);
+    await onRefreshCollections?.();
+  };
+
+  const toggleAddPhotoSelected = (assetId: string) => {
+    setAddPhotosSelectedIds((prev) => (prev.includes(assetId) ? prev.filter((x) => x !== assetId) : [...prev, assetId]));
+  };
+
+  const selectAllVisibleAddPhotos = () => {
+    setAddPhotosSelectedIds(addPhotosAvailableFiltered.map((a) => a.id));
+  };
+
+  const clearAddPhotosSelection = () => setAddPhotosSelectedIds([]);
+
+  const commitAddPhotos = async () => {
+    const colId = addPhotosForCollectionId;
+    if (!colId || addPhotosSelectedIds.length === 0) return;
+    setAddPhotosBusy(true);
+    try {
+      const results = await Promise.allSettled(
+        addPhotosSelectedIds.map((assetId) =>
+          fetch(`/api/collections/${colId}/assets`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ assetId, include: true })
+          }).then((r) => {
+            if (!r.ok) throw new Error(String(r.status));
+          })
+        )
+      );
+      const failed = results.filter((r) => r.status === "rejected").length;
+      if (failed > 0) {
+        window.alert(`${failed} foto${failed === 1 ? "" : "s"} no s'han pogut afegir.`);
+      }
+      setAddPhotosSelectedIds([]);
+      await onRefreshCollections?.();
+    } finally {
+      setAddPhotosBusy(false);
+    }
+  };
+
   const openPreview = (asset: Asset, sourceAssets: Asset[]) => {
     setPreviewZoom(1);
     setPreviewAsset({
@@ -623,58 +748,152 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
         ) : null}
 
         {activeTab === "collections" ? (
-          <div className="admin-tab-panel">
+          <div className="admin-tab-panel admin-tab-panel--collections">
+            <div className="admin-collection-toolbar">
+              <input
+                type="text"
+                value={newCollectionName}
+                onChange={(e) => setNewCollectionName(e.target.value)}
+                placeholder="Nom de la col·lecció"
+                aria-label="Nom de la nova col·lecció"
+                className="admin-collection-new-input"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void handleCreateCollection();
+                }}
+              />
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => void handleCreateCollection()}>
+                Crear col·lecció
+              </button>
+            </div>
+            <p className="modal-muted admin-collection-hint">
+              Edita el nom, elimina la col·lecció o obre el selector per afegir fotos de la biblioteca que encara no hi siguin.
+            </p>
             <table className="admin-stats-table">
               <thead>
                 <tr>
                   <th>Col·lecció</th>
-                  <th>Total</th>
                   <th>Fotos</th>
+                  <th className="admin-collection-actions-col">Accions</th>
                 </tr>
               </thead>
               <tbody>
-                {collections.map((collection) => (
-                  <Fragment key={collection.id}>
-                    <tr>
-                      <td>{collection.name}</td>
-                      <td>{collection.assetIds.length}</td>
-                      <td>
-                        <button type="button" className="btn btn-sm" onClick={() => toggleCollectionRow(collection.id)}>
-                          {openCollectionRows[collection.id] ? "Amagar" : "Mostrar"}
-                        </button>
-                      </td>
-                    </tr>
-                    {openCollectionRows[collection.id] ? (
-                      <tr key={`${collection.id}-assets`} className="admin-stats-expanded-row">
-                        <td colSpan={3}>
-                          <div className="admin-linked-thumbs">
-                            {collection.assetIds.map((assetId) => {
-                              const asset = assetById.get(assetId);
-                              if (!asset) return null;
-                              const thumb = (asset.files.thumbUrl || asset.files.previewUrl || asset.files.originalUrl).trim();
-                              const included = collection.assetIds.includes(asset.id);
-                              return (
-                                <label key={`${collection.id}-${asset.id}`} className="admin-linked-thumb-item admin-linked-thumb-item--check">
-                                  <input
-                                    type="checkbox"
-                                    checked={included}
-                                    onChange={(e) => {
-                                      void toggleAssetInCollection(collection, asset.id, e.target.checked);
-                                    }}
-                                  />
-                                  <button type="button" onClick={() => openPreview(asset, collection.assetIds.map((id) => assetById.get(id)).filter((x): x is Asset => Boolean(x)))}>
-                                    {/* eslint-disable-next-line @next/next/no-img-element -- remote storage image */}
-                                    <img src={thumb} alt={asset.title} referrerPolicy="no-referrer" />
-                                  </button>
-                                </label>
-                              );
-                            })}
-                          </div>
+                {collections.map((collection) => {
+                  const isEditing = editingCollectionId === collection.id;
+                  const memberAssets = collection.assetIds.map((id) => assetById.get(id)).filter((x): x is Asset => Boolean(x));
+                  return (
+                    <Fragment key={collection.id}>
+                      <tr>
+                        <td>
+                          {isEditing ? (
+                            <div className="admin-collection-name-edit">
+                              <input
+                                type="text"
+                                value={editingCollectionDraft}
+                                onChange={(e) => setEditingCollectionDraft(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") void commitRenameCollection();
+                                  if (e.key === "Escape") setEditingCollectionId(null);
+                                }}
+                                aria-label="Nou nom de la col·lecció"
+                                autoFocus
+                              />
+                              <button type="button" className="btn btn-icon btn-sm" title="Desar" aria-label="Desar nom" onClick={() => void commitRenameCollection()}>
+                                <span aria-hidden>✓</span>
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-icon btn-sm"
+                                title="Cancel·lar"
+                                aria-label="Cancel·lar"
+                                onClick={() => setEditingCollectionId(null)}
+                              >
+                                <span aria-hidden>×</span>
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="admin-collection-name-row">
+                              <span className="admin-collection-name-text">{collection.name}</span>
+                              <button
+                                type="button"
+                                className="btn btn-icon btn-sm"
+                                title="Renombrar"
+                                aria-label={`Renombrar ${collection.name}`}
+                                onClick={() => {
+                                  setEditingCollectionId(collection.id);
+                                  setEditingCollectionDraft(collection.name);
+                                }}
+                              >
+                                <span aria-hidden>✎</span>
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                        <td>{collection.assetIds.length}</td>
+                        <td className="admin-collection-actions-cell">
+                          <button type="button" className="btn btn-sm" onClick={() => toggleCollectionRow(collection.id)}>
+                            {openCollectionRows[collection.id] ? "Amagar fotos" : "Mostrar fotos"}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-primary"
+                            onClick={() => setAddPhotosForCollectionId(collection.id)}
+                          >
+                            Afegir fotos…
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-sm danger"
+                            onClick={() => setDeleteCollectionId(collection.id)}
+                          >
+                            Eliminar
+                          </button>
                         </td>
                       </tr>
-                    ) : null}
-                  </Fragment>
-                ))}
+                      {openCollectionRows[collection.id] ? (
+                        <tr key={`${collection.id}-assets`} className="admin-stats-expanded-row">
+                          <td colSpan={3}>
+                            <p className="admin-collection-members-label">Fotos d&apos;aquesta col·lecció (desmarca per treure-les)</p>
+                            {memberAssets.length ? (
+                              <div className="admin-linked-thumbs">
+                                {collection.assetIds.map((assetId) => {
+                                  const asset = assetById.get(assetId);
+                                  if (!asset) return null;
+                                  const thumb = (asset.files.thumbUrl || asset.files.previewUrl || asset.files.originalUrl).trim();
+                                  const included = collection.assetIds.includes(asset.id);
+                                  return (
+                                    <label key={`${collection.id}-${asset.id}`} className="admin-linked-thumb-item admin-linked-thumb-item--check">
+                                      <input
+                                        type="checkbox"
+                                        checked={included}
+                                        onChange={(e) => {
+                                          void toggleAssetInCollection(collection, asset.id, e.target.checked);
+                                        }}
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          openPreview(
+                                            asset,
+                                            collection.assetIds.map((id) => assetById.get(id)).filter((x): x is Asset => Boolean(x))
+                                          )
+                                        }
+                                      >
+                                        {/* eslint-disable-next-line @next/next/no-img-element -- remote storage image */}
+                                        <img src={thumb} alt={asset.title} referrerPolicy="no-referrer" />
+                                      </button>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <p className="modal-muted">Encara no hi ha fotos. Utilitza «Afegir fotos…».</p>
+                            )}
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -950,6 +1169,115 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
                 onEditImage(previewCurrent);
               }}>
                 Editar imatge
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {deleteCollectionId ? (
+        <div
+          className="modal-overlay admin-sub-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Confirmar eliminació de la col·lecció"
+          onClick={() => setDeleteCollectionId(null)}
+        >
+          <div className="modal-content admin-sub-dialog" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
+            <p>Vols eliminar aquesta col·lecció? Les fotos no s&apos;eliminen de la biblioteca.</p>
+            <div className="modal-actions">
+              <button type="button" onClick={() => setDeleteCollectionId(null)}>
+                Cancel·lar
+              </button>
+              <button type="button" className="danger" onClick={() => void confirmDeleteCollection()}>
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {addPhotosForCollectionId && addPhotosTarget ? (
+        <div
+          className="modal-overlay admin-sub-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="admin-add-photos-title"
+          onClick={() => setAddPhotosForCollectionId(null)}
+        >
+          <div className="modal-content admin-add-photos-dialog" onClick={(e) => e.stopPropagation()}>
+            <header className="admin-add-photos-head">
+              <h3 id="admin-add-photos-title">Afegir fotos a «{addPhotosTarget.name}»</h3>
+              <button type="button" className="btn btn-ghost btn-sm" aria-label="Tancar" onClick={() => setAddPhotosForCollectionId(null)}>
+                ×
+              </button>
+            </header>
+            <p className="modal-muted admin-add-photos-sub">
+              Cerca per nom o data (AAAA-MM-DD). Selecciona una o més fotos que encara no siguin en aquesta col·lecció.
+            </p>
+            <div className="admin-add-photos-toolbar">
+              <input
+                type="search"
+                className="admin-add-photos-search"
+                value={addPhotosQuery}
+                onChange={(e) => setAddPhotosQuery(e.target.value)}
+                placeholder="Cercar…"
+                aria-label="Cercar fotos per nom o data"
+              />
+              <button type="button" className="btn btn-sm" onClick={selectAllVisibleAddPhotos} disabled={addPhotosAvailableFiltered.length === 0}>
+                Seleccionar totes les visibles
+              </button>
+              <button type="button" className="btn btn-sm" onClick={clearAddPhotosSelection} disabled={addPhotosSelectedIds.length === 0}>
+                Netejar selecció
+              </button>
+            </div>
+            <div className="admin-picker-scroll">
+              {addPhotosAvailableFiltered.length ? (
+                <div className="admin-picker-grid">
+                  {addPhotosAvailableFiltered.map((asset) => {
+                    const thumb = (asset.files.thumbUrl || asset.files.previewUrl || asset.files.originalUrl).trim();
+                    const sel = addPhotosSelectedIds.includes(asset.id);
+                    return (
+                      <button
+                        key={asset.id}
+                        type="button"
+                        aria-pressed={sel}
+                        className={`admin-picker-tile${sel ? " admin-picker-tile--selected" : ""}`}
+                        onClick={() => toggleAddPhotoSelected(asset.id)}
+                      >
+                        <span className="admin-picker-tile-check" aria-hidden>
+                          {sel ? "✓" : ""}
+                        </span>
+                        {thumb ? (
+                          // eslint-disable-next-line @next/next/no-img-element -- remote storage image
+                          <img src={thumb} alt="" className="admin-picker-tile-img" referrerPolicy="no-referrer" />
+                        ) : (
+                          <span className="admin-picker-tile-placeholder">Sense miniatura</span>
+                        )}
+                        <span className="admin-picker-tile-title">{asset.title}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="modal-muted admin-picker-empty">
+                  {assets.length === 0
+                    ? "No hi ha fotos a la biblioteca."
+                    : "Cap foto coincideix o totes ja són en aquesta col·lecció."}
+                </p>
+              )}
+            </div>
+            <div className="admin-add-photos-footer">
+              <button type="button" className="btn btn-sm" onClick={() => setAddPhotosForCollectionId(null)}>
+                Cancel·lar
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm btn-primary"
+                disabled={addPhotosSelectedIds.length === 0 || addPhotosBusy}
+                onClick={() => void commitAddPhotos()}
+              >
+                {addPhotosBusy ? "Afegint…" : `Afegir ${addPhotosSelectedIds.length} foto${addPhotosSelectedIds.length === 1 ? "" : "s"}`}
               </button>
             </div>
           </div>

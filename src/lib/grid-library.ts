@@ -4,6 +4,18 @@ export type GridSortOrder = "taken_desc" | "taken_asc";
 
 export type GridDistribution = "uniform" | "featured";
 
+/** Props per formularis de preferències de graella (popover i Configuració). */
+export type LibraryGridPreferencesBinder = {
+  distribution: GridDistribution;
+  onDistributionChange: (v: GridDistribution) => void;
+  sortOrder: GridSortOrder;
+  onSortOrderChange: (v: GridSortOrder) => void;
+  tileMinPx: number;
+  onTileMinPxChange: (v: number) => void;
+  tileImageHoverPercent: number;
+  onTileImageHoverPercentChange: (v: number) => void;
+};
+
 /** Presets tipus «Fotos»: només estableixen la mida mínima en px de la miniatura (la graella és auto-fill). */
 export type GridDensityPreset = "compact" | "balanced" | "prominent";
 

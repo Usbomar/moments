@@ -61,9 +61,9 @@ export function reorderPhotoColumns(order: PhotoColumnKey[], dragKey: PhotoColum
   return next;
 }
 
-export type AdminTabId = "photos" | "guest" | "collections" | "tags" | "locations" | "colors";
+export type AdminTabId = "photos" | "libraryGrid" | "guest" | "collections" | "tags" | "locations" | "colors";
 
-export const DEFAULT_TAB_ORDER: AdminTabId[] = ["photos", "guest", "collections", "tags", "locations", "colors"];
+export const DEFAULT_TAB_ORDER: AdminTabId[] = ["photos", "libraryGrid", "guest", "collections", "tags", "locations", "colors"];
 
 const ALL_TABS = new Set<string>(DEFAULT_TAB_ORDER);
 

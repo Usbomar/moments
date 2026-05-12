@@ -693,6 +693,16 @@ function HomeContent() {
           await refreshAdminCollections();
         }}
         onRefreshCollections={refreshAdminCollections}
+        libraryGridPrefs={{
+          distribution: gridDistribution,
+          onDistributionChange: setGridDistribution,
+          sortOrder: gridSortOrder,
+          onSortOrderChange: setGridSortOrder,
+          tileMinPx,
+          onTileMinPxChange: (v) => setTileMinPx(clampTileMinPx(v)),
+          tileImageHoverPercent,
+          onTileImageHoverPercentChange: (v) => setTileImageHoverPercent(normalizeTileImageHoverPercent(v))
+        }}
       />
     </>
   );

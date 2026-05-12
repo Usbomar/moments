@@ -3,8 +3,10 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { Asset } from "@/lib/types";
+import type { LibraryGridPreferencesBinder } from "@/lib/grid-library";
 import type { AppCollection } from "@/lib/collections";
 import { AdminAssetPickerModal } from "@/components/AdminAssetPickerModal";
+import { LibraryGridPreferencesPanel } from "@/components/LibraryGridPreferencesPanel";
 import { useAdminAssetStats, type SortState, type SortKey } from "@/components/admin/useAdminAssetStats";
 import {
   COLOR_PRESETS,
@@ -30,6 +32,7 @@ import {
 
 const TAB_LABELS: Record<AdminTabId, string> = {
   photos: "Fotos",
+  libraryGrid: "Graella",
   guest: "Convidat",
   collections: "Col·leccions",
   tags: "TAGS",
@@ -66,6 +69,7 @@ type Props = {
   onDelete: (asset: Asset) => Promise<void>;
   onQuickUpdate: (asset: Asset, patch: Partial<Asset>) => Promise<void>;
   onRefreshCollections?: () => Promise<void>;
+  libraryGridPrefs: LibraryGridPreferencesBinder;
 };
 
 type DraftPatch = Partial<Pick<Asset, "title" | "takenAt" | "favorite" | "colorHue" | "location" | "hiddenFromGuests">>;
@@ -78,7 +82,18 @@ type GuestProfileCfg = {
   guestUrl: string | null;
 };
 
-export function AdminAssetManager({ open, assets, collections, onClose, onEdit, onEditImage, onDelete, onQuickUpdate, onRefreshCollections }: Props) {
+export function AdminAssetManager({
+  open,
+  assets,
+  collections,
+  onClose,
+  onEdit,
+  onEditImage,
+  onDelete,
+  onQuickUpdate,
+  onRefreshCollections,
+  libraryGridPrefs
+}: Props) {
   const [activeTab, setActiveTab] = useState<AdminTabId>("photos");
   const [sort, setSort] = useState<SortState[]>([{ key: "takenAt", dir: "desc" }]);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -1380,6 +1395,16 @@ export function AdminAssetManager({ open, assets, collections, onClose, onEdit, 
                 })}
               </tbody>
             </table>
+          </div>
+        ) : null}
+
+        {activeTab === "libraryGrid" ? (
+          <div className="admin-tab-panel">
+            <p className="modal-muted" style={{ marginBottom: 14, maxWidth: 520 }}>
+              Preferències de la vista en graella de la biblioteca (i les mateixes miniatures a cronologia, mapa i colors). Es desen
+              automàticament al navegador.
+            </p>
+            <LibraryGridPreferencesPanel variant="settings" {...libraryGridPrefs} />
           </div>
         ) : null}
 

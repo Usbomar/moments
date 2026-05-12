@@ -80,32 +80,36 @@ function LibraryTile({
   if (!thumbUrl || imgBroken) {
     return (
       <button type="button" className={tileClass} onClick={handleClick}>
-        <span className="tile-crop">
-          <div style={placeholderStyle}>
-            <span style={{ fontWeight: 600, color: "var(--text, #151719)" }}>{imgBroken ? "Could not load" : "No image"}</span>
-            <span style={{ wordBreak: "break-word", maxWidth: "100%" }}>{asset.title}</span>
-          </div>
+        <span className="tile-surface">
+          <span className="tile-crop">
+            <div style={placeholderStyle}>
+              <span style={{ fontWeight: 600, color: "var(--text, #151719)" }}>{imgBroken ? "Could not load" : "No image"}</span>
+              <span style={{ wordBreak: "break-word", maxWidth: "100%" }}>{asset.title}</span>
+            </div>
+          </span>
+          {asset.favorite ? <span className="badge">Favorite</span> : null}
         </span>
-        {asset.favorite ? <span className="badge">Favorite</span> : null}
       </button>
     );
   }
 
   return (
     <button type="button" className={tileClass} onClick={handleClick}>
-      <span className="tile-crop">
-        <LazyImage
-          fill
-          src={thumbUrl}
-          alt={asset.title}
-          referrerPolicy="no-referrer"
-          onError={() => setImgBroken(true)}
-          style={{
-            transition: "opacity 180ms ease"
-          }}
-        />
+      <span className="tile-surface">
+        <span className="tile-crop">
+          <LazyImage
+            fill
+            src={thumbUrl}
+            alt={asset.title}
+            referrerPolicy="no-referrer"
+            onError={() => setImgBroken(true)}
+            style={{
+              transition: "opacity 180ms ease"
+            }}
+          />
+        </span>
+        {asset.favorite ? <span className="badge">Favorite</span> : null}
       </span>
-      {asset.favorite ? <span className="badge">Favorite</span> : null}
     </button>
   );
 }

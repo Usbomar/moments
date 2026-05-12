@@ -20,9 +20,11 @@ import type { AppCollection } from "@/lib/collections";
 import { AdminAssetManager } from "@/components/AdminAssetManager";
 import { GridOptionsPopover } from "@/components/GridOptionsPopover";
 import {
+  clampTileMinPx,
+  GRID_DENSITY_PRESET_TILE_MIN,
   normalizeFeaturedTileSize,
+  normalizeTileImageHoverPercent,
   sortAssetsForGrid,
-  type FeaturedTileSize,
   type GridDistribution,
   type GridSortOrder
 } from "@/lib/grid-library";
@@ -77,6 +79,9 @@ function TabLoadingHint({ label }: { label: string }) {
 
 const GRID_DIST_STORAGE = "moments-grid-distribution";
 const GRID_SORT_STORAGE = "moments-grid-sort";
+const GRID_TILE_MIN_STORAGE = "moments-grid-tile-min-px";
+const GRID_TILE_IMG_HOVER_STORAGE = "moments-grid-tile-img-hover-pct";
+/** Llegit només per migració si falta `moments-grid-tile-min-px`. */
 const GRID_FEATURED_TILE_STORAGE = "moments-grid-featured-tile-size";
 
 function HomeContent() {
@@ -85,7 +90,8 @@ function HomeContent() {
   const searchRef = useRef<HTMLInputElement>(null);
   const [view, setView] = useState<GalleryView>("masonry");
   const [gridDistribution, setGridDistribution] = useState<GridDistribution>("uniform");
-  const [featuredTileSize, setFeaturedTileSize] = useState<FeaturedTileSize>("balanced");
+  const [tileMinPx, setTileMinPx] = useState(() => GRID_DENSITY_PRESET_TILE_MIN.balanced);
+  const [tileImageHoverPercent, setTileImageHoverPercent] = useState(100);
   const [gridSortOrder, setGridSortOrder] = useState<GridSortOrder>("taken_desc");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
@@ -230,10 +236,21 @@ function HomeContent() {
     try {
       const d = window.localStorage.getItem(GRID_DIST_STORAGE) as GridDistribution | null;
       const s = window.localStorage.getItem(GRID_SORT_STORAGE) as GridSortOrder | null;
-      const fts = window.localStorage.getItem(GRID_FEATURED_TILE_STORAGE);
+      const pxRaw = window.localStorage.getItem(GRID_TILE_MIN_STORAGE);
+      const imgRaw = window.localStorage.getItem(GRID_TILE_IMG_HOVER_STORAGE);
       if (d === "uniform" || d === "featured") setGridDistribution(d);
       if (s === "taken_desc" || s === "taken_asc") setGridSortOrder(s);
-      setFeaturedTileSize(normalizeFeaturedTileSize(fts));
+      if (pxRaw != null && pxRaw.trim() !== "") {
+        const n = Number.parseInt(pxRaw, 10);
+        if (Number.isFinite(n)) setTileMinPx(clampTileMinPx(n));
+      } else {
+        const fts = window.localStorage.getItem(GRID_FEATURED_TILE_STORAGE);
+        const preset = normalizeFeaturedTileSize(fts);
+        setTileMinPx(GRID_DENSITY_PRESET_TILE_MIN[preset]);
+      }
+      if (imgRaw != null && imgRaw.trim() !== "") {
+        setTileImageHoverPercent(normalizeTileImageHoverPercent(imgRaw));
+      }
     } catch {
       /* ignore */
     }
@@ -243,11 +260,12 @@ function HomeContent() {
     try {
       window.localStorage.setItem(GRID_DIST_STORAGE, gridDistribution);
       window.localStorage.setItem(GRID_SORT_STORAGE, gridSortOrder);
-      window.localStorage.setItem(GRID_FEATURED_TILE_STORAGE, featuredTileSize);
+      window.localStorage.setItem(GRID_TILE_MIN_STORAGE, String(tileMinPx));
+      window.localStorage.setItem(GRID_TILE_IMG_HOVER_STORAGE, String(tileImageHoverPercent));
     } catch {
       /* ignore */
     }
-  }, [gridDistribution, gridSortOrder, featuredTileSize]);
+  }, [gridDistribution, gridSortOrder, tileMinPx, tileImageHoverPercent]);
 
   useEffect(() => {
     if (supabaseConfigured !== true) return;
@@ -470,8 +488,10 @@ function HomeContent() {
               onDistributionChange={setGridDistribution}
               sortOrder={gridSortOrder}
               onSortOrderChange={setGridSortOrder}
-              featuredTileSize={featuredTileSize}
-              onFeaturedTileSizeChange={setFeaturedTileSize}
+              tileMinPx={tileMinPx}
+              onTileMinPxChange={(v) => setTileMinPx(clampTileMinPx(v))}
+              tileImageHoverPercent={tileImageHoverPercent}
+              onTileImageHoverPercentChange={(v) => setTileImageHoverPercent(normalizeTileImageHoverPercent(v))}
             />
           ) : undefined
         }
@@ -506,6 +526,9 @@ function HomeContent() {
                   {view === "timeline" ? (
                     <TimelineView
                       items={viewItems}
+                      distribution={gridDistribution}
+                      tileMinPx={tileMinPx}
+                      imageHoverPercent={tileImageHoverPercent}
                       onOpenModal={(asset) => setSelectedAsset(asset)}
                       onOpenViewer={openViewer}
                     />
@@ -514,7 +537,8 @@ function HomeContent() {
                     <LibraryGrid
                       items={gridCatalogItems}
                       distribution={gridDistribution}
-                      featuredTileSize={featuredTileSize}
+                      tileMinPx={tileMinPx}
+                      imageHoverPercent={tileImageHoverPercent}
                       onOpenModal={(asset) => setSelectedAsset(asset)}
                       onOpenViewer={openViewer}
                     />
@@ -522,6 +546,9 @@ function HomeContent() {
                   {view === "colors" ? (
                     <ColorView
                       items={viewItems}
+                      distribution={gridDistribution}
+                      tileMinPx={tileMinPx}
+                      imageHoverPercent={tileImageHoverPercent}
                       onEditPhoto={(asset) => setSelectedAsset(asset)}
                       onOpenViewer={openViewer}
                     />
@@ -567,6 +594,9 @@ function HomeContent() {
             <ViewErrorBoundary label="Mapa">
               <MapView
                 items={library}
+                distribution={gridDistribution}
+                tileMinPx={tileMinPx}
+                imageHoverPercent={tileImageHoverPercent}
                 onEditPhoto={(asset) => setSelectedAsset(asset)}
                 onOpenViewer={openViewer}
               />

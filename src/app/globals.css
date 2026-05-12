@@ -100,41 +100,28 @@ button.active {
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(var(--grid-tile-min, 160px), 1fr));
+  gap: var(--grid-gap, 10px);
+  overflow: visible;
 }
 
 .grid--featured {
   grid-auto-flow: dense;
 }
 
-/* Preferides destacades: nombre de columnes de base (la rajola destacada segueix span 2×2). */
-.grid--featured-balanced {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.grid--featured-compact {
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-}
-
-.grid--featured-prominent {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-@media (max-width: 639px) {
-  .grid--featured-balanced,
-  .grid--featured-compact,
-  .grid--featured-prominent {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
 .tile {
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   border-radius: 0;
   aspect-ratio: 1 / 1;
   cursor: pointer;
+  z-index: 0;
+  transform: scale(1);
+  transform-origin: center center;
+  transition:
+    transform 200ms ease,
+    box-shadow 200ms ease;
+  box-shadow: none;
 }
 
 .tile--featured {
@@ -142,23 +129,47 @@ button.active {
   grid-row: span 2;
 }
 
-.tile img {
+.tile-crop {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.tile:hover {
+  z-index: 3;
+  transform: scale(1.15);
+  box-shadow: 0 14px 34px rgba(8, 12, 18, 0.26);
+}
+
+.tile:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.tile:focus-visible {
+  outline: 2px solid var(--accent, #2563eb);
+  outline-offset: 3px;
+}
+
+.tile-crop img {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 150ms ease;
+  transition: transform 200ms ease;
 }
 
-.tile:hover img {
-  transform: scale(1.05);
+.tile:hover .tile-crop img {
+  transform: scale(var(--tile-img-hover-scale, 1));
 }
 
 .badge {
   position: absolute;
   right: 8px;
   top: 8px;
+  z-index: 2;
   font-size: 12px;
   background: rgba(255, 255, 255, 0.9);
   border-radius: 0;
@@ -1631,7 +1642,7 @@ button.danger {
   top: calc(100% + 6px);
   left: 0;
   z-index: 140;
-  min-width: 220px;
+  min-width: 260px;
   padding: 12px 14px;
   background: var(--bg-primary);
   border: 1px solid var(--border);
@@ -1683,6 +1694,57 @@ button.danger {
 
 .grid-options-row input {
   accent-color: var(--accent, #2563eb);
+}
+
+.grid-options-size-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.grid-options-size-row input[type="number"] {
+  width: 4.75rem;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.grid-options-preset-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.grid-options-preset-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.grid-options-preset-btn:hover {
+  background: color-mix(in srgb, var(--bg-secondary) 88%, var(--text-primary));
+}
+
+.grid-options-preset-btn.is-active {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border-dark));
+  background: color-mix(in srgb, var(--accent-light) 45%, var(--bg-secondary));
+}
+
+.grid-options-muted {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  line-height: 1.35;
+  margin-top: 2px;
 }
 
 .view-selector-compact {

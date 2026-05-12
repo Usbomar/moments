@@ -4,14 +4,18 @@ import { useMemo } from "react";
 import { groupByMonth } from "@/lib/grouping";
 import type { Asset } from "@/lib/types";
 import { LibraryGrid } from "@/components/library-grid";
+import type { GridDistribution } from "@/lib/grid-library";
 
 interface Props {
   items: Asset[];
   onOpenViewer?: (asset: Asset, contextItems: Asset[]) => void;
   onOpenModal?: (asset: Asset) => void;
+  distribution?: GridDistribution;
+  tileMinPx?: number;
+  imageHoverPercent?: number;
 }
 
-export function TimelineView({ items, onOpenModal, onOpenViewer }: Props) {
+export function TimelineView({ items, onOpenModal, onOpenViewer, distribution = "uniform", tileMinPx, imageHoverPercent }: Props) {
   const { groups, months, flatOrdered } = useMemo(() => {
     const g = groupByMonth(items);
     const mo = Object.keys(g).sort((a, b) => b.localeCompare(a));
@@ -30,6 +34,9 @@ export function TimelineView({ items, onOpenModal, onOpenViewer }: Props) {
           <h3>{toLabel(month)}</h3>
           <LibraryGrid
             items={groups[month]}
+            distribution={distribution}
+            tileMinPx={tileMinPx}
+            imageHoverPercent={imageHoverPercent}
             onOpenModal={onOpenModal}
             onOpenViewer={onOpenViewer ? (a) => onOpenViewer(a, flatOrdered) : undefined}
           />

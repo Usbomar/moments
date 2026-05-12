@@ -3,11 +3,15 @@
 import { useMemo, useState } from "react";
 import type { Asset } from "@/lib/types";
 import { LibraryGrid } from "@/components/library-grid";
+import type { GridDistribution } from "@/lib/grid-library";
 
 interface Props {
   items: Asset[];
   onOpenViewer: (asset: Asset, contextItems: Asset[]) => void;
   onEditPhoto: (asset: Asset) => void;
+  distribution?: GridDistribution;
+  tileMinPx?: number;
+  imageHoverPercent?: number;
 }
 
 interface ColorBucket {
@@ -37,7 +41,7 @@ function buildBuckets(items: Asset[]): ColorBucket[] {
   return Array.from(buckets.values()).sort((a, b) => a.hue - b.hue);
 }
 
-export function ColorView({ items, onOpenViewer, onEditPhoto }: Props) {
+export function ColorView({ items, onOpenViewer, onEditPhoto, distribution = "uniform", tileMinPx, imageHoverPercent }: Props) {
   const buckets = useMemo(() => buildBuckets(items), [items]);
   const [activeHue, setActiveHue] = useState<number | null>(null);
 
@@ -95,7 +99,14 @@ export function ColorView({ items, onOpenViewer, onEditPhoto }: Props) {
         </p>
       ) : null}
 
-      <LibraryGrid items={visible} onOpenModal={onEditPhoto} onOpenViewer={onOpenViewer} />
+      <LibraryGrid
+        items={visible}
+        distribution={distribution}
+        tileMinPx={tileMinPx}
+        imageHoverPercent={imageHoverPercent}
+        onOpenModal={onEditPhoto}
+        onOpenViewer={onOpenViewer}
+      />
     </div>
   );
 }

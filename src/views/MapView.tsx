@@ -6,11 +6,15 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { Asset } from "@/lib/types";
 import { LibraryGrid } from "@/components/library-grid";
+import type { GridDistribution } from "@/lib/grid-library";
 
 interface Props {
   items: Asset[];
   onOpenViewer: (asset: Asset, contextItems: Asset[]) => void;
   onEditPhoto: (asset: Asset) => void;
+  distribution?: GridDistribution;
+  tileMinPx?: number;
+  imageHoverPercent?: number;
 }
 
 interface Cluster {
@@ -90,7 +94,7 @@ function buildClusterPopupContent(cluster: Cluster, onOpen: (a: Asset) => void):
   return wrap;
 }
 
-export function MapView({ items, onOpenViewer, onEditPhoto }: Props) {
+export function MapView({ items, onOpenViewer, onEditPhoto, distribution = "uniform", tileMinPx, imageHoverPercent }: Props) {
   const clusters = useMemo(() => clusterByArea(items), [items]);
   const [selectedCluster, setSelectedCluster] = useState<Cluster | null>(null);
   const [layerMode, setLayerMode] = useState<"markers" | "heatmap">("markers");
@@ -187,6 +191,9 @@ export function MapView({ items, onOpenViewer, onEditPhoto }: Props) {
           </h3>
           <LibraryGrid
             items={activeCluster.items}
+            distribution={distribution}
+            tileMinPx={tileMinPx}
+            imageHoverPercent={imageHoverPercent}
             onOpenModal={onEditPhoto}
             onOpenViewer={onOpenViewer}
           />

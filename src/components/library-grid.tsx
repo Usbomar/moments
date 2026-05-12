@@ -4,14 +4,23 @@ import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import type { Asset } from "@/lib/types";
 import { LazyImage } from "@/components/LazyImage";
-import { assignFeaturedHighlights, type FeaturedTileSize, type GridDistribution } from "@/lib/grid-library";
+import {
+  assignFeaturedHighlights,
+  clampTileMinPx,
+  gridGapForTileMin,
+  GRID_TILE_MIN_PX_DEFAULT,
+  normalizeTileImageHoverPercent,
+  type GridDistribution
+} from "@/lib/grid-library";
 
 interface Props {
   items: Asset[];
   /** Només lectura Quadrícula: rajoles grans només per preferides (patró per blocs). */
   distribution?: GridDistribution;
-  /** Només amb `distribution="featured"`: densitat de la graella i mida relativa de la rajola destacada. */
-  featuredTileSize?: FeaturedTileSize;
+  /** Mida mínima de carril en px (`auto-fill` + `minmax`). Per defecte 160. */
+  tileMinPx?: number;
+  /** Zoom addicional de la imatge en hover; 100 = cap (només l’efecte de la rajola). */
+  imageHoverPercent?: number;
   /** Clic al thumbnail: obre el visor a pantalla completa (prioritat sobre onOpenModal). */
   onOpenViewer?: (asset: Asset, contextItems: Asset[]) => void;
   /** Opcional: només si no hi ha onOpenViewer (p. ex. eines internes). */
@@ -71,10 +80,12 @@ function LibraryTile({
   if (!thumbUrl || imgBroken) {
     return (
       <button type="button" className={tileClass} onClick={handleClick}>
-        <div style={placeholderStyle}>
-          <span style={{ fontWeight: 600, color: "var(--text, #151719)" }}>{imgBroken ? "Could not load" : "No image"}</span>
-          <span style={{ wordBreak: "break-word", maxWidth: "100%" }}>{asset.title}</span>
-        </div>
+        <span className="tile-crop">
+          <div style={placeholderStyle}>
+            <span style={{ fontWeight: 600, color: "var(--text, #151719)" }}>{imgBroken ? "Could not load" : "No image"}</span>
+            <span style={{ wordBreak: "break-word", maxWidth: "100%" }}>{asset.title}</span>
+          </div>
+        </span>
         {asset.favorite ? <span className="badge">Favorite</span> : null}
       </button>
     );
@@ -82,16 +93,18 @@ function LibraryTile({
 
   return (
     <button type="button" className={tileClass} onClick={handleClick}>
-      <LazyImage
-        fill
-        src={thumbUrl}
-        alt={asset.title}
-        referrerPolicy="no-referrer"
-        onError={() => setImgBroken(true)}
-        style={{
-          transition: "opacity 180ms ease"
-        }}
-      />
+      <span className="tile-crop">
+        <LazyImage
+          fill
+          src={thumbUrl}
+          alt={asset.title}
+          referrerPolicy="no-referrer"
+          onError={() => setImgBroken(true)}
+          style={{
+            transition: "opacity 180ms ease"
+          }}
+        />
+      </span>
       {asset.favorite ? <span className="badge">Favorite</span> : null}
     </button>
   );
@@ -101,30 +114,36 @@ function LibraryTile({
 export function LibraryGrid({
   items,
   distribution = "uniform",
-  featuredTileSize = "balanced",
+  tileMinPx: tileMinPxProp,
+  imageHoverPercent: imageHoverPercentProp,
   onOpen,
   onOpenModal,
   onOpenViewer
 }: Props) {
+  const tileMinPx = clampTileMinPx(tileMinPxProp ?? GRID_TILE_MIN_PX_DEFAULT);
+  const gapPx = gridGapForTileMin(tileMinPx);
+  const imgHover = normalizeTileImageHoverPercent(imageHoverPercentProp ?? 100);
+  const imgScale = imgHover / 100;
+
   const featuredFlags = useMemo(
     () => (distribution === "featured" ? assignFeaturedHighlights(items) : items.map(() => false)),
     [items, distribution]
   );
 
-  const featuredSizeClass =
-    distribution === "featured"
-      ? featuredTileSize === "compact"
-        ? "grid--featured-compact"
-        : featuredTileSize === "prominent"
-          ? "grid--featured-prominent"
-          : "grid--featured-balanced"
-      : "";
+  const gridClass = distribution === "featured" ? "grid grid--featured" : "grid";
 
-  const gridClass =
-    distribution === "featured" ? ["grid", "grid--featured", featuredSizeClass].filter(Boolean).join(" ") : "grid";
+  const gridStyle = useMemo(
+    () =>
+      ({
+        ["--grid-tile-min" as string]: `${tileMinPx}px`,
+        ["--grid-gap" as string]: `${gapPx}px`,
+        ["--tile-img-hover-scale" as string]: String(imgScale)
+      }) as CSSProperties,
+    [tileMinPx, gapPx, imgScale]
+  );
 
   return (
-    <div className={gridClass}>
+    <div className={gridClass} style={gridStyle}>
       {items.map((asset, index) => (
         <LibraryTile
           key={`${asset.id}:${asset.files.thumbUrl ?? ""}`}

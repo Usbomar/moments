@@ -2,19 +2,22 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Asset } from "@/lib/types";
+import { ViewerFavoriteButton } from "@/components/ViewerFavoriteButton";
 
 interface Props {
   items: Asset[];
   onEditPhoto: (asset: Asset) => void;
   /** Obre el visor de pantalla completa amb aquest asset. */
   onOpenViewer?: (asset: Asset, contextItems: Asset[]) => void;
+  onFavoriteToggle?: (asset: Asset, favorite: boolean) => void | Promise<void>;
 }
 
-export function SliderView({ items, onEditPhoto, onOpenViewer }: Props) {
+export function SliderView({ items, onEditPhoto, onOpenViewer, onFavoriteToggle }: Props) {
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [speedMs, setSpeedMs] = useState(2400);
   const [fullscreen, setFullscreen] = useState(true);
+  const [favBusy, setFavBusy] = useState(false);
   const itemsKeyRef = useRef<string>("");
 
   const itemsKey = useMemo(() => items.map((item) => item.id).join("|"), [items]);
@@ -100,6 +103,17 @@ export function SliderView({ items, onEditPhoto, onOpenViewer }: Props) {
           <button type="button" className={btnClass} onClick={() => setIndex((prev) => (prev + 1) % items.length)}>
             Següent
           </button>
+          <ViewerFavoriteButton
+            favorite={!!current.favorite}
+            disabled={!onFavoriteToggle}
+            busy={favBusy}
+            onClick={() => {
+              if (!onFavoriteToggle) return;
+              const next = !current.favorite;
+              setFavBusy(true);
+              void Promise.resolve(onFavoriteToggle(current, next)).finally(() => setFavBusy(false));
+            }}
+          />
           {onOpenViewer ? (
             <button type="button" className={btnClass} onClick={() => onOpenViewer(current, items)}>
               Presentació

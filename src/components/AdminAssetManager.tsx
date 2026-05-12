@@ -7,6 +7,7 @@ import type { LibraryGridPreferencesBinder } from "@/lib/grid-library";
 import type { AppCollection } from "@/lib/collections";
 import { AdminAssetPickerModal } from "@/components/AdminAssetPickerModal";
 import { LibraryGridPreferencesPanel } from "@/components/LibraryGridPreferencesPanel";
+import { ViewerFavoriteButton } from "@/components/ViewerFavoriteButton";
 import { useAdminAssetStats, type SortState, type SortKey } from "@/components/admin/useAdminAssetStats";
 import {
   COLOR_PRESETS,
@@ -106,6 +107,7 @@ export function AdminAssetManager({
   const [newColorName, setNewColorName] = useState("");
   const [previewAsset, setPreviewAsset] = useState<{ assetId: string; sourceIds: string[] } | null>(null);
   const [previewZoom, setPreviewZoom] = useState<1 | 2>(1);
+  const [previewFavBusy, setPreviewFavBusy] = useState(false);
   const [editingColorHue, setEditingColorHue] = useState<number | null>(null);
   const [editingColorName, setEditingColorName] = useState("");
   const [openTagRows, setOpenTagRows] = useState<Record<string, boolean>>({});
@@ -1499,6 +1501,15 @@ export function AdminAssetManager({
               </button>
             </div>
             <div className="viewer-toolbar" role="toolbar" aria-label="Accions de la foto">
+              <ViewerFavoriteButton
+                favorite={!!previewCurrent.favorite}
+                busy={previewFavBusy}
+                onClick={() => {
+                  const next = !previewCurrent.favorite;
+                  setPreviewFavBusy(true);
+                  void onQuickUpdate(previewCurrent, { favorite: next }).finally(() => setPreviewFavBusy(false));
+                }}
+              />
               <button type="button" className="viewer-toolbar-btn viewer-toolbar-btn--primary" onClick={() => {
                 setPreviewAsset(null);
                 onEdit(previewCurrent);

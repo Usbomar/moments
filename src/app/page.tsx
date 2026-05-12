@@ -437,12 +437,12 @@ function HomeContent() {
     [imageEditorAsset, onImageSaved]
   );
 
-  const onPhotoSave = useCallback(async (updated: Asset) => {
+  const onPhotoSave = useCallback(async (updated: Asset): Promise<Asset | null> => {
     // Fallback local només quan sabem segur que Supabase NO està configurat.
     // Si l'estat encara és "undefined" (càrrega inicial), intentem persistir al servidor.
     if (supabaseConfiguredRef.current === false) {
       setLibrary((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
-      return;
+      return updated;
     }
     const response = await fetch(`/api/assets/${updated.id}`, {
       method: "PATCH",
@@ -463,14 +463,29 @@ function HomeContent() {
       if (process.env.NODE_ENV !== "production") {
         console.error("PATCH asset failed:", payload.error ?? response.statusText);
       }
-      return;
+      return null;
     }
     if (payload.asset) {
       setLibrary((prev) => prev.map((a) => (a.id === payload.asset!.id ? payload.asset! : a)));
     }
     clearCache();
     await refreshLibraryRef.current();
+    return payload.asset ?? updated;
   }, []);
+
+  const mergeAssetIntoViewerLists = useCallback((merged: Asset) => {
+    setSlideshowItems((prev) => (prev ? prev.map((a) => (a.id === merged.id ? merged : a)) : prev));
+    setViewerQueue((prev) => (prev ? prev.map((a) => (a.id === merged.id ? merged : a)) : null));
+    setCollectionSlideshow((prev) => (prev ? prev.map((a) => (a.id === merged.id ? merged : a)) : null));
+  }, []);
+
+  const handleViewerFavoriteToggle = useCallback(
+    async (asset: Asset, favorite: boolean) => {
+      const mergedSaved = await onPhotoSave({ ...asset, favorite });
+      if (mergedSaved) mergeAssetIntoViewerLists(mergedSaved);
+    },
+    [onPhotoSave, mergeAssetIntoViewerLists]
+  );
 
   const viewItems = useMemo(() => library, [library]);
   const gridCatalogItems = useMemo(() => sortAssetsForGrid(library, gridSortOrder), [library, gridSortOrder]);
@@ -609,6 +624,7 @@ function HomeContent() {
                       items={viewItems}
                       onEditPhoto={(asset) => setSelectedAsset(asset)}
                       onOpenViewer={openViewer}
+                      onFavoriteToggle={handleViewerFavoriteToggle}
                     />
                   ) : null}
                 </div>
@@ -667,6 +683,7 @@ function HomeContent() {
         onClose={onViewerClose}
         onEditDetails={openDetailsFromViewer}
         onEditImage={openImageEditorFromViewer}
+        onFavoriteToggle={handleViewerFavoriteToggle}
       />
 
       {collectionSlideshow?.length ? (
@@ -675,6 +692,7 @@ function HomeContent() {
             items={collectionSlideshow}
             onClose={() => setCollectionSlideshow(null)}
             onEditDetails={openDetailsFromCollectionSlideshow}
+            onFavoriteToggle={handleViewerFavoriteToggle}
           />
         </ViewErrorBoundary>
       ) : null}
@@ -690,7 +708,9 @@ function HomeContent() {
               setSelectedAsset(null);
               setPhotoModalFront(false);
             }}
-            onSave={onPhotoSave}
+            onSave={async (updated): Promise<void> => {
+              await onPhotoSave(updated);
+            }}
           />
         </ViewErrorBoundary>
       ) : null}

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Asset } from "@/lib/types";
+import { ViewerFavoriteButton } from "@/components/ViewerFavoriteButton";
 
 const FADE_MS = 450;
 
@@ -9,6 +10,8 @@ type Props = {
   items: Asset[];
   onClose: () => void;
   onEditDetails?: (asset: Asset) => void;
+  /** Commuta preferit (mateix flux que la biblioteca). */
+  onFavoriteToggle?: (asset: Asset, favorite: boolean) => void | Promise<void>;
   /** Temps que cada foto resta visible (després del fade d’entrada, abans del següent fos) */
   dwellMs?: number;
 };
@@ -20,10 +23,11 @@ function urlFor(asset: Asset): string {
 /**
  * Presentació a pantalla completa amb fos a negre entre imatges (estil “ken burns” lleuger només en opacitat).
  */
-export function FadingSlideshow({ items, onClose, onEditDetails, dwellMs = 2800 }: Props) {
+export function FadingSlideshow({ items, onClose, onEditDetails, onFavoriteToggle, dwellMs = 2800 }: Props) {
   const [index, setIndex] = useState(0);
   const [veilOn, setVeilOn] = useState(false);
   const [playing, setPlaying] = useState(true);
+  const [favBusy, setFavBusy] = useState(false);
   const busyRef = useRef(false);
   const indexRef = useRef(0);
 
@@ -115,9 +119,22 @@ export function FadingSlideshow({ items, onClose, onEditDetails, dwellMs = 2800 
           <span className="fading-slideshow-counter" aria-live="polite">
             {label}
           </span>
-          <button type="button" className="viewer-toolbar-btn" onClick={onClose} aria-label="Tancar presentació">
-            ×
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <ViewerFavoriteButton
+              favorite={!!current.favorite}
+              disabled={!onFavoriteToggle}
+              busy={favBusy}
+              onClick={() => {
+                if (!onFavoriteToggle) return;
+                const next = !current.favorite;
+                setFavBusy(true);
+                void Promise.resolve(onFavoriteToggle(current, next)).finally(() => setFavBusy(false));
+              }}
+            />
+            <button type="button" className="viewer-toolbar-btn" onClick={onClose} aria-label="Tancar presentació">
+              ×
+            </button>
+          </div>
         </header>
 
         <div className="fading-slideshow-stage">

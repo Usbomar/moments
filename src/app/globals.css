@@ -401,6 +401,15 @@ button.active {
   border-color: var(--accent-hover);
 }
 
+.viewer-toolbar-btn--star {
+  color: rgba(245, 220, 160, 0.95);
+}
+
+.viewer-toolbar-btn--star.viewer-toolbar-btn--star-on {
+  color: #f0c040;
+  filter: drop-shadow(0 0 5px rgba(240, 192, 64, 0.35));
+}
+
 /* Presentació col·lecció: fos entre fotos */
 .fading-slideshow {
   position: fixed;

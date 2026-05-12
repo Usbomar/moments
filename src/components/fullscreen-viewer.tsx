@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import type { Asset } from "@/lib/types";
+import { ViewerFavoriteButton } from "@/components/ViewerFavoriteButton";
 
 interface Props {
   items: Asset[];
@@ -11,6 +12,10 @@ interface Props {
   onSelect: (id: string) => void;
   onEditDetails?: (asset: Asset) => void;
   onEditImage?: (asset: Asset) => void;
+  /**
+   * Commuta preferit i persisteix (p. ex. PATCH). Sense callback (vista convidada): l’estrella es mostra però deshabilitada.
+   */
+  onFavoriteToggle?: (asset: Asset, favorite: boolean) => void | Promise<void>;
 }
 
 /** Matches library-grid placeholder look (gray gradient + centered text). */
@@ -54,14 +59,23 @@ type SlideProps = {
   onClose: () => void;
   onEditDetails?: (asset: Asset) => void;
   onEditImage?: (asset: Asset) => void;
+  onFavoriteToggle?: (asset: Asset, favorite: boolean) => void | Promise<void>;
 };
 
 /** `key={selectedId}` al muntar reinicia el zoom sense efectes. */
-function ViewerSlide({ current, index, items, onSelect, onClose, onEditDetails, onEditImage }: SlideProps) {
+function ViewerSlide({ current, index, items, onSelect, onClose, onEditDetails, onEditImage, onFavoriteToggle }: SlideProps) {
   const [zoom, setZoom] = useState<1 | 2>(1);
+  const [favBusy, setFavBusy] = useState(false);
   const previewUrl = (current.files.mediumUrl || current.files.previewUrl)?.trim() ?? "";
   const takenAtText = new Date(current.takenAt).toLocaleDateString("ca-ES", { day: "numeric", month: "long", year: "numeric" });
   const locationText = current.location ? `${current.location.city}${current.location.country ? `, ${current.location.country}` : ""}` : "";
+
+  const toggleFavorite = () => {
+    if (!onFavoriteToggle) return;
+    const next = !current.favorite;
+    setFavBusy(true);
+    void Promise.resolve(onFavoriteToggle(current, next)).finally(() => setFavBusy(false));
+  };
 
   return (
     <>
@@ -116,6 +130,12 @@ function ViewerSlide({ current, index, items, onSelect, onClose, onEditDetails, 
         <button type="button" className="viewer-toolbar-btn" disabled={index <= 0} onClick={() => index > 0 && onSelect(items[index - 1]!.id)}>
           ←
         </button>
+        <ViewerFavoriteButton
+          favorite={!!current.favorite}
+          disabled={!onFavoriteToggle}
+          busy={favBusy}
+          onClick={toggleFavorite}
+        />
         {onEditDetails ? (
           <button
             type="button"
@@ -154,7 +174,7 @@ function ViewerSlide({ current, index, items, onSelect, onClose, onEditDetails, 
   );
 }
 
-export function FullscreenViewer({ items, selectedId, onClose, onSelect, onEditDetails, onEditImage }: Props) {
+export function FullscreenViewer({ items, selectedId, onClose, onSelect, onEditDetails, onEditImage, onFavoriteToggle }: Props) {
   const index = items.findIndex((x) => x.id === selectedId);
   const current = index >= 0 ? items[index] : null;
 
@@ -183,6 +203,7 @@ export function FullscreenViewer({ items, selectedId, onClose, onSelect, onEditD
           onClose={onClose}
           onEditDetails={onEditDetails}
           onEditImage={onEditImage}
+          onFavoriteToggle={onFavoriteToggle}
         />
       </div>
     </div>

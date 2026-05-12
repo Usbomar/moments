@@ -15,6 +15,9 @@ interface Props {
   distribution?: GridDistribution;
   tileMinPx?: number;
   imageHoverPercent?: number;
+  tileHoverFrameScalePercent?: number;
+  tileHoverLiftPx?: number;
+  tileHoverShadowPct?: number;
 }
 
 interface Cluster {
@@ -94,7 +97,17 @@ function buildClusterPopupContent(cluster: Cluster, onOpen: (a: Asset) => void):
   return wrap;
 }
 
-export function MapView({ items, onOpenViewer, onEditPhoto, distribution = "uniform", tileMinPx, imageHoverPercent }: Props) {
+export function MapView({
+  items,
+  onOpenViewer,
+  onEditPhoto,
+  distribution = "uniform",
+  tileMinPx,
+  imageHoverPercent,
+  tileHoverFrameScalePercent,
+  tileHoverLiftPx,
+  tileHoverShadowPct
+}: Props) {
   const clusters = useMemo(() => clusterByArea(items), [items]);
   const [selectedCluster, setSelectedCluster] = useState<Cluster | null>(null);
   const [layerMode, setLayerMode] = useState<"markers" | "heatmap">("markers");
@@ -194,6 +207,9 @@ export function MapView({ items, onOpenViewer, onEditPhoto, distribution = "unif
             distribution={distribution}
             tileMinPx={tileMinPx}
             imageHoverPercent={imageHoverPercent}
+            tileHoverFrameScalePercent={tileHoverFrameScalePercent}
+            tileHoverLiftPx={tileHoverLiftPx}
+            tileHoverShadowPct={tileHoverShadowPct}
             onOpenModal={onEditPhoto}
             onOpenViewer={onOpenViewer}
           />

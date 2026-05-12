@@ -23,8 +23,14 @@ import {
   clampTileMinPx,
   GRID_DENSITY_PRESET_TILE_MIN,
   normalizeFeaturedTileSize,
+  normalizeTileHoverFrameScalePercent,
+  normalizeTileHoverLiftPx,
+  normalizeTileHoverShadowPct,
   normalizeTileImageHoverPercent,
   sortAssetsForGrid,
+  TILE_HOVER_FRAME_SCALE_DEFAULT,
+  TILE_HOVER_LIFT_DEFAULT,
+  TILE_HOVER_SHADOW_DEFAULT,
   type GridDistribution,
   type GridSortOrder
 } from "@/lib/grid-library";
@@ -81,6 +87,9 @@ const GRID_DIST_STORAGE = "moments-grid-distribution";
 const GRID_SORT_STORAGE = "moments-grid-sort";
 const GRID_TILE_MIN_STORAGE = "moments-grid-tile-min-px";
 const GRID_TILE_IMG_HOVER_STORAGE = "moments-grid-tile-img-hover-pct";
+const GRID_TILE_HOVER_FRAME_SCALE_STORAGE = "moments-grid-tile-hover-frame-scale-pct";
+const GRID_TILE_HOVER_LIFT_STORAGE = "moments-grid-tile-hover-lift-px";
+const GRID_TILE_HOVER_SHADOW_STORAGE = "moments-grid-tile-hover-shadow-pct";
 /** Llegit només per migració si falta `moments-grid-tile-min-px`. */
 const GRID_FEATURED_TILE_STORAGE = "moments-grid-featured-tile-size";
 
@@ -92,6 +101,9 @@ function HomeContent() {
   const [gridDistribution, setGridDistribution] = useState<GridDistribution>("uniform");
   const [tileMinPx, setTileMinPx] = useState(() => GRID_DENSITY_PRESET_TILE_MIN.balanced);
   const [tileImageHoverPercent, setTileImageHoverPercent] = useState(100);
+  const [tileHoverFrameScalePercent, setTileHoverFrameScalePercent] = useState(TILE_HOVER_FRAME_SCALE_DEFAULT);
+  const [tileHoverLiftPx, setTileHoverLiftPx] = useState(TILE_HOVER_LIFT_DEFAULT);
+  const [tileHoverShadowPct, setTileHoverShadowPct] = useState(TILE_HOVER_SHADOW_DEFAULT);
   const [gridSortOrder, setGridSortOrder] = useState<GridSortOrder>("taken_desc");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
@@ -238,6 +250,9 @@ function HomeContent() {
       const s = window.localStorage.getItem(GRID_SORT_STORAGE) as GridSortOrder | null;
       const pxRaw = window.localStorage.getItem(GRID_TILE_MIN_STORAGE);
       const imgRaw = window.localStorage.getItem(GRID_TILE_IMG_HOVER_STORAGE);
+      const frameRaw = window.localStorage.getItem(GRID_TILE_HOVER_FRAME_SCALE_STORAGE);
+      const liftRaw = window.localStorage.getItem(GRID_TILE_HOVER_LIFT_STORAGE);
+      const shadowRaw = window.localStorage.getItem(GRID_TILE_HOVER_SHADOW_STORAGE);
       if (d === "uniform" || d === "featured") setGridDistribution(d);
       if (s === "taken_desc" || s === "taken_asc") setGridSortOrder(s);
       if (pxRaw != null && pxRaw.trim() !== "") {
@@ -251,6 +266,15 @@ function HomeContent() {
       if (imgRaw != null && imgRaw.trim() !== "") {
         setTileImageHoverPercent(normalizeTileImageHoverPercent(imgRaw));
       }
+      if (frameRaw != null && frameRaw.trim() !== "") {
+        setTileHoverFrameScalePercent(normalizeTileHoverFrameScalePercent(frameRaw));
+      }
+      if (liftRaw != null && liftRaw.trim() !== "") {
+        setTileHoverLiftPx(normalizeTileHoverLiftPx(liftRaw));
+      }
+      if (shadowRaw != null && shadowRaw.trim() !== "") {
+        setTileHoverShadowPct(normalizeTileHoverShadowPct(shadowRaw));
+      }
     } catch {
       /* ignore */
     }
@@ -262,10 +286,13 @@ function HomeContent() {
       window.localStorage.setItem(GRID_SORT_STORAGE, gridSortOrder);
       window.localStorage.setItem(GRID_TILE_MIN_STORAGE, String(tileMinPx));
       window.localStorage.setItem(GRID_TILE_IMG_HOVER_STORAGE, String(tileImageHoverPercent));
+      window.localStorage.setItem(GRID_TILE_HOVER_FRAME_SCALE_STORAGE, String(tileHoverFrameScalePercent));
+      window.localStorage.setItem(GRID_TILE_HOVER_LIFT_STORAGE, String(tileHoverLiftPx));
+      window.localStorage.setItem(GRID_TILE_HOVER_SHADOW_STORAGE, String(tileHoverShadowPct));
     } catch {
       /* ignore */
     }
-  }, [gridDistribution, gridSortOrder, tileMinPx, tileImageHoverPercent]);
+  }, [gridDistribution, gridSortOrder, tileMinPx, tileImageHoverPercent, tileHoverFrameScalePercent, tileHoverLiftPx, tileHoverShadowPct]);
 
   useEffect(() => {
     if (supabaseConfigured !== true) return;
@@ -492,6 +519,12 @@ function HomeContent() {
               onTileMinPxChange={(v) => setTileMinPx(clampTileMinPx(v))}
               tileImageHoverPercent={tileImageHoverPercent}
               onTileImageHoverPercentChange={(v) => setTileImageHoverPercent(normalizeTileImageHoverPercent(v))}
+              tileHoverFrameScalePercent={tileHoverFrameScalePercent}
+              onTileHoverFrameScalePercentChange={(v) => setTileHoverFrameScalePercent(normalizeTileHoverFrameScalePercent(v))}
+              tileHoverLiftPx={tileHoverLiftPx}
+              onTileHoverLiftPxChange={(v) => setTileHoverLiftPx(normalizeTileHoverLiftPx(v))}
+              tileHoverShadowPct={tileHoverShadowPct}
+              onTileHoverShadowPctChange={(v) => setTileHoverShadowPct(normalizeTileHoverShadowPct(v))}
             />
           ) : undefined
         }
@@ -529,6 +562,9 @@ function HomeContent() {
                       distribution={gridDistribution}
                       tileMinPx={tileMinPx}
                       imageHoverPercent={tileImageHoverPercent}
+                      tileHoverFrameScalePercent={tileHoverFrameScalePercent}
+                      tileHoverLiftPx={tileHoverLiftPx}
+                      tileHoverShadowPct={tileHoverShadowPct}
                       onOpenModal={(asset) => setSelectedAsset(asset)}
                       onOpenViewer={openViewer}
                     />
@@ -539,6 +575,9 @@ function HomeContent() {
                       distribution={gridDistribution}
                       tileMinPx={tileMinPx}
                       imageHoverPercent={tileImageHoverPercent}
+                      tileHoverFrameScalePercent={tileHoverFrameScalePercent}
+                      tileHoverLiftPx={tileHoverLiftPx}
+                      tileHoverShadowPct={tileHoverShadowPct}
                       onOpenModal={(asset) => setSelectedAsset(asset)}
                       onOpenViewer={openViewer}
                     />
@@ -549,6 +588,9 @@ function HomeContent() {
                       distribution={gridDistribution}
                       tileMinPx={tileMinPx}
                       imageHoverPercent={tileImageHoverPercent}
+                      tileHoverFrameScalePercent={tileHoverFrameScalePercent}
+                      tileHoverLiftPx={tileHoverLiftPx}
+                      tileHoverShadowPct={tileHoverShadowPct}
                       onEditPhoto={(asset) => setSelectedAsset(asset)}
                       onOpenViewer={openViewer}
                     />
@@ -597,6 +639,9 @@ function HomeContent() {
                 distribution={gridDistribution}
                 tileMinPx={tileMinPx}
                 imageHoverPercent={tileImageHoverPercent}
+                tileHoverFrameScalePercent={tileHoverFrameScalePercent}
+                tileHoverLiftPx={tileHoverLiftPx}
+                tileHoverShadowPct={tileHoverShadowPct}
                 onEditPhoto={(asset) => setSelectedAsset(asset)}
                 onOpenViewer={openViewer}
               />
@@ -701,7 +746,13 @@ function HomeContent() {
           tileMinPx,
           onTileMinPxChange: (v) => setTileMinPx(clampTileMinPx(v)),
           tileImageHoverPercent,
-          onTileImageHoverPercentChange: (v) => setTileImageHoverPercent(normalizeTileImageHoverPercent(v))
+          onTileImageHoverPercentChange: (v) => setTileImageHoverPercent(normalizeTileImageHoverPercent(v)),
+          tileHoverFrameScalePercent,
+          onTileHoverFrameScalePercentChange: (v) => setTileHoverFrameScalePercent(normalizeTileHoverFrameScalePercent(v)),
+          tileHoverLiftPx,
+          onTileHoverLiftPxChange: (v) => setTileHoverLiftPx(normalizeTileHoverLiftPx(v)),
+          tileHoverShadowPct,
+          onTileHoverShadowPctChange: (v) => setTileHoverShadowPct(normalizeTileHoverShadowPct(v))
         }}
       />
     </>

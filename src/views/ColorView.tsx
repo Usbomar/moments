@@ -12,6 +12,9 @@ interface Props {
   distribution?: GridDistribution;
   tileMinPx?: number;
   imageHoverPercent?: number;
+  tileHoverFrameScalePercent?: number;
+  tileHoverLiftPx?: number;
+  tileHoverShadowPct?: number;
 }
 
 interface ColorBucket {
@@ -41,7 +44,17 @@ function buildBuckets(items: Asset[]): ColorBucket[] {
   return Array.from(buckets.values()).sort((a, b) => a.hue - b.hue);
 }
 
-export function ColorView({ items, onOpenViewer, onEditPhoto, distribution = "uniform", tileMinPx, imageHoverPercent }: Props) {
+export function ColorView({
+  items,
+  onOpenViewer,
+  onEditPhoto,
+  distribution = "uniform",
+  tileMinPx,
+  imageHoverPercent,
+  tileHoverFrameScalePercent,
+  tileHoverLiftPx,
+  tileHoverShadowPct
+}: Props) {
   const buckets = useMemo(() => buildBuckets(items), [items]);
   const [activeHue, setActiveHue] = useState<number | null>(null);
 
@@ -104,6 +117,9 @@ export function ColorView({ items, onOpenViewer, onEditPhoto, distribution = "un
         distribution={distribution}
         tileMinPx={tileMinPx}
         imageHoverPercent={imageHoverPercent}
+        tileHoverFrameScalePercent={tileHoverFrameScalePercent}
+        tileHoverLiftPx={tileHoverLiftPx}
+        tileHoverShadowPct={tileHoverShadowPct}
         onOpenModal={onEditPhoto}
         onOpenViewer={onOpenViewer}
       />

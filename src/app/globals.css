@@ -149,8 +149,8 @@ button.active {
 }
 
 .tile:hover .tile-surface {
-  transform: translate3d(0, -6px, 0) scale(1.18);
-  box-shadow: 0 24px 50px rgba(6, 10, 16, 0.44);
+  transform: translate3d(0, calc(-1 * var(--tile-hover-lift, 6px)), 0) scale(var(--tile-hover-scale, 1.18));
+  box-shadow: var(--tile-hover-shadow, 0 24px 50px rgba(6, 10, 16, 0.44));
   border-color: color-mix(in srgb, var(--border-dark) 78%, transparent);
 }
 

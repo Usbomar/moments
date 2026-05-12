@@ -9,7 +9,14 @@ import {
   clampTileMinPx,
   gridGapForTileMin,
   GRID_TILE_MIN_PX_DEFAULT,
+  normalizeTileHoverFrameScalePercent,
+  normalizeTileHoverLiftPx,
+  normalizeTileHoverShadowPct,
   normalizeTileImageHoverPercent,
+  tileHoverSurfaceBoxShadow,
+  TILE_HOVER_FRAME_SCALE_DEFAULT,
+  TILE_HOVER_LIFT_DEFAULT,
+  TILE_HOVER_SHADOW_DEFAULT,
   type GridDistribution
 } from "@/lib/grid-library";
 
@@ -21,6 +28,12 @@ interface Props {
   tileMinPx?: number;
   /** Zoom addicional de la imatge en hover; 100 = cap (només l’efecte de la rajola). */
   imageHoverPercent?: number;
+  /** Escala del marc sencer (108–130 %). Per defecte 118. */
+  tileHoverFrameScalePercent?: number;
+  /** Pujada del marc en px (0–14). Per defecte 6. */
+  tileHoverLiftPx?: number;
+  /** Intensitat de l’ombra (40–160, 100 = referència). Per defecte 100. */
+  tileHoverShadowPct?: number;
   /** Clic al thumbnail: obre el visor a pantalla completa (prioritat sobre onOpenModal). */
   onOpenViewer?: (asset: Asset, contextItems: Asset[]) => void;
   /** Opcional: només si no hi ha onOpenViewer (p. ex. eines internes). */
@@ -120,6 +133,9 @@ export function LibraryGrid({
   distribution = "uniform",
   tileMinPx: tileMinPxProp,
   imageHoverPercent: imageHoverPercentProp,
+  tileHoverFrameScalePercent: frameScaleProp,
+  tileHoverLiftPx: liftProp,
+  tileHoverShadowPct: shadowProp,
   onOpen,
   onOpenModal,
   onOpenViewer
@@ -128,6 +144,11 @@ export function LibraryGrid({
   const gapPx = gridGapForTileMin(tileMinPx);
   const imgHover = normalizeTileImageHoverPercent(imageHoverPercentProp ?? 100);
   const imgScale = imgHover / 100;
+  const frameScalePct = normalizeTileHoverFrameScalePercent(frameScaleProp ?? TILE_HOVER_FRAME_SCALE_DEFAULT);
+  const liftPx = normalizeTileHoverLiftPx(liftProp ?? TILE_HOVER_LIFT_DEFAULT);
+  const shadowPct = normalizeTileHoverShadowPct(shadowProp ?? TILE_HOVER_SHADOW_DEFAULT);
+  const frameScale = frameScalePct / 100;
+  const hoverShadow = tileHoverSurfaceBoxShadow(liftPx, shadowPct);
 
   const featuredFlags = useMemo(
     () => (distribution === "featured" ? assignFeaturedHighlights(items) : items.map(() => false)),
@@ -141,9 +162,12 @@ export function LibraryGrid({
       ({
         ["--grid-tile-min" as string]: `${tileMinPx}px`,
         ["--grid-gap" as string]: `${gapPx}px`,
-        ["--tile-img-hover-scale" as string]: String(imgScale)
+        ["--tile-img-hover-scale" as string]: String(imgScale),
+        ["--tile-hover-scale" as string]: String(frameScale),
+        ["--tile-hover-lift" as string]: `${liftPx}px`,
+        ["--tile-hover-shadow" as string]: hoverShadow
       }) as CSSProperties,
-    [tileMinPx, gapPx, imgScale]
+    [tileMinPx, gapPx, imgScale, frameScale, liftPx, hoverShadow]
   );
 
   return (

@@ -14,6 +14,15 @@ export type LibraryGridPreferencesBinder = {
   onTileMinPxChange: (v: number) => void;
   tileImageHoverPercent: number;
   onTileImageHoverPercentChange: (v: number) => void;
+  /** Escala del marc sencer en hover: percentatge respecte a 100 (p. ex. 118 = 1,18). */
+  tileHoverFrameScalePercent: number;
+  onTileHoverFrameScalePercentChange: (v: number) => void;
+  /** Pujada del marc en píxels (translateY negatiu). */
+  tileHoverLiftPx: number;
+  onTileHoverLiftPxChange: (v: number) => void;
+  /** Intensitat de l’ombra: 100 = valor per defecte, més alt = més marcada. */
+  tileHoverShadowPct: number;
+  onTileHoverShadowPctChange: (v: number) => void;
 };
 
 /** Presets tipus «Fotos»: només estableixen la mida mínima en px de la miniatura (la graella és auto-fill). */
@@ -58,6 +67,42 @@ export function normalizeTileImageHoverPercent(raw: unknown): number {
   const n = typeof raw === "string" ? Number.parseInt(raw, 10) : typeof raw === "number" ? raw : NaN;
   if (!Number.isFinite(n)) return 100;
   return Math.min(130, Math.max(100, Math.round(n)));
+}
+
+export const TILE_HOVER_FRAME_SCALE_DEFAULT = 118;
+
+/** Escala del marc en hover en % de la mida (108–130 → 1,08–1,30). */
+export function normalizeTileHoverFrameScalePercent(raw: unknown): number {
+  const n = typeof raw === "string" ? Number.parseInt(raw, 10) : typeof raw === "number" ? raw : NaN;
+  if (!Number.isFinite(n)) return TILE_HOVER_FRAME_SCALE_DEFAULT;
+  return Math.min(130, Math.max(108, Math.round(n)));
+}
+
+export const TILE_HOVER_LIFT_DEFAULT = 6;
+
+export function normalizeTileHoverLiftPx(raw: unknown): number {
+  const n = typeof raw === "string" ? Number.parseInt(raw, 10) : typeof raw === "number" ? raw : NaN;
+  if (!Number.isFinite(n)) return TILE_HOVER_LIFT_DEFAULT;
+  return Math.min(14, Math.max(0, Math.round(n)));
+}
+
+export const TILE_HOVER_SHADOW_DEFAULT = 100;
+
+/** 100 = ombra de referència; es pot baixar o pujar per afinar. */
+export function normalizeTileHoverShadowPct(raw: unknown): number {
+  const n = typeof raw === "string" ? Number.parseInt(raw, 10) : typeof raw === "number" ? raw : NaN;
+  if (!Number.isFinite(n)) return TILE_HOVER_SHADOW_DEFAULT;
+  return Math.min(160, Math.max(40, Math.round(n)));
+}
+
+/** Genera la `box-shadow` del marc en hover segons elevació i intensitat. */
+export function tileHoverSurfaceBoxShadow(liftPx: number, shadowPct: number): string {
+  const lift = normalizeTileHoverLiftPx(liftPx);
+  const s = normalizeTileHoverShadowPct(shadowPct) / 100;
+  const y = Math.round(4 + lift * 1.25);
+  const blur = Math.round(16 + 38 * s);
+  const alpha = Math.min(0.58, 0.16 + 0.32 * s);
+  return `0 ${y}px ${blur}px rgba(6, 10, 16, ${alpha.toFixed(3)})`;
 }
 
 /** Una foto sense data de captura vàlida va al final; dins aquest grup: pujada més recent primer. */

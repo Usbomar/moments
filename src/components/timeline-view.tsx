@@ -13,9 +13,22 @@ interface Props {
   distribution?: GridDistribution;
   tileMinPx?: number;
   imageHoverPercent?: number;
+  tileHoverFrameScalePercent?: number;
+  tileHoverLiftPx?: number;
+  tileHoverShadowPct?: number;
 }
 
-export function TimelineView({ items, onOpenModal, onOpenViewer, distribution = "uniform", tileMinPx, imageHoverPercent }: Props) {
+export function TimelineView({
+  items,
+  onOpenModal,
+  onOpenViewer,
+  distribution = "uniform",
+  tileMinPx,
+  imageHoverPercent,
+  tileHoverFrameScalePercent,
+  tileHoverLiftPx,
+  tileHoverShadowPct
+}: Props) {
   const { groups, months, flatOrdered } = useMemo(() => {
     const g = groupByMonth(items);
     const mo = Object.keys(g).sort((a, b) => b.localeCompare(a));
@@ -37,6 +50,9 @@ export function TimelineView({ items, onOpenModal, onOpenViewer, distribution = 
             distribution={distribution}
             tileMinPx={tileMinPx}
             imageHoverPercent={imageHoverPercent}
+            tileHoverFrameScalePercent={tileHoverFrameScalePercent}
+            tileHoverLiftPx={tileHoverLiftPx}
+            tileHoverShadowPct={tileHoverShadowPct}
             onOpenModal={onOpenModal}
             onOpenViewer={onOpenViewer ? (a) => onOpenViewer(a, flatOrdered) : undefined}
           />

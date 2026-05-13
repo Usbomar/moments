@@ -44,6 +44,11 @@ function sanitizeFilePart(name: string): string {
     .slice(0, 80) || "track.mp3";
 }
 
+function isMissingMusicSchemaError(message: string): boolean {
+  const text = message.toLowerCase();
+  return text.includes("collection_music_tracks") || text.includes("schema cache");
+}
+
 export async function GET() {
   try {
     if (!isSupabaseConfigured()) {
@@ -59,9 +64,14 @@ export async function GET() {
       .select("id,title,source,url,storage_path,duration_seconds,size_bytes,created_at")
       .eq("user_id", userId)
       .order("created_at", { ascending: false });
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      if (isMissingMusicSchemaError(error.message)) {
+        return NextResponse.json({ tracks: [], supabaseConfigured: true, musicSchemaReady: false });
+      }
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
 
-    return NextResponse.json({ tracks: ((data ?? []) as MusicTrackRow[]).map(mapTrack), supabaseConfigured: true });
+    return NextResponse.json({ tracks: ((data ?? []) as MusicTrackRow[]).map(mapTrack), supabaseConfigured: true, musicSchemaReady: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 500 });

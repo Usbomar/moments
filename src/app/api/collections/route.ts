@@ -9,8 +9,8 @@ import type { CollectionMusicSource, CollectionMusicTrack } from "@/lib/collecti
 type AlbumRow = {
   id: string;
   name: string;
-  music_track_id: string | null;
-  collection_music_tracks:
+  music_track_id?: string | null;
+  collection_music_tracks?:
     | {
     id: string;
     title: string;
@@ -34,6 +34,11 @@ type AlbumRow = {
     | null;
   album_assets: Array<{ asset_id: string; position: number | null }> | null;
 };
+
+function isMissingMusicSchemaError(message: string): boolean {
+  const text = message.toLowerCase();
+  return text.includes("collection_music_tracks") || text.includes("music_track_id") || text.includes("schema cache");
+}
 
 function mapTrack(row: AlbumRow["collection_music_tracks"]): CollectionMusicTrack | null {
   const track = Array.isArray(row) ? row[0] : row;
@@ -78,9 +83,21 @@ export async function GET() {
       .select("id,name,music_track_id,collection_music_tracks(id,title,source,url,storage_path,duration_seconds,size_bytes,created_at),album_assets(asset_id,position)")
       .eq("user_id", userId)
       .order("name", { ascending: true });
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      if (!isMissingMusicSchemaError(error.message)) return NextResponse.json({ error: error.message }, { status: 500 });
+
+      const fallback = await supabase
+        .from("albums")
+        .select("id,name,album_assets(asset_id,position)")
+        .eq("user_id", userId)
+        .order("name", { ascending: true });
+      if (fallback.error) return NextResponse.json({ error: fallback.error.message }, { status: 500 });
+      const collections = ((fallback.data ?? []) as unknown as AlbumRow[]).map(mapAlbum);
+      return NextResponse.json({ collections, supabaseConfigured: true, musicSchemaReady: false });
+    }
+
     const collections = ((data ?? []) as unknown as AlbumRow[]).map(mapAlbum);
-    return NextResponse.json({ collections, supabaseConfigured: true });
+    return NextResponse.json({ collections, supabaseConfigured: true, musicSchemaReady: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 500 });

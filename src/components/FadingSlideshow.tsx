@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Asset } from "@/lib/types";
 import type { CollectionMusicTrack } from "@/lib/collection-music";
+import type { SliderTransition } from "@/lib/grid-library";
 import { ViewerFavoriteButton } from "@/components/ViewerFavoriteButton";
 
 const FADE_MS = 450;
@@ -14,6 +15,7 @@ type Props = {
   /** Commuta preferit (mateix flux que la biblioteca). */
   onFavoriteToggle?: (asset: Asset, favorite: boolean) => void | Promise<void>;
   musicTrack?: CollectionMusicTrack | null;
+  transition: SliderTransition;
   /** Temps que cada foto resta visible (després del fade d’entrada, abans del següent fos) */
   dwellMs?: number;
 };
@@ -25,7 +27,7 @@ function urlFor(asset: Asset): string {
 /**
  * Presentació a pantalla completa amb crossfade entre imatges i música local opcional.
  */
-export function FadingSlideshow({ items, onClose, onEditDetails, onFavoriteToggle, musicTrack, dwellMs = 2800 }: Props) {
+export function FadingSlideshow({ items, onClose, onEditDetails, onFavoriteToggle, musicTrack, transition, dwellMs = 2800 }: Props) {
   const [index, setIndex] = useState(0);
   const [previousIndex, setPreviousIndex] = useState<number | null>(null);
   const [playing, setPlaying] = useState(true);
@@ -40,6 +42,7 @@ export function FadingSlideshow({ items, onClose, onEditDetails, onFavoriteToggl
   const audioRef = useRef<HTMLAudioElement>(null);
   const musicInputRef = useRef<HTMLInputElement>(null);
   const musicSrcRef = useRef<string | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   const n = items.length;
   const current = n > 0 ? items[Math.min(index, n - 1)] : null;
@@ -178,6 +181,16 @@ export function FadingSlideshow({ items, onClose, onEditDetails, onFavoriteToggl
     if (musicInputRef.current) musicInputRef.current.value = "";
   }, []);
 
+  const requestBrowserFullscreen = useCallback(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    if (document.fullscreenElement) {
+      void document.exitFullscreen?.();
+      return;
+    }
+    void el.requestFullscreen?.();
+  }, []);
+
   if (!current || n < 1) return null;
 
   const src = urlFor(current);
@@ -186,6 +199,7 @@ export function FadingSlideshow({ items, onClose, onEditDetails, onFavoriteToggl
 
   return (
     <div
+      ref={rootRef}
       className="fading-slideshow"
       role="dialog"
       aria-modal="true"
@@ -221,7 +235,7 @@ export function FadingSlideshow({ items, onClose, onEditDetails, onFavoriteToggl
               // eslint-disable-next-line @next/next/no-img-element -- URL signades
               <img
                 key={`previous-${previous.id}`}
-                className="fading-slideshow-img fading-slideshow-img--previous"
+                className={`fading-slideshow-img fading-slideshow-img--previous fading-slideshow-img--previous-${transition}`}
                 src={previousSrc}
                 alt=""
                 aria-hidden
@@ -233,7 +247,7 @@ export function FadingSlideshow({ items, onClose, onEditDetails, onFavoriteToggl
               // eslint-disable-next-line @next/next/no-img-element -- URL signades
               <img
                 key={`current-${current.id}`}
-                className="fading-slideshow-img fading-slideshow-img--current"
+                className={`fading-slideshow-img fading-slideshow-img--current fading-slideshow-img--current-${transition}`}
                 src={src}
                 alt={current.title}
                 referrerPolicy="no-referrer"
@@ -255,13 +269,22 @@ export function FadingSlideshow({ items, onClose, onEditDetails, onFavoriteToggl
           </button>
           <button
             type="button"
-            className={`viewer-toolbar-btn viewer-toolbar-btn--icon${shuffle ? " viewer-toolbar-btn--active" : ""}`}
+            className={`viewer-toolbar-btn viewer-toolbar-btn--icon viewer-toolbar-btn--shuffle${shuffle ? " viewer-toolbar-btn--active" : ""}`}
             aria-label={shuffle ? "Desactivar ordre aleatori" : "Activar ordre aleatori"}
             title={shuffle ? "Aleatori activat" : "Aleatori"}
             aria-pressed={shuffle}
             onClick={() => setShuffle((value) => !value)}
           >
-            <span aria-hidden>🔀</span>
+            <span className="viewer-icon viewer-icon-shuffle" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className="viewer-toolbar-btn viewer-toolbar-btn--icon"
+            aria-label="Pantalla completa"
+            title="Pantalla completa"
+            onClick={requestBrowserFullscreen}
+          >
+            <span className="viewer-icon viewer-icon-fullscreen" aria-hidden />
           </button>
           <button type="button" className="viewer-toolbar-btn" onClick={goNext} disabled={n < 2}>
             Següent

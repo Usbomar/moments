@@ -6,7 +6,8 @@ import {
   GRID_TILE_MIN_PX_ABS_MAX,
   GRID_TILE_MIN_PX_ABS_MIN,
   type GridDensityPreset,
-  type LibraryGridPreferencesBinder
+  type LibraryGridPreferencesBinder,
+  type SliderTransition
 } from "@/lib/grid-library";
 
 export type LibraryGridPrefsPanelVariant = "popover" | "settings";
@@ -30,12 +31,21 @@ export function LibraryGridPreferencesPanel({
   tileHoverLiftPx,
   onTileHoverLiftPxChange,
   tileHoverShadowPct,
-  onTileHoverShadowPctChange
+  onTileHoverShadowPctChange,
+  sliderTransition,
+  onSliderTransitionChange
 }: Props) {
   const rid = useId();
   const presetActive = (p: GridDensityPreset) => tileMinPx === GRID_DENSITY_PRESET_TILE_MIN[p];
 
   const rootClass = variant === "settings" ? "library-grid-prefs library-grid-prefs--settings" : "library-grid-prefs";
+  const sliderTransitionOptions: Array<{ id: SliderTransition; label: string; hint: string; iconClass: string }> = [
+    { id: "crossfade", label: "Fusió", hint: "Fotos superposades", iconClass: "grid-options-icon-transition-crossfade" },
+    { id: "fade", label: "Fos", hint: "Entrada suau", iconClass: "grid-options-icon-transition-fade" },
+    { id: "slide", label: "Lliscament", hint: "Moviment lateral", iconClass: "grid-options-icon-transition-slide" },
+    { id: "zoom", label: "Zoom", hint: "Aproximació lleu", iconClass: "grid-options-icon-transition-zoom" },
+    { id: "wipe", label: "Cortina", hint: "Revelat net", iconClass: "grid-options-icon-transition-wipe" }
+  ];
 
   return (
     <div className={rootClass}>
@@ -253,6 +263,32 @@ export function LibraryGridPreferencesPanel({
           </label>
         </div>
       </fieldset>
+
+      {variant === "settings" ? (
+        <fieldset className="grid-options-fieldset">
+          <legend>
+            <span className="grid-options-section-icon grid-options-icon-transition" aria-hidden />
+            Transició sliders
+          </legend>
+          <div className="grid-options-choice-grid grid-options-choice-grid--transitions" role="group" aria-label="Efecte de transició entre fotos dels sliders">
+            {sliderTransitionOptions.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                className={`grid-options-choice-card grid-options-choice-card--compact${sliderTransition === option.id ? " is-active" : ""}`}
+                aria-pressed={sliderTransition === option.id}
+                onClick={() => onSliderTransitionChange(option.id)}
+              >
+                <span className={`grid-options-choice-icon ${option.iconClass}`} aria-hidden />
+                <span>
+                  <strong>{option.label}</strong>
+                  <small>{option.hint}</small>
+                </span>
+              </button>
+            ))}
+          </div>
+        </fieldset>
+      ) : null}
 
       <fieldset className="grid-options-fieldset">
         <legend>

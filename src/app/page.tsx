@@ -24,6 +24,7 @@ import {
   clampTileMinPx,
   GRID_DENSITY_PRESET_TILE_MIN,
   normalizeFeaturedTileSize,
+  normalizeSliderTransition,
   normalizeTileHoverFrameScalePercent,
   normalizeTileHoverLiftPx,
   normalizeTileHoverShadowPct,
@@ -33,7 +34,8 @@ import {
   TILE_HOVER_LIFT_DEFAULT,
   TILE_HOVER_SHADOW_DEFAULT,
   type GridDistribution,
-  type GridSortOrder
+  type GridSortOrder,
+  type SliderTransition
 } from "@/lib/grid-library";
 
 const MapView = dynamic(() => import("@/views/MapView").then((mod) => mod.MapView), {
@@ -91,6 +93,7 @@ const GRID_TILE_IMG_HOVER_STORAGE = "moments-grid-tile-img-hover-pct";
 const GRID_TILE_HOVER_FRAME_SCALE_STORAGE = "moments-grid-tile-hover-frame-scale-pct";
 const GRID_TILE_HOVER_LIFT_STORAGE = "moments-grid-tile-hover-lift-px";
 const GRID_TILE_HOVER_SHADOW_STORAGE = "moments-grid-tile-hover-shadow-pct";
+const SLIDER_TRANSITION_STORAGE = "moments-slider-transition";
 /** Llegit només per migració si falta `moments-grid-tile-min-px`. */
 const GRID_FEATURED_TILE_STORAGE = "moments-grid-featured-tile-size";
 
@@ -110,6 +113,7 @@ function HomeContent() {
   const [tileHoverFrameScalePercent, setTileHoverFrameScalePercent] = useState(TILE_HOVER_FRAME_SCALE_DEFAULT);
   const [tileHoverLiftPx, setTileHoverLiftPx] = useState(TILE_HOVER_LIFT_DEFAULT);
   const [tileHoverShadowPct, setTileHoverShadowPct] = useState(TILE_HOVER_SHADOW_DEFAULT);
+  const [sliderTransition, setSliderTransition] = useState<SliderTransition>("crossfade");
   const [gridSortOrder, setGridSortOrder] = useState<GridSortOrder>("taken_desc");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
@@ -259,6 +263,7 @@ function HomeContent() {
       const frameRaw = window.localStorage.getItem(GRID_TILE_HOVER_FRAME_SCALE_STORAGE);
       const liftRaw = window.localStorage.getItem(GRID_TILE_HOVER_LIFT_STORAGE);
       const shadowRaw = window.localStorage.getItem(GRID_TILE_HOVER_SHADOW_STORAGE);
+      const transitionRaw = window.localStorage.getItem(SLIDER_TRANSITION_STORAGE);
       if (d === "uniform" || d === "featured") setGridDistribution(d);
       if (s === "taken_desc" || s === "taken_asc") setGridSortOrder(s);
       if (pxRaw != null && pxRaw.trim() !== "") {
@@ -281,6 +286,7 @@ function HomeContent() {
       if (shadowRaw != null && shadowRaw.trim() !== "") {
         setTileHoverShadowPct(normalizeTileHoverShadowPct(shadowRaw));
       }
+      setSliderTransition(normalizeSliderTransition(transitionRaw));
     } catch {
       /* ignore */
     }
@@ -295,10 +301,11 @@ function HomeContent() {
       window.localStorage.setItem(GRID_TILE_HOVER_FRAME_SCALE_STORAGE, String(tileHoverFrameScalePercent));
       window.localStorage.setItem(GRID_TILE_HOVER_LIFT_STORAGE, String(tileHoverLiftPx));
       window.localStorage.setItem(GRID_TILE_HOVER_SHADOW_STORAGE, String(tileHoverShadowPct));
+      window.localStorage.setItem(SLIDER_TRANSITION_STORAGE, sliderTransition);
     } catch {
       /* ignore */
     }
-  }, [gridDistribution, gridSortOrder, tileMinPx, tileImageHoverPercent, tileHoverFrameScalePercent, tileHoverLiftPx, tileHoverShadowPct]);
+  }, [gridDistribution, gridSortOrder, tileMinPx, tileImageHoverPercent, tileHoverFrameScalePercent, tileHoverLiftPx, tileHoverShadowPct, sliderTransition]);
 
   useEffect(() => {
     if (supabaseConfigured !== true) return;
@@ -548,6 +555,8 @@ function HomeContent() {
               onTileHoverLiftPxChange={(v) => setTileHoverLiftPx(normalizeTileHoverLiftPx(v))}
               tileHoverShadowPct={tileHoverShadowPct}
               onTileHoverShadowPctChange={(v) => setTileHoverShadowPct(normalizeTileHoverShadowPct(v))}
+              sliderTransition={sliderTransition}
+              onSliderTransitionChange={setSliderTransition}
             />
           ) : undefined
         }
@@ -630,6 +639,7 @@ function HomeContent() {
                   {view === "slider" ? (
                     <SliderView
                       items={viewItems}
+                      transition={sliderTransition}
                       onEditPhoto={(asset) => setSelectedAsset(asset)}
                       onOpenViewer={openViewer}
                       onFavoriteToggle={handleViewerFavoriteToggle}
@@ -699,6 +709,7 @@ function HomeContent() {
           <FadingSlideshow
             items={collectionSlideshow.assets}
             musicTrack={collectionSlideshow.musicTrack}
+            transition={sliderTransition}
             onClose={() => setCollectionSlideshow(null)}
             onEditDetails={openDetailsFromCollectionSlideshow}
             onFavoriteToggle={handleViewerFavoriteToggle}
@@ -781,7 +792,9 @@ function HomeContent() {
           tileHoverLiftPx,
           onTileHoverLiftPxChange: (v) => setTileHoverLiftPx(normalizeTileHoverLiftPx(v)),
           tileHoverShadowPct,
-          onTileHoverShadowPctChange: (v) => setTileHoverShadowPct(normalizeTileHoverShadowPct(v))
+          onTileHoverShadowPctChange: (v) => setTileHoverShadowPct(normalizeTileHoverShadowPct(v)),
+          sliderTransition,
+          onSliderTransitionChange: setSliderTransition
         }}
       />
     </>

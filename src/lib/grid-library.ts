@@ -4,6 +4,8 @@ export type GridSortOrder = "taken_desc" | "taken_asc";
 
 export type GridDistribution = "uniform" | "featured";
 
+export type SliderTransition = "crossfade" | "fade" | "slide" | "zoom" | "wipe";
+
 /** Props per formularis de preferències de graella (popover i Configuració). */
 export type LibraryGridPreferencesBinder = {
   distribution: GridDistribution;
@@ -23,6 +25,8 @@ export type LibraryGridPreferencesBinder = {
   /** Intensitat de l’ombra: 100 = valor per defecte, més alt = més marcada. */
   tileHoverShadowPct: number;
   onTileHoverShadowPctChange: (v: number) => void;
+  sliderTransition: SliderTransition;
+  onSliderTransitionChange: (v: SliderTransition) => void;
 };
 
 /** Presets tipus «Fotos»: només estableixen la mida mínima en px de la miniatura (la graella és auto-fill). */
@@ -49,6 +53,11 @@ export function normalizeGridDensityPreset(raw: unknown): GridDensityPreset {
 
 export function normalizeFeaturedTileSize(raw: unknown): GridDensityPreset {
   return normalizeGridDensityPreset(raw);
+}
+
+export function normalizeSliderTransition(raw: unknown): SliderTransition {
+  if (raw === "crossfade" || raw === "fade" || raw === "slide" || raw === "zoom" || raw === "wipe") return raw;
+  return "crossfade";
 }
 
 export function clampTileMinPx(px: number): number {

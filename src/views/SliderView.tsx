@@ -2,60 +2,86 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Asset } from "@/lib/types";
+import type { SliderTransition } from "@/lib/grid-library";
 import { ViewerFavoriteButton } from "@/components/ViewerFavoriteButton";
+
+const SLIDER_TRANSITION_MS = 450;
 
 interface Props {
   items: Asset[];
+  transition: SliderTransition;
   onEditPhoto: (asset: Asset) => void;
   /** Obre el visor de pantalla completa amb aquest asset. */
   onOpenViewer?: (asset: Asset, contextItems: Asset[]) => void;
   onFavoriteToggle?: (asset: Asset, favorite: boolean) => void | Promise<void>;
 }
 
-export function SliderView({ items, onEditPhoto, onOpenViewer, onFavoriteToggle }: Props) {
+export function SliderView({ items, transition, onEditPhoto, onOpenViewer, onFavoriteToggle }: Props) {
   const [index, setIndex] = useState(0);
+  const [previousIndex, setPreviousIndex] = useState<number | null>(null);
   const [playing, setPlaying] = useState(false);
   const [shuffle, setShuffle] = useState(false);
   const [speedMs, setSpeedMs] = useState(2400);
   const [fullscreen, setFullscreen] = useState(true);
   const [favBusy, setFavBusy] = useState(false);
   const itemsKeyRef = useRef<string>("");
+  const busyRef = useRef(false);
+  const sectionRef = useRef<HTMLElement>(null);
 
   const itemsKey = useMemo(() => items.map((item) => item.id).join("|"), [items]);
 
   const current = useMemo(() => items[index] ?? null, [items, index]);
+  const previous = previousIndex != null ? items[previousIndex] ?? null : null;
 
   useEffect(() => {
     if (itemsKeyRef.current === itemsKey) return;
     itemsKeyRef.current = itemsKey;
-    queueMicrotask(() => setIndex(0));
+    queueMicrotask(() => {
+      setPreviousIndex(null);
+      busyRef.current = false;
+      setIndex(0);
+    });
   }, [itemsKey]);
+
+  const goToIndex = useCallback(
+    (nextRaw: number) => {
+      if (busyRef.current || items.length < 1) return;
+      const next = ((nextRaw % items.length) + items.length) % items.length;
+      if (next === index) return;
+      busyRef.current = true;
+      setPreviousIndex(index);
+      setIndex(next);
+      window.setTimeout(() => {
+        setPreviousIndex(null);
+        busyRef.current = false;
+      }, SLIDER_TRANSITION_MS);
+    },
+    [index, items.length]
+  );
+
+  const goNext = useCallback(() => {
+    if (!shuffle || items.length < 3) {
+      goToIndex(index + 1);
+      return;
+    }
+    let next = index;
+    while (next === index) {
+      next = Math.floor(Math.random() * items.length);
+    }
+    goToIndex(next);
+  }, [goToIndex, index, items.length, shuffle]);
+
+  const goPrev = useCallback(() => {
+    goToIndex(index - 1);
+  }, [goToIndex, index]);
 
   useEffect(() => {
     if (!playing || !items.length) return;
     const timer = window.setInterval(() => {
-      setIndex((prev) => {
-        if (!shuffle || items.length < 3) return (prev + 1) % items.length;
-        let next = prev;
-        while (next === prev) {
-          next = Math.floor(Math.random() * items.length);
-        }
-        return next;
-      });
+      goNext();
     }, speedMs);
     return () => window.clearInterval(timer);
-  }, [playing, speedMs, items.length, shuffle]);
-
-  const goNext = useCallback(() => {
-    setIndex((prev) => {
-      if (!shuffle || items.length < 3) return (prev + 1) % items.length;
-      let next = prev;
-      while (next === prev) {
-        next = Math.floor(Math.random() * items.length);
-      }
-      return next;
-    });
-  }, [items.length, shuffle]);
+  }, [playing, speedMs, items.length, goNext]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -66,14 +92,25 @@ export function SliderView({ items, onEditPhoto, onOpenViewer, onFavoriteToggle 
       } else if (event.key === "ArrowRight") {
         goNext();
       } else if (event.key === "ArrowLeft") {
-        setIndex((prev) => (prev - 1 + items.length) % items.length);
+        goPrev();
       } else if (event.key === "Escape") {
         setFullscreen(false);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [fullscreen, items.length, goNext]);
+  }, [fullscreen, goNext, goPrev]);
+
+  const toggleBrowserFullscreen = useCallback(() => {
+    setFullscreen(true);
+    const el = sectionRef.current;
+    if (!el) return;
+    if (document.fullscreenElement) {
+      void document.exitFullscreen?.();
+      return;
+    }
+    void el.requestFullscreen?.();
+  }, []);
 
   if (!items.length) {
     return <p className="view-empty">No hi ha elements per al mode slider.</p>;
@@ -83,9 +120,12 @@ export function SliderView({ items, onEditPhoto, onOpenViewer, onFavoriteToggle 
 
   const btnClass = fullscreen ? "viewer-toolbar-btn" : undefined;
   const toolbarClass = fullscreen ? "viewer-toolbar slider-view-toolbar" : "controls slider-view-toolbar";
+  const currentSrc = (current.files.mediumUrl || current.files.previewUrl || current.files.originalUrl).trim();
+  const previousSrc = previous ? (previous.files.mediumUrl || previous.files.previewUrl || previous.files.originalUrl).trim() : "";
 
   return (
     <section
+      ref={sectionRef}
       className={fullscreen ? "viewer" : "view-panel"}
       onClick={() => setFullscreen(false)}
     >
@@ -94,17 +134,29 @@ export function SliderView({ items, onEditPhoto, onOpenViewer, onFavoriteToggle 
         onClick={(e) => e.stopPropagation()}
         style={{ transition: "opacity 260ms ease, transform 260ms ease" }}
       >
-        <div className="slider-view-media-box">
+        <div className={`slider-view-media-box slider-view-media-box--transition-${transition}`}>
+          {previous && previousSrc ? (
+            // eslint-disable-next-line @next/next/no-img-element -- URL signades / emmagatzematge
+            <img
+              key={`previous-${previous.id}`}
+              className={`viewer-media slider-view-media slider-view-media--previous slider-view-media--previous-${transition}`}
+              src={previousSrc}
+              alt=""
+              aria-hidden
+              referrerPolicy="no-referrer"
+              decoding="async"
+            />
+          ) : null}
           {/* eslint-disable-next-line @next/next/no-img-element -- URL signades / emmagatzematge */}
           <img
-            className="viewer-media"
-            src={(current.files.mediumUrl || current.files.previewUrl || current.files.originalUrl).trim()}
+            key={`current-${current.id}`}
+            className={`viewer-media slider-view-media slider-view-media--current slider-view-media--current-${transition}`}
+            src={currentSrc}
             alt={current.title}
             referrerPolicy="no-referrer"
             loading="eager"
             decoding="async"
             fetchPriority="high"
-            style={{ cursor: "pointer", display: "block" }}
             onClick={() => onEditPhoto(current)}
           />
         </div>
@@ -112,7 +164,7 @@ export function SliderView({ items, onEditPhoto, onOpenViewer, onFavoriteToggle 
           <button
             type="button"
             className={btnClass}
-            onClick={() => setIndex((prev) => (prev - 1 + items.length) % items.length)}
+            onClick={goPrev}
           >
             Anterior
           </button>
@@ -121,13 +173,22 @@ export function SliderView({ items, onEditPhoto, onOpenViewer, onFavoriteToggle 
           </button>
           <button
             type="button"
-            className={`${btnClass ?? "btn btn-sm"}${shuffle && fullscreen ? " viewer-toolbar-btn--active" : ""}`}
+            className={`${btnClass ?? "btn btn-sm"} viewer-toolbar-btn--icon viewer-toolbar-btn--shuffle${shuffle && fullscreen ? " viewer-toolbar-btn--active" : ""}`}
             aria-label={shuffle ? "Desactivar ordre aleatori" : "Activar ordre aleatori"}
             title={shuffle ? "Aleatori activat" : "Aleatori"}
             aria-pressed={shuffle}
             onClick={() => setShuffle((value) => !value)}
           >
-            <span aria-hidden>🔀</span>
+            <span className="viewer-icon viewer-icon-shuffle" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={`${btnClass ?? "btn btn-sm"} viewer-toolbar-btn--icon`}
+            aria-label="Pantalla completa"
+            title="Pantalla completa"
+            onClick={toggleBrowserFullscreen}
+          >
+            <span className="viewer-icon viewer-icon-fullscreen" aria-hidden />
           </button>
           <button type="button" className={btnClass} onClick={goNext}>
             Següent
@@ -157,11 +218,6 @@ export function SliderView({ items, onEditPhoto, onOpenViewer, onFavoriteToggle 
               <option value={6000}>6 s</option>
             </select>
           </label>
-          {!fullscreen ? (
-            <button type="button" className={btnClass} onClick={() => setFullscreen(true)}>
-              Pantalla completa
-            </button>
-          ) : null}
         </div>
       </div>
     </section>

@@ -1359,22 +1359,33 @@ export function AdminAssetManager({
                               </select>
                             </td>
                             <td className="admin-collection-actions-cell">
-                              <button type="button" className="btn btn-sm" onClick={() => toggleCollectionRow(collection.id)}>
-                                {openCollectionRows[collection.id] ? "Amagar fotos" : "Mostrar fotos"}
+                              <button
+                                type="button"
+                                className={`btn btn-icon btn-sm admin-collection-icon-btn${openCollectionRows[collection.id] ? " is-active" : ""}`}
+                                title={openCollectionRows[collection.id] ? "Amagar fotos" : "Mostrar fotos"}
+                                aria-label={openCollectionRows[collection.id] ? `Amagar fotos de ${collection.name}` : `Mostrar fotos de ${collection.name}`}
+                                aria-pressed={!!openCollectionRows[collection.id]}
+                                onClick={() => toggleCollectionRow(collection.id)}
+                              >
+                                <span className="admin-collection-icon admin-collection-icon-grid" aria-hidden />
                               </button>
                               <button
                                 type="button"
-                                className="btn btn-sm btn-primary"
+                                className="btn btn-icon btn-sm btn-primary admin-collection-icon-btn"
+                                title="Afegir fotos"
+                                aria-label={`Afegir fotos a ${collection.name}`}
                                 onClick={() => setAssetPickerTarget({ kind: "collection", id: collection.id })}
                               >
-                                Afegir fotos…
+                                <span className="admin-collection-icon admin-collection-icon-add" aria-hidden />
                               </button>
                               <button
                                 type="button"
-                                className="btn btn-sm danger"
+                                className="btn btn-icon btn-sm danger admin-collection-icon-btn"
+                                title="Eliminar"
+                                aria-label={`Eliminar la col·lecció ${collection.name}`}
                                 onClick={() => setDeleteCollectionId(collection.id)}
                               >
-                                Eliminar
+                                <span className="admin-collection-icon admin-collection-icon-delete" aria-hidden />
                               </button>
                             </td>
                           </tr>

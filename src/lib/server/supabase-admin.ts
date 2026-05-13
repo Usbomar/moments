@@ -17,3 +17,7 @@ export function getSupabaseAdmin() {
 export function getStorageBucket() {
   return process.env.SUPABASE_STORAGE_BUCKET ?? "fotos";
 }
+
+export function getCollectionMusicBucket() {
+  return process.env.SUPABASE_COLLECTION_MUSIC_BUCKET ?? "collection-music";
+}

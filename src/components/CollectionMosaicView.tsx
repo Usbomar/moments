@@ -40,7 +40,7 @@ export function CollectionMosaicView({ items, collections, maxOpen, onOpenModal,
           <section key={collection.id} className="collection-mosaic-section">
             <button type="button" className="collection-mosaic-header" onClick={() => toggleOpen(collection.id)}>
               <span>{collection.name}</span>
-              <small>{assets.length} fotos</small>
+              <small>{collection.musicTrack ? `♪ ${collection.musicTrack.title}` : `${assets.length} fotos`}</small>
             </button>
             {open ? (
               <div className="collection-mosaic-grid">
@@ -65,6 +65,7 @@ export function CollectionMosaicView({ items, collections, maxOpen, onOpenModal,
               <button type="button" className="collection-mosaic-cover" onClick={() => toggleOpen(collection.id)}>
                 <LazyImage fill src={coverUrl} alt={collection.name} className="collection-mosaic-image" referrerPolicy="no-referrer" />
                 <span className="collection-mosaic-cover-title">{collection.name}</span>
+                {collection.musicTrack ? <span className="collection-mosaic-cover-music">♪ {collection.musicTrack.title}</span> : null}
               </button>
             ) : null}
           </section>

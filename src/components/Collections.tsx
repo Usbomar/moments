@@ -3,12 +3,13 @@
 import { useCallback, useEffect, useMemo, useState, type MouseEvent } from "react";
 import type { Asset } from "@/lib/types";
 import type { AppCollection } from "@/lib/collections";
+import type { CollectionMusicTrack } from "@/lib/collection-music";
 import { LazyImage } from "@/components/LazyImage";
 
 interface Props {
   items: Asset[];
   /** Obre el visor a pantalla completa només amb els assets d’aquesta col·lecció */
-  onPlaySlideshow?: (assets: Asset[]) => void;
+  onPlaySlideshow?: (assets: Asset[], musicTrack: CollectionMusicTrack | null) => void;
 }
 
 export function Collections({ items, onPlaySlideshow }: Props) {
@@ -125,6 +126,7 @@ export function Collections({ items, onPlaySlideshow }: Props) {
             <div className="collections-detail-head-main">
               <h2>{activeCollection.name}</h2>
               <p className="modal-muted">{visibleAssets.length} foto(s)</p>
+              {activeCollection.musicTrack ? <p className="collection-music-label">♪ {activeCollection.musicTrack.title}</p> : null}
             </div>
             <button
               type="button"
@@ -132,7 +134,7 @@ export function Collections({ items, onPlaySlideshow }: Props) {
               aria-label="Presentació només d’aquesta col·lecció"
               title="Presentació"
               disabled={!visibleAssets.length}
-              onClick={() => onPlaySlideshow?.(visibleAssets)}
+              onClick={() => onPlaySlideshow?.(visibleAssets, activeCollection.musicTrack)}
             >
               <span aria-hidden>▶</span>
             </button>
@@ -199,6 +201,7 @@ export function Collections({ items, onPlaySlideshow }: Props) {
                       <div className="collection-card-label">
                         <span className="collection-card-title">{c.name}</span>
                         <span className="collection-card-count">{c.assetIds.length} fotos</span>
+                        {c.musicTrack ? <span className="collection-card-music">♪ {c.musicTrack.title}</span> : null}
                       </div>
                     </>
                   ) : null}
@@ -249,7 +252,7 @@ export function Collections({ items, onPlaySlideshow }: Props) {
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            onPlaySlideshow(slideAssets);
+                            onPlaySlideshow(slideAssets, c.musicTrack);
                           }}
                         >
                           <span aria-hidden>▶</span>

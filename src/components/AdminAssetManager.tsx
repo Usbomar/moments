@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import type { Asset } from "@/lib/types";
 import type { LibraryGridPreferencesBinder } from "@/lib/grid-library";
 import type { AppCollection } from "@/lib/collections";
+import { formatMusicDuration, formatMusicSize, type CollectionMusicTrack } from "@/lib/collection-music";
 import { AdminAssetPickerModal } from "@/components/AdminAssetPickerModal";
 import { LibraryGridPreferencesPanel } from "@/components/LibraryGridPreferencesPanel";
 import { ViewerFavoriteButton } from "@/components/ViewerFavoriteButton";
@@ -75,6 +76,40 @@ type Props = {
 
 type DraftPatch = Partial<Pick<Asset, "title" | "takenAt" | "favorite" | "colorHue" | "location" | "hiddenFromGuests">>;
 const CUSTOM_COLOR_STORAGE_KEY = "moments_admin_custom_colors_v1";
+
+function readAudioDurationFromUrl(url: string): Promise<number | null> {
+  return new Promise((resolve) => {
+    const audio = new Audio();
+    let settled = false;
+    const done = (value: number | null) => {
+      if (settled) return;
+      settled = true;
+      audio.removeAttribute("src");
+      audio.load();
+      resolve(value);
+    };
+    const timer = window.setTimeout(() => done(null), 5000);
+    audio.preload = "metadata";
+    audio.onloadedmetadata = () => {
+      window.clearTimeout(timer);
+      done(Number.isFinite(audio.duration) ? audio.duration : null);
+    };
+    audio.onerror = () => {
+      window.clearTimeout(timer);
+      done(null);
+    };
+    audio.src = url;
+  });
+}
+
+async function readAudioDurationFromFile(file: File): Promise<number | null> {
+  const url = URL.createObjectURL(file);
+  try {
+    return await readAudioDurationFromUrl(url);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
 type GuestProfileCfg = {
   guestAccessEnabled: boolean;
   guestSlug: string | null;
@@ -124,6 +159,13 @@ export function AdminAssetManager({
   const [editingCollectionId, setEditingCollectionId] = useState<string | null>(null);
   const [editingCollectionDraft, setEditingCollectionDraft] = useState("");
   const [deleteCollectionId, setDeleteCollectionId] = useState<string | null>(null);
+  const [musicTracks, setMusicTracks] = useState<CollectionMusicTrack[]>([]);
+  const [musicLoading, setMusicLoading] = useState(false);
+  const [musicBusy, setMusicBusy] = useState(false);
+  const [musicError, setMusicError] = useState<string | null>(null);
+  const [musicUploadTitle, setMusicUploadTitle] = useState("");
+  const [musicLinkTitle, setMusicLinkTitle] = useState("");
+  const [musicLinkUrl, setMusicLinkUrl] = useState("");
   const [assetPickerTarget, setAssetPickerTarget] = useState<AssetPickerTarget | null>(null);
   const [tabOrder, setTabOrder] = useState<AdminTabId[]>(() => {
     if (typeof window === "undefined") return [...DEFAULT_TAB_ORDER];
@@ -146,8 +188,30 @@ export function AdminAssetManager({
     return [...DEFAULT_PHOTO_COLUMNS];
   });
   const saveTimersRef = useRef<Record<string, number>>({});
+  const musicFileInputRef = useRef<HTMLInputElement>(null);
   const allColorOptions = useMemo(() => [...COLOR_PRESETS, ...customColors], [customColors]);
   const { tagStats, locationStats, tagsToAssets, locationsToAssets, assetById, sorted } = useAdminAssetStats(assets, sort);
+
+  const refreshMusicTracks = useCallback(async () => {
+    setMusicLoading(true);
+    setMusicError(null);
+    try {
+      const res = await fetch("/api/collection-music", { cache: "no-store" });
+      const body = (await res.json().catch(() => ({}))) as { tracks?: CollectionMusicTrack[]; error?: string };
+      if (!res.ok) {
+        setMusicError(body.error ?? "No s'ha pogut carregar la música.");
+        return;
+      }
+      setMusicTracks(body.tracks ?? []);
+    } finally {
+      setMusicLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!open || activeTab !== "collections") return;
+    void refreshMusicTracks();
+  }, [activeTab, open, refreshMusicTracks]);
 
   const pickerAvailableAssets = useMemo(() => {
     if (!assetPickerTarget) return [];
@@ -508,6 +572,86 @@ export function AdminAssetManager({
     });
     if (assetPickerTarget?.kind === "collection" && assetPickerTarget.id === removedId) setAssetPickerTarget(null);
     await onRefreshCollections?.();
+  };
+
+  const handleUploadMusicFile = async (file: File | undefined) => {
+    if (!file) return;
+    setMusicBusy(true);
+    setMusicError(null);
+    try {
+      const duration = await readAudioDurationFromFile(file);
+      const form = new FormData();
+      form.set("source", "uploaded");
+      form.set("file", file);
+      form.set("title", musicUploadTitle.trim() || file.name.replace(/\.[^.]+$/, ""));
+      if (duration) form.set("durationSeconds", String(Math.round(duration)));
+      const res = await fetch("/api/collection-music", { method: "POST", body: form });
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setMusicError(body.error ?? "No s'ha pogut pujar l'MP3.");
+        return;
+      }
+      setMusicUploadTitle("");
+      if (musicFileInputRef.current) musicFileInputRef.current.value = "";
+      await refreshMusicTracks();
+    } finally {
+      setMusicBusy(false);
+    }
+  };
+
+  const handleAddLinkedMusic = async () => {
+    const url = musicLinkUrl.trim();
+    if (!url) return;
+    setMusicBusy(true);
+    setMusicError(null);
+    try {
+      const duration = await readAudioDurationFromUrl(url);
+      const form = new FormData();
+      form.set("source", "linked");
+      form.set("url", url);
+      form.set("title", musicLinkTitle.trim() || url);
+      if (duration) form.set("durationSeconds", String(Math.round(duration)));
+      const res = await fetch("/api/collection-music", { method: "POST", body: form });
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setMusicError(body.error ?? "No s'ha pogut vincular la música.");
+        return;
+      }
+      setMusicLinkTitle("");
+      setMusicLinkUrl("");
+      await refreshMusicTracks();
+    } finally {
+      setMusicBusy(false);
+    }
+  };
+
+  const assignMusicToCollection = async (collectionId: string, musicTrackId: string | null) => {
+    const res = await fetch(`/api/collections/${collectionId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ musicTrackId })
+    });
+    if (!res.ok) return;
+    await onRefreshCollections?.();
+  };
+
+  const deleteMusicTrack = async (track: CollectionMusicTrack) => {
+    const ok = window.confirm(`Vols eliminar «${track.title}» de la biblioteca de música?`);
+    if (!ok) return;
+    setMusicBusy(true);
+    setMusicError(null);
+    try {
+      const res = await fetch(`/api/collection-music/${track.id}`, { method: "DELETE" });
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setMusicError(body.error ?? "No s'ha pogut eliminar la pista.");
+        return;
+      }
+      await refreshMusicTracks();
+      await onRefreshCollections?.();
+    } finally {
+      setMusicBusy(false);
+    }
   };
 
   const handleAssetPickerConfirm = async (selectedIds: string[]) => {
@@ -1116,153 +1260,241 @@ export function AdminAssetManager({
 
         {activeTab === "collections" ? (
           <div className="admin-tab-panel admin-tab-panel--collections">
-            <div className="admin-collection-toolbar">
-              <input
-                type="text"
-                value={newCollectionName}
-                onChange={(e) => setNewCollectionName(e.target.value)}
-                placeholder="Nom de la col·lecció"
-                aria-label="Nom de la nova col·lecció"
-                className="admin-collection-new-input"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") void handleCreateCollection();
-                }}
-              />
-              <button type="button" className="btn btn-primary btn-sm" onClick={() => void handleCreateCollection()}>
-                Crear col·lecció
-              </button>
+            <div className="admin-collections-layout">
+              <div className="admin-collections-main">
+                <div className="admin-collection-toolbar">
+                  <input
+                    type="text"
+                    value={newCollectionName}
+                    onChange={(e) => setNewCollectionName(e.target.value)}
+                    placeholder="Nom de la col·lecció"
+                    aria-label="Nom de la nova col·lecció"
+                    className="admin-collection-new-input"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void handleCreateCollection();
+                    }}
+                  />
+                  <button type="button" className="btn btn-primary btn-sm" onClick={() => void handleCreateCollection()}>
+                    Crear col·lecció
+                  </button>
+                </div>
+                <p className="modal-muted admin-collection-hint">
+                  Edita el nom, assigna una cançó, elimina la col·lecció o obre el selector per afegir fotos.
+                </p>
+                <table className="admin-stats-table">
+                  <thead>
+                    <tr>
+                      <th>Col·lecció</th>
+                      <th>Fotos</th>
+                      <th>Música</th>
+                      <th className="admin-collection-actions-col">Accions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {collections.map((collection) => {
+                      const isEditing = editingCollectionId === collection.id;
+                      const memberAssets = collection.assetIds.map((id) => assetById.get(id)).filter((x): x is Asset => Boolean(x));
+                      return (
+                        <Fragment key={collection.id}>
+                          <tr>
+                            <td>
+                              {isEditing ? (
+                                <div className="admin-collection-name-edit">
+                                  <input
+                                    type="text"
+                                    value={editingCollectionDraft}
+                                    onChange={(e) => setEditingCollectionDraft(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") void commitRenameCollection();
+                                      if (e.key === "Escape") setEditingCollectionId(null);
+                                    }}
+                                    aria-label="Nou nom de la col·lecció"
+                                    autoFocus
+                                  />
+                                  <button type="button" className="btn btn-icon btn-sm" title="Desar" aria-label="Desar nom" onClick={() => void commitRenameCollection()}>
+                                    <span aria-hidden>✓</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn btn-icon btn-sm"
+                                    title="Cancel·lar"
+                                    aria-label="Cancel·lar"
+                                    onClick={() => setEditingCollectionId(null)}
+                                  >
+                                    <span aria-hidden>×</span>
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="admin-collection-name-row">
+                                  <span className="admin-collection-name-text">{collection.name}</span>
+                                  {collection.musicTrack ? <span className="admin-collection-music-pill">♪ {collection.musicTrack.title}</span> : null}
+                                  <button
+                                    type="button"
+                                    className="btn btn-icon btn-sm"
+                                    title="Renombrar"
+                                    aria-label={`Renombrar ${collection.name}`}
+                                    onClick={() => {
+                                      setEditingCollectionId(collection.id);
+                                      setEditingCollectionDraft(collection.name);
+                                    }}
+                                  >
+                                    <span aria-hidden>✎</span>
+                                  </button>
+                                </div>
+                              )}
+                            </td>
+                            <td>{collection.assetIds.length}</td>
+                            <td>
+                              <select
+                                className="admin-collection-music-select"
+                                value={collection.musicTrackId ?? ""}
+                                onChange={(e) => void assignMusicToCollection(collection.id, e.target.value || null)}
+                              >
+                                <option value="">Sense música</option>
+                                {musicTracks.map((track) => (
+                                  <option key={track.id} value={track.id}>
+                                    {track.title}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+                            <td className="admin-collection-actions-cell">
+                              <button type="button" className="btn btn-sm" onClick={() => toggleCollectionRow(collection.id)}>
+                                {openCollectionRows[collection.id] ? "Amagar fotos" : "Mostrar fotos"}
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-primary"
+                                onClick={() => setAssetPickerTarget({ kind: "collection", id: collection.id })}
+                              >
+                                Afegir fotos…
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-sm danger"
+                                onClick={() => setDeleteCollectionId(collection.id)}
+                              >
+                                Eliminar
+                              </button>
+                            </td>
+                          </tr>
+                          {openCollectionRows[collection.id] ? (
+                            <tr key={`${collection.id}-assets`} className="admin-stats-expanded-row">
+                              <td colSpan={4}>
+                                <p className="admin-collection-members-label">Fotos d&apos;aquesta col·lecció (desmarca per treure-les)</p>
+                                {memberAssets.length ? (
+                                  <div className="admin-linked-thumbs">
+                                    {collection.assetIds.map((assetId) => {
+                                      const asset = assetById.get(assetId);
+                                      if (!asset) return null;
+                                      const thumb = (asset.files.thumbUrl || asset.files.previewUrl || asset.files.originalUrl).trim();
+                                      const included = collection.assetIds.includes(asset.id);
+                                      return (
+                                        <label key={`${collection.id}-${asset.id}`} className="admin-linked-thumb-item admin-linked-thumb-item--check">
+                                          <input
+                                            type="checkbox"
+                                            checked={included}
+                                            onChange={(e) => {
+                                              void toggleAssetInCollection(collection, asset.id, e.target.checked);
+                                            }}
+                                          />
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              openPreview(
+                                                asset,
+                                                collection.assetIds.map((id) => assetById.get(id)).filter((x): x is Asset => Boolean(x))
+                                              )
+                                            }
+                                          >
+                                            {/* eslint-disable-next-line @next/next/no-img-element -- remote storage image */}
+                                            <img src={thumb} alt={asset.title} referrerPolicy="no-referrer" />
+                                          </button>
+                                        </label>
+                                      );
+                                    })}
+                                  </div>
+                                ) : (
+                                  <p className="modal-muted">Encara no hi ha fotos. Utilitza «Afegir fotos…».</p>
+                                )}
+                              </td>
+                            </tr>
+                          ) : null}
+                        </Fragment>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <aside className="admin-collection-music-panel" aria-label="Música per a col·leccions">
+                <div>
+                  <h3>Música</h3>
+                  <p className="modal-muted">Puja MP3 a Supabase o vincula un àudio directe d’internet. Després assigna&apos;l a cada col·lecció.</p>
+                </div>
+                <div className="admin-collection-music-card">
+                  <strong>Pujar MP3</strong>
+                  <input
+                    type="text"
+                    value={musicUploadTitle}
+                    onChange={(e) => setMusicUploadTitle(e.target.value)}
+                    placeholder="Títol opcional"
+                    aria-label="Títol de l'MP3"
+                  />
+                  <input
+                    ref={musicFileInputRef}
+                    type="file"
+                    accept="audio/mpeg,audio/mp3,.mp3"
+                    onChange={(e) => void handleUploadMusicFile(e.target.files?.[0])}
+                    disabled={musicBusy}
+                  />
+                </div>
+                <div className="admin-collection-music-card">
+                  <strong>Vincular URL</strong>
+                  <input
+                    type="text"
+                    value={musicLinkTitle}
+                    onChange={(e) => setMusicLinkTitle(e.target.value)}
+                    placeholder="Nom de la cançó"
+                    aria-label="Nom de la cançó vinculada"
+                  />
+                  <input
+                    type="url"
+                    value={musicLinkUrl}
+                    onChange={(e) => setMusicLinkUrl(e.target.value)}
+                    placeholder="https://.../canço.mp3"
+                    aria-label="URL directa d'àudio"
+                  />
+                  <button type="button" className="btn btn-sm" disabled={musicBusy || !musicLinkUrl.trim()} onClick={() => void handleAddLinkedMusic()}>
+                    Afegir enllaç
+                  </button>
+                </div>
+                {musicError ? <p className="modal-error">{musicError}</p> : null}
+                <div className="admin-collection-music-list">
+                  <div className="admin-collection-music-list-head">
+                    <strong>Cançons</strong>
+                    <button type="button" className="btn btn-sm" disabled={musicLoading} onClick={() => void refreshMusicTracks()}>
+                      Actualitzar
+                    </button>
+                  </div>
+                  {musicLoading ? <p className="modal-muted">Carregant música…</p> : null}
+                  {!musicLoading && musicTracks.length === 0 ? <p className="modal-muted">Encara no hi ha cançons.</p> : null}
+                  {musicTracks.map((track) => (
+                    <div key={track.id} className="admin-collection-music-track">
+                      <div>
+                        <strong>{track.title}</strong>
+                        <span>{track.source === "uploaded" ? "MP3 pujat" : "Enllaç extern"}</span>
+                      </div>
+                      <small>{formatMusicDuration(track.durationSeconds)}</small>
+                      <small>{track.source === "uploaded" ? formatMusicSize(track.sizeBytes) : "0 MB a Supabase"}</small>
+                      <button type="button" className="btn btn-icon btn-sm btn-icon--danger" aria-label={`Eliminar ${track.title}`} onClick={() => void deleteMusicTrack(track)}>
+                        <span aria-hidden>×</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </aside>
             </div>
-            <p className="modal-muted admin-collection-hint">
-              Edita el nom, elimina la col·lecció o obre el selector per afegir fotos de la biblioteca que encara no hi siguin.
-            </p>
-            <table className="admin-stats-table">
-              <thead>
-                <tr>
-                  <th>Col·lecció</th>
-                  <th>Fotos</th>
-                  <th className="admin-collection-actions-col">Accions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {collections.map((collection) => {
-                  const isEditing = editingCollectionId === collection.id;
-                  const memberAssets = collection.assetIds.map((id) => assetById.get(id)).filter((x): x is Asset => Boolean(x));
-                  return (
-                    <Fragment key={collection.id}>
-                      <tr>
-                        <td>
-                          {isEditing ? (
-                            <div className="admin-collection-name-edit">
-                              <input
-                                type="text"
-                                value={editingCollectionDraft}
-                                onChange={(e) => setEditingCollectionDraft(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") void commitRenameCollection();
-                                  if (e.key === "Escape") setEditingCollectionId(null);
-                                }}
-                                aria-label="Nou nom de la col·lecció"
-                                autoFocus
-                              />
-                              <button type="button" className="btn btn-icon btn-sm" title="Desar" aria-label="Desar nom" onClick={() => void commitRenameCollection()}>
-                                <span aria-hidden>✓</span>
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-icon btn-sm"
-                                title="Cancel·lar"
-                                aria-label="Cancel·lar"
-                                onClick={() => setEditingCollectionId(null)}
-                              >
-                                <span aria-hidden>×</span>
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="admin-collection-name-row">
-                              <span className="admin-collection-name-text">{collection.name}</span>
-                              <button
-                                type="button"
-                                className="btn btn-icon btn-sm"
-                                title="Renombrar"
-                                aria-label={`Renombrar ${collection.name}`}
-                                onClick={() => {
-                                  setEditingCollectionId(collection.id);
-                                  setEditingCollectionDraft(collection.name);
-                                }}
-                              >
-                                <span aria-hidden>✎</span>
-                              </button>
-                            </div>
-                          )}
-                        </td>
-                        <td>{collection.assetIds.length}</td>
-                        <td className="admin-collection-actions-cell">
-                          <button type="button" className="btn btn-sm" onClick={() => toggleCollectionRow(collection.id)}>
-                            {openCollectionRows[collection.id] ? "Amagar fotos" : "Mostrar fotos"}
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-sm btn-primary"
-                            onClick={() => setAssetPickerTarget({ kind: "collection", id: collection.id })}
-                          >
-                            Afegir fotos…
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-sm danger"
-                            onClick={() => setDeleteCollectionId(collection.id)}
-                          >
-                            Eliminar
-                          </button>
-                        </td>
-                      </tr>
-                      {openCollectionRows[collection.id] ? (
-                        <tr key={`${collection.id}-assets`} className="admin-stats-expanded-row">
-                          <td colSpan={3}>
-                            <p className="admin-collection-members-label">Fotos d&apos;aquesta col·lecció (desmarca per treure-les)</p>
-                            {memberAssets.length ? (
-                              <div className="admin-linked-thumbs">
-                                {collection.assetIds.map((assetId) => {
-                                  const asset = assetById.get(assetId);
-                                  if (!asset) return null;
-                                  const thumb = (asset.files.thumbUrl || asset.files.previewUrl || asset.files.originalUrl).trim();
-                                  const included = collection.assetIds.includes(asset.id);
-                                  return (
-                                    <label key={`${collection.id}-${asset.id}`} className="admin-linked-thumb-item admin-linked-thumb-item--check">
-                                      <input
-                                        type="checkbox"
-                                        checked={included}
-                                        onChange={(e) => {
-                                          void toggleAssetInCollection(collection, asset.id, e.target.checked);
-                                        }}
-                                      />
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          openPreview(
-                                            asset,
-                                            collection.assetIds.map((id) => assetById.get(id)).filter((x): x is Asset => Boolean(x))
-                                          )
-                                        }
-                                      >
-                                        {/* eslint-disable-next-line @next/next/no-img-element -- remote storage image */}
-                                        <img src={thumb} alt={asset.title} referrerPolicy="no-referrer" />
-                                      </button>
-                                    </label>
-                                  );
-                                })}
-                              </div>
-                            ) : (
-                              <p className="modal-muted">Encara no hi ha fotos. Utilitza «Afegir fotos…».</p>
-                            )}
-                          </td>
-                        </tr>
-                      ) : null}
-                    </Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
           </div>
         ) : null}
 

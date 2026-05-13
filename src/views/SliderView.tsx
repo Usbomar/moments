@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Asset } from "@/lib/types";
 import { ViewerFavoriteButton } from "@/components/ViewerFavoriteButton";
 
@@ -15,6 +15,7 @@ interface Props {
 export function SliderView({ items, onEditPhoto, onOpenViewer, onFavoriteToggle }: Props) {
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const [shuffle, setShuffle] = useState(false);
   const [speedMs, setSpeedMs] = useState(2400);
   const [fullscreen, setFullscreen] = useState(true);
   const [favBusy, setFavBusy] = useState(false);
@@ -33,10 +34,28 @@ export function SliderView({ items, onEditPhoto, onOpenViewer, onFavoriteToggle 
   useEffect(() => {
     if (!playing || !items.length) return;
     const timer = window.setInterval(() => {
-      setIndex((prev) => (prev + 1) % items.length);
+      setIndex((prev) => {
+        if (!shuffle || items.length < 3) return (prev + 1) % items.length;
+        let next = prev;
+        while (next === prev) {
+          next = Math.floor(Math.random() * items.length);
+        }
+        return next;
+      });
     }, speedMs);
     return () => window.clearInterval(timer);
-  }, [playing, speedMs, items.length]);
+  }, [playing, speedMs, items.length, shuffle]);
+
+  const goNext = useCallback(() => {
+    setIndex((prev) => {
+      if (!shuffle || items.length < 3) return (prev + 1) % items.length;
+      let next = prev;
+      while (next === prev) {
+        next = Math.floor(Math.random() * items.length);
+      }
+      return next;
+    });
+  }, [items.length, shuffle]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -45,7 +64,7 @@ export function SliderView({ items, onEditPhoto, onOpenViewer, onFavoriteToggle 
         event.preventDefault();
         setPlaying((prev) => !prev);
       } else if (event.key === "ArrowRight") {
-        setIndex((prev) => (prev + 1) % items.length);
+        goNext();
       } else if (event.key === "ArrowLeft") {
         setIndex((prev) => (prev - 1 + items.length) % items.length);
       } else if (event.key === "Escape") {
@@ -54,7 +73,7 @@ export function SliderView({ items, onEditPhoto, onOpenViewer, onFavoriteToggle 
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [fullscreen, items.length]);
+  }, [fullscreen, items.length, goNext]);
 
   if (!items.length) {
     return <p className="view-empty">No hi ha elements per al mode slider.</p>;
@@ -100,7 +119,17 @@ export function SliderView({ items, onEditPhoto, onOpenViewer, onFavoriteToggle 
           <button type="button" className={btnClass} onClick={() => setPlaying((prev) => !prev)}>
             {playing ? "Pausa" : "Reprodueix"}
           </button>
-          <button type="button" className={btnClass} onClick={() => setIndex((prev) => (prev + 1) % items.length)}>
+          <button
+            type="button"
+            className={`${btnClass ?? "btn btn-sm"}${shuffle && fullscreen ? " viewer-toolbar-btn--active" : ""}`}
+            aria-label={shuffle ? "Desactivar ordre aleatori" : "Activar ordre aleatori"}
+            title={shuffle ? "Aleatori activat" : "Aleatori"}
+            aria-pressed={shuffle}
+            onClick={() => setShuffle((value) => !value)}
+          >
+            <span aria-hidden>🔀</span>
+          </button>
+          <button type="button" className={btnClass} onClick={goNext}>
             Següent
           </button>
           <ViewerFavoriteButton

@@ -6,6 +6,7 @@ export type StoredCollection = {
   name: string;
   coverAssetId: string | null;
   assetIds: string[];
+  musicTrackId: string | null;
 };
 
 export function loadCollections(): StoredCollection[] {
@@ -27,7 +28,8 @@ export function loadCollections(): StoredCollection[] {
         const coverAssetId = o.coverAssetId === null ? null : typeof o.coverAssetId === "string" ? o.coverAssetId : null;
         const assetIds = Array.isArray(o.assetIds) ? o.assetIds.filter((x): x is string => typeof x === "string") : [];
         if (!id || !name) return null;
-        return { id, name, coverAssetId, assetIds } satisfies StoredCollection;
+        const musicTrackId = o.musicTrackId === null ? null : typeof o.musicTrackId === "string" ? o.musicTrackId : null;
+        return { id, name, coverAssetId, assetIds, musicTrackId } satisfies StoredCollection;
       })
       .filter((x): x is StoredCollection => x != null);
   } catch {

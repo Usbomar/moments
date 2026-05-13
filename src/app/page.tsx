@@ -17,6 +17,7 @@ import { MainLayout } from "@/layouts/MainLayout";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { loadCollections } from "@/lib/collections-storage";
 import type { AppCollection } from "@/lib/collections";
+import type { CollectionMusicTrack } from "@/lib/collection-music";
 import { AdminAssetManager } from "@/components/AdminAssetManager";
 import { GridOptionsPopover } from "@/components/GridOptionsPopover";
 import {
@@ -93,6 +94,11 @@ const GRID_TILE_HOVER_SHADOW_STORAGE = "moments-grid-tile-hover-shadow-pct";
 /** Llegit només per migració si falta `moments-grid-tile-min-px`. */
 const GRID_FEATURED_TILE_STORAGE = "moments-grid-featured-tile-size";
 
+type CollectionSlideshowState = {
+  assets: Asset[];
+  musicTrack: CollectionMusicTrack | null;
+};
+
 function HomeContent() {
   const COLLECTIONS_MIGRATED_KEY = "moments_collections_migrated_to_server_v1";
   const { filters } = useFilters();
@@ -112,7 +118,7 @@ function HomeContent() {
   const [slideshowItems, setSlideshowItems] = useState<Asset[] | null>(null);
   /** Ordre de navegació del visor ple pantalla quan s’obre des d’una vista (graella, mosaic, mapa, etc.). */
   const [viewerQueue, setViewerQueue] = useState<Asset[] | null>(null);
-  const [collectionSlideshow, setCollectionSlideshow] = useState<Asset[] | null>(null);
+  const [collectionSlideshow, setCollectionSlideshow] = useState<CollectionSlideshowState | null>(null);
   const [adminOpen, setAdminOpen] = useState(false);
   const [photoModalFront, setPhotoModalFront] = useState(false);
   const [adminCollections, setAdminCollections] = useState<AppCollection[]>([]);
@@ -328,11 +334,11 @@ function HomeContent() {
     setSelectedId(memAssets[0]!.id);
   }, []);
 
-  const onCollectionSlideshow = useCallback((assets: Asset[]) => {
+  const onCollectionSlideshow = useCallback((assets: Asset[], musicTrack: CollectionMusicTrack | null = null) => {
     if (!assets.length) return;
     setSelectedId(null);
     setSlideshowItems(null);
-    setCollectionSlideshow(assets);
+    setCollectionSlideshow({ assets, musicTrack });
   }, []);
 
   const openViewer = useCallback((asset: Asset, contextItems: Asset[]) => {
@@ -370,7 +376,7 @@ function HomeContent() {
     setSlideshowItems(null);
   }, []);
 
-  const modalOpen = !!(selectedAsset || imageEditorAsset || selectedId || (collectionSlideshow?.length ?? 0) > 0);
+  const modalOpen = !!(selectedAsset || imageEditorAsset || selectedId || (collectionSlideshow?.assets.length ?? 0) > 0);
 
   const onModalEscape = useCallback(() => {
     if (imageEditorAsset) return;
@@ -378,7 +384,7 @@ function HomeContent() {
       setSelectedAsset(null);
       return;
     }
-    if (collectionSlideshow?.length) {
+    if (collectionSlideshow?.assets.length) {
       setCollectionSlideshow(null);
       return;
     }
@@ -476,7 +482,9 @@ function HomeContent() {
   const mergeAssetIntoViewerLists = useCallback((merged: Asset) => {
     setSlideshowItems((prev) => (prev ? prev.map((a) => (a.id === merged.id ? merged : a)) : prev));
     setViewerQueue((prev) => (prev ? prev.map((a) => (a.id === merged.id ? merged : a)) : null));
-    setCollectionSlideshow((prev) => (prev ? prev.map((a) => (a.id === merged.id ? merged : a)) : null));
+    setCollectionSlideshow((prev) =>
+      prev ? { ...prev, assets: prev.assets.map((a) => (a.id === merged.id ? merged : a)) } : null
+    );
   }, []);
 
   const handleViewerFavoriteToggle = useCallback(
@@ -686,10 +694,11 @@ function HomeContent() {
         onFavoriteToggle={handleViewerFavoriteToggle}
       />
 
-      {collectionSlideshow?.length ? (
+      {collectionSlideshow?.assets.length ? (
         <ViewErrorBoundary label="Presentació col·lecció">
           <FadingSlideshow
-            items={collectionSlideshow}
+            items={collectionSlideshow.assets}
+            musicTrack={collectionSlideshow.musicTrack}
             onClose={() => setCollectionSlideshow(null)}
             onEditDetails={openDetailsFromCollectionSlideshow}
             onFavoriteToggle={handleViewerFavoriteToggle}

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Asset } from "@/lib/types";
+import type { CollectionMusicTrack } from "@/lib/collection-music";
 import { ViewerFavoriteButton } from "@/components/ViewerFavoriteButton";
 
 const FADE_MS = 450;
@@ -12,6 +13,7 @@ type Props = {
   onEditDetails?: (asset: Asset) => void;
   /** Commuta preferit (mateix flux que la biblioteca). */
   onFavoriteToggle?: (asset: Asset, favorite: boolean) => void | Promise<void>;
+  musicTrack?: CollectionMusicTrack | null;
   /** Temps que cada foto resta visible (després del fade d’entrada, abans del següent fos) */
   dwellMs?: number;
 };
@@ -21,18 +23,27 @@ function urlFor(asset: Asset): string {
 }
 
 /**
- * Presentació a pantalla completa amb fos a negre entre imatges (estil “ken burns” lleuger només en opacitat).
+ * Presentació a pantalla completa amb crossfade entre imatges i música local opcional.
  */
-export function FadingSlideshow({ items, onClose, onEditDetails, onFavoriteToggle, dwellMs = 2800 }: Props) {
+export function FadingSlideshow({ items, onClose, onEditDetails, onFavoriteToggle, musicTrack, dwellMs = 2800 }: Props) {
   const [index, setIndex] = useState(0);
-  const [veilOn, setVeilOn] = useState(false);
+  const [previousIndex, setPreviousIndex] = useState<number | null>(null);
   const [playing, setPlaying] = useState(true);
+  const [shuffle, setShuffle] = useState(false);
   const [favBusy, setFavBusy] = useState(false);
+  const [musicSrc, setMusicSrc] = useState<string | null>(() => musicTrack?.url ?? null);
+  const [musicName, setMusicName] = useState<string | null>(() => musicTrack?.title ?? null);
+  const [musicPlaying, setMusicPlaying] = useState(() => !!musicTrack?.url);
+  const [musicVolume, setMusicVolume] = useState(0.42);
   const busyRef = useRef(false);
   const indexRef = useRef(0);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const musicInputRef = useRef<HTMLInputElement>(null);
+  const musicSrcRef = useRef<string | null>(null);
 
   const n = items.length;
   const current = n > 0 ? items[Math.min(index, n - 1)] : null;
+  const previous = previousIndex != null && n > 0 ? items[Math.min(previousIndex, n - 1)] : null;
   const itemsKey = useMemo(() => items.map((i) => i.id).join("|"), [items]);
 
   useEffect(() => {
@@ -43,12 +54,41 @@ export function FadingSlideshow({ items, onClose, onEditDetails, onFavoriteToggl
     const id = window.requestAnimationFrame(() => {
       setIndex(0);
       indexRef.current = 0;
-      setVeilOn(false);
+      setPreviousIndex(null);
       busyRef.current = false;
       setPlaying(true);
     });
     return () => window.cancelAnimationFrame(id);
   }, [itemsKey]);
+
+  useEffect(() => {
+    return () => {
+      if (musicSrcRef.current) {
+        URL.revokeObjectURL(musicSrcRef.current);
+        musicSrcRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.volume = musicVolume;
+  }, [musicVolume]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !musicSrc) return;
+
+    if (!musicPlaying) {
+      audio.pause();
+      return;
+    }
+
+    void audio.play().catch(() => {
+      setMusicPlaying(false);
+    });
+  }, [musicPlaying, musicSrc]);
 
   const goToIndex = useCallback(
     (nextRaw: number) => {
@@ -56,30 +96,46 @@ export function FadingSlideshow({ items, onClose, onEditDetails, onFavoriteToggl
       const next = ((nextRaw % n) + n) % n;
       if (next === indexRef.current) return;
       busyRef.current = true;
-      setVeilOn(true);
+      setPreviousIndex(indexRef.current);
+      setIndex(next);
+      indexRef.current = next;
       window.setTimeout(() => {
-        setIndex(next);
-        indexRef.current = next;
-        window.requestAnimationFrame(() => {
-          setVeilOn(false);
-          window.setTimeout(() => {
-            busyRef.current = false;
-          }, FADE_MS);
-        });
+        setPreviousIndex(null);
+        busyRef.current = false;
       }, FADE_MS);
     },
     [n]
   );
+
+  const goNext = useCallback(() => {
+    if (!shuffle || n < 3) {
+      goToIndex(indexRef.current + 1);
+      return;
+    }
+    let next = indexRef.current;
+    while (next === indexRef.current) {
+      next = Math.floor(Math.random() * n);
+    }
+    goToIndex(next);
+  }, [goToIndex, n, shuffle]);
+
+  const togglePlayback = useCallback(() => {
+    setPlaying((currentPlaying) => {
+      const nextPlaying = !currentPlaying;
+      if (musicSrcRef.current) setMusicPlaying(nextPlaying);
+      return nextPlaying;
+    });
+  }, []);
 
   useEffect(() => {
     if (!playing || n < 2) return;
     const cycleMs = dwellMs + 2 * FADE_MS;
     const id = window.setInterval(() => {
       if (busyRef.current) return;
-      goToIndex(indexRef.current + 1);
+      goNext();
     }, cycleMs);
     return () => window.clearInterval(id);
-  }, [playing, n, dwellMs, goToIndex]);
+  }, [playing, n, dwellMs, goNext]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -88,22 +144,44 @@ export function FadingSlideshow({ items, onClose, onEditDetails, onFavoriteToggl
         onClose();
       } else if (e.key === "ArrowRight") {
         e.preventDefault();
-        goToIndex(indexRef.current + 1);
+        goNext();
       } else if (e.key === "ArrowLeft") {
         e.preventDefault();
         goToIndex(indexRef.current - 1);
       } else if (e.key === " ") {
         e.preventDefault();
-        setPlaying((p) => !p);
+        togglePlayback();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose, goToIndex]);
+  }, [onClose, goToIndex, goNext, togglePlayback]);
+
+  const handleMusicPick = useCallback((file: File | undefined) => {
+    if (!file) return;
+    if (musicSrcRef.current) URL.revokeObjectURL(musicSrcRef.current);
+    const nextSrc = URL.createObjectURL(file);
+    musicSrcRef.current = nextSrc;
+    setMusicSrc(nextSrc);
+    setMusicName(file.name);
+    setMusicPlaying(true);
+  }, []);
+
+  const clearMusic = useCallback(() => {
+    const audio = audioRef.current;
+    audio?.pause();
+    if (musicSrcRef.current) URL.revokeObjectURL(musicSrcRef.current);
+    musicSrcRef.current = null;
+    setMusicSrc(null);
+    setMusicName(null);
+    setMusicPlaying(false);
+    if (musicInputRef.current) musicInputRef.current.value = "";
+  }, []);
 
   if (!current || n < 1) return null;
 
   const src = urlFor(current);
+  const previousSrc = previous ? urlFor(previous) : "";
   const label = `${index + 1} / ${n}`;
 
   return (
@@ -139,11 +217,23 @@ export function FadingSlideshow({ items, onClose, onEditDetails, onFavoriteToggl
 
         <div className="fading-slideshow-stage">
           <div className="fading-slideshow-img-wrap">
+            {previous && previousSrc ? (
+              // eslint-disable-next-line @next/next/no-img-element -- URL signades
+              <img
+                key={`previous-${previous.id}`}
+                className="fading-slideshow-img fading-slideshow-img--previous"
+                src={previousSrc}
+                alt=""
+                aria-hidden
+                referrerPolicy="no-referrer"
+                decoding="async"
+              />
+            ) : null}
             {src ? (
               // eslint-disable-next-line @next/next/no-img-element -- URL signades
               <img
-                key={current.id}
-                className="fading-slideshow-img"
+                key={`current-${current.id}`}
+                className="fading-slideshow-img fading-slideshow-img--current"
                 src={src}
                 alt={current.title}
                 referrerPolicy="no-referrer"
@@ -153,7 +243,6 @@ export function FadingSlideshow({ items, onClose, onEditDetails, onFavoriteToggl
             ) : (
               <div className="fading-slideshow-placeholder">{current.title}</div>
             )}
-            <div className={`fading-slideshow-veil${veilOn ? " fading-slideshow-veil--on" : ""}`} aria-hidden />
           </div>
         </div>
 
@@ -161,10 +250,20 @@ export function FadingSlideshow({ items, onClose, onEditDetails, onFavoriteToggl
           <button type="button" className="viewer-toolbar-btn" onClick={() => goToIndex(indexRef.current - 1)} disabled={n < 2}>
             Anterior
           </button>
-          <button type="button" className="viewer-toolbar-btn viewer-toolbar-btn--primary" onClick={() => setPlaying((p) => !p)}>
+          <button type="button" className="viewer-toolbar-btn viewer-toolbar-btn--primary" onClick={togglePlayback}>
             {playing ? "Pausa" : "Reprodueix"}
           </button>
-          <button type="button" className="viewer-toolbar-btn" onClick={() => goToIndex(indexRef.current + 1)} disabled={n < 2}>
+          <button
+            type="button"
+            className={`viewer-toolbar-btn viewer-toolbar-btn--icon${shuffle ? " viewer-toolbar-btn--active" : ""}`}
+            aria-label={shuffle ? "Desactivar ordre aleatori" : "Activar ordre aleatori"}
+            title={shuffle ? "Aleatori activat" : "Aleatori"}
+            aria-pressed={shuffle}
+            onClick={() => setShuffle((value) => !value)}
+          >
+            <span aria-hidden>🔀</span>
+          </button>
+          <button type="button" className="viewer-toolbar-btn" onClick={goNext} disabled={n < 2}>
             Següent
           </button>
           {onEditDetails ? (
@@ -180,6 +279,49 @@ export function FadingSlideshow({ items, onClose, onEditDetails, onFavoriteToggl
               Editar dades
             </button>
           ) : null}
+        </div>
+
+        <div className="fading-slideshow-music" aria-label="Música de la presentació">
+          <audio
+            ref={audioRef}
+            src={musicSrc ?? undefined}
+            loop
+            onEnded={() => setMusicPlaying(false)}
+            onPlay={() => setMusicPlaying(true)}
+            onPause={() => setMusicPlaying(false)}
+          />
+          <input
+            ref={musicInputRef}
+            className="fading-slideshow-music-input"
+            type="file"
+            accept="audio/*"
+            onChange={(e) => handleMusicPick(e.target.files?.[0])}
+          />
+          <button type="button" className="viewer-toolbar-btn" onClick={() => musicInputRef.current?.click()}>
+            {musicName ? "Canviar música" : "Afegir música"}
+          </button>
+          {musicSrc ? (
+            <>
+              <button type="button" className="viewer-toolbar-btn" onClick={() => setMusicPlaying((v) => !v)}>
+                {musicPlaying ? "Pausar música" : "Reprendre música"}
+              </button>
+              <label className="fading-slideshow-volume">
+                <span>Volum</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={musicVolume}
+                  onChange={(e) => setMusicVolume(Number(e.target.value))}
+                />
+              </label>
+              <button type="button" className="viewer-toolbar-btn viewer-toolbar-btn--subtle" onClick={clearMusic}>
+                Treure música
+              </button>
+            </>
+          ) : null}
+          {musicName ? <span className="fading-slideshow-track" title={musicName}>{musicName}</span> : null}
         </div>
       </div>
     </div>

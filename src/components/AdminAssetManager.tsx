@@ -1402,10 +1402,6 @@ export function AdminAssetManager({
 
         {activeTab === "libraryGrid" ? (
           <div className="admin-tab-panel">
-            <p className="modal-muted" style={{ marginBottom: 14, maxWidth: 520 }}>
-              Preferències de la vista en graella de la biblioteca (i les mateixes miniatures a cronologia, mapa i colors). Es desen
-              automàticament al navegador.
-            </p>
             <LibraryGridPreferencesPanel variant="settings" {...libraryGridPrefs} />
           </div>
         ) : null}

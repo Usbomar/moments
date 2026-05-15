@@ -17,6 +17,7 @@ export type LocationNested =
   | {
       location_id: number;
       locations: {
+        id?: number;
         lat: number;
         lng: number;
         city: string | null;
@@ -27,12 +28,14 @@ export type LocationNested =
       location_id: number;
       locations:
         | {
+            id?: number;
             lat: number;
             lng: number;
             city: string | null;
             country: string | null;
           }
         | Array<{
+            id?: number;
             lat: number;
             lng: number;
             city: string | null;
@@ -67,10 +70,31 @@ export function pickFirstAssetFile(raw: AssetFilesNested): AssetFileRow | null {
 }
 
 export function pickFirstLocation(raw: LocationNested) {
+  const link = pickFirstLocationLink(raw);
+  return link ? { id: link.placeId, lat: link.lat, lng: link.lng, city: link.city, country: link.country } : null;
+}
+
+/** Dades de la primera ubicació enllaçada (inclou ids per persistència / neteja). */
+export function pickFirstLocationLink(raw: LocationNested): {
+  placeId: number;
+  lat: number;
+  lng: number;
+  city: string | null;
+  country: string | null;
+} | null {
   if (raw == null) return null;
   const first = Array.isArray(raw) ? (raw[0] ?? null) : raw;
   if (!first?.locations) return null;
-  return Array.isArray(first.locations) ? (first.locations[0] ?? null) : first.locations;
+  const loc = Array.isArray(first.locations) ? (first.locations[0] ?? null) : first.locations;
+  if (!loc) return null;
+  const placeId = typeof loc.id === "number" && Number.isFinite(loc.id) ? loc.id : first.location_id;
+  return {
+    placeId,
+    lat: loc.lat,
+    lng: loc.lng,
+    city: loc.city,
+    country: loc.country
+  };
 }
 
 export function toAsset(row: {
@@ -92,7 +116,7 @@ export function toAsset(row: {
   asset_tags: TagNested;
 }): Asset {
   const file = pickFirstAssetFile(row.asset_files);
-  const location = pickFirstLocation(row.asset_locations);
+  const locationLink = pickFirstLocationLink(row.asset_locations);
   const tagRows = row.asset_tags ?? [];
   const tags = tagRows.filter((tag) => tag.origin === "manual").map((tag) => tag.tag);
   const autoTags = tagRows.filter((tag) => tag.origin === "auto").map((tag) => tag.tag);
@@ -108,11 +132,11 @@ export function toAsset(row: {
   const ch = row.color_hue;
   const colorHueProp =
     typeof ch === "number" && Number.isFinite(ch) ? { colorHue: Math.min(359, Math.max(0, Math.round(ch))) } : {};
-  const latNum = Number(location?.lat);
-  const lngNum = Number(location?.lng);
+  const latNum = Number(locationLink?.lat);
+  const lngNum = Number(locationLink?.lng);
   const hasValidCoords = Number.isFinite(latNum) && Number.isFinite(lngNum);
-  const city = location?.city?.trim() ?? "";
-  const country = location?.country?.trim() ?? "";
+  const city = locationLink?.city?.trim() ?? "";
+  const country = locationLink?.country?.trim() ?? "";
   const hasExplicitLocationLabel = Boolean(city) && Boolean(country);
   return {
     id: row.id,
@@ -133,8 +157,9 @@ export function toAsset(row: {
     autoTags,
     ...colorHueProp,
     location:
-      location && hasValidCoords && hasExplicitLocationLabel
+      locationLink && hasValidCoords && hasExplicitLocationLabel
         ? {
+            id: locationLink.placeId,
             lat: latNum,
             lng: lngNum,
             city,

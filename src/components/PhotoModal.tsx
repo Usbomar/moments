@@ -8,6 +8,7 @@ import type { AppCollection } from "@/lib/collections";
 interface Props {
   asset: Asset | null;
   onClose: () => void;
+  /** Ha de rebutjar (throw) si el servidor no desa; llavors el modal no es tanca. */
   onSave: (updated: Asset) => void | Promise<void>;
   front?: boolean;
   /** Tags ja usats en altres fotos (minúscules, únics); per suggerir mentre s’escriu. */
@@ -29,7 +30,7 @@ function fromDateInputValue(value: string): string {
   return d.toISOString();
 }
 
-function formatLocationText(loc?: LocationInfo): string {
+function formatLocationText(loc?: LocationInfo | null): string {
   if (!loc) return "";
   return `${loc.city}, ${loc.country}`;
 }
@@ -64,7 +65,7 @@ export function PhotoModal({ asset, onClose, onSave, libraryTagSuggestions = [],
   const [tags, setTags] = useState<string[]>(() => [...(asset?.tags ?? [])]);
   const [dateValue, setDateValue] = useState(() => (asset ? toDateInputValue(asset.takenAt) : ""));
   const [locationText, setLocationText] = useState(() => formatLocationText(asset?.location));
-  const [pickedLocation, setPickedLocation] = useState<LocationInfo | undefined>(() => asset?.location);
+  const [pickedLocation, setPickedLocation] = useState<LocationInfo | undefined>(() => asset?.location ?? undefined);
   const [favorite, setFavorite] = useState(() => asset?.favorite ?? false);
   const [hiddenFromGuests, setHiddenFromGuests] = useState(() => asset?.hiddenFromGuests ?? false);
   const [colorHue, setColorHue] = useState<number | null>(() =>
@@ -106,8 +107,8 @@ export function PhotoModal({ asset, onClose, onSave, libraryTagSuggestions = [],
     setTagInput("");
     setTags([...(asset.tags ?? [])]);
     setDateValue(toDateInputValue(asset.takenAt));
-    setLocationText(formatLocationText(asset.location));
-    setPickedLocation(asset.location);
+    setLocationText(formatLocationText(asset.location ?? null));
+    setPickedLocation(asset.location ?? undefined);
     setFavorite(asset.favorite ?? false);
     setHiddenFromGuests(asset.hiddenFromGuests ?? false);
     setColorHue(
@@ -195,10 +196,10 @@ export function PhotoModal({ asset, onClose, onSave, libraryTagSuggestions = [],
         return;
       }
       const locFromText = locationText.trim();
-      let location: LocationInfo | undefined;
+      let location: LocationInfo | null;
 
       if (!locFromText) {
-        location = undefined;
+        location = null;
       } else {
         const geo = await fetchGeocode(locFromText);
         if (geo) {
@@ -237,8 +238,12 @@ export function PhotoModal({ asset, onClose, onSave, libraryTagSuggestions = [],
       };
       updated.colorHue =
         colorHue !== null && typeof colorHue === "number" ? Math.min(359, Math.max(0, Math.round(colorHue))) : null;
-      await onSave(updated);
-      onClose();
+      try {
+        await onSave(updated);
+        onClose();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "No s'ha pogut desar.");
+      }
     })();
   }, [asset, colorHue, dateValue, description, favorite, hiddenFromGuests, locationText, onClose, onSave, pickedLocation, tags, title]);
 

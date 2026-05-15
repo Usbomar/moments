@@ -23,6 +23,7 @@ import {
   makeThumbWebp
 } from "@/lib/server/apply-image-operations";
 import { pickFirstAssetFile, toAsset } from "@/lib/server/asset-map";
+import { ASSET_DETAIL_SELECT } from "@/lib/server/asset-row-select";
 import { extractStoragePath, generateSignedUrls } from "@/lib/server/storage-utils";
 import { objectPathFromSignedUrl } from "@/lib/server/signed-url-path";
 import { getStorageBucket, getSupabaseAdmin } from "@/lib/server/supabase-admin";
@@ -98,13 +99,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const supabase = getSupabaseAdmin();
     const bucket = getStorageBucket();
 
-    const { data: row, error: rowErr } = await supabase
-      .from("assets")
-      .select(
-        "id,user_id,type,title,description,taken_at,uploaded_at,width,height,duration,favorite,hidden_from_guests,asset_files(original_url,preview_url,medium_url,thumb_url,checksum,size),asset_locations(location_id,locations(lat,lng,city,country)),asset_tags(tag,origin)"
-      )
-      .eq("id", id)
-      .maybeSingle();
+    const { data: row, error: rowErr } = await supabase.from("assets").select(ASSET_DETAIL_SELECT).eq("id", id).maybeSingle();
 
     if (rowErr) return NextResponse.json({ error: rowErr.message }, { status: 500 });
     if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -235,13 +230,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       .eq("asset_id", id);
     if (upFiles) return NextResponse.json({ error: upFiles.message }, { status: 500 });
 
-    const { data: fresh, error: freshErr } = await supabase
-      .from("assets")
-      .select(
-        "id,user_id,type,title,description,taken_at,uploaded_at,width,height,duration,favorite,hidden_from_guests,asset_files(original_url,preview_url,medium_url,thumb_url,checksum,size),asset_locations(location_id,locations(lat,lng,city,country)),asset_tags(tag,origin)"
-      )
-      .eq("id", id)
-      .maybeSingle();
+    const { data: fresh, error: freshErr } = await supabase.from("assets").select(ASSET_DETAIL_SELECT).eq("id", id).maybeSingle();
 
     if (freshErr || !fresh) {
       return NextResponse.json({ error: freshErr?.message ?? "Failed to reload asset" }, { status: 500 });

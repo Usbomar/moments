@@ -27,7 +27,7 @@ describe("POST /api/collections", () => {
     isSupabaseConfiguredMock.mockReturnValue(true);
     requireAuthUserIdMock.mockResolvedValue({ userId: "user-123" });
 
-    const insertMock = vi.fn(async () => ({ error: null }));
+    const insertMock = vi.fn(async (_row: { id: string; user_id: string; name: string }) => ({ error: null }));
     fromMock.mockReturnValue({
       insert: insertMock
     });
@@ -43,8 +43,8 @@ describe("POST /api/collections", () => {
 
     expect(res.status).toBe(200);
     expect(insertMock).toHaveBeenCalledTimes(1);
-    const payload = insertMock.mock.calls[0]?.[0] as { user_id?: string; name?: string };
-    expect(payload.user_id).toBe("user-123");
-    expect(payload.name).toBe("Vacaciones");
+    expect(insertMock).toHaveBeenCalledWith(
+      expect.objectContaining({ user_id: "user-123", name: "Vacaciones" })
+    );
   });
 });

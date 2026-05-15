@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-import { getSupabaseAdmin } from "@/lib/server/supabase-admin";
-import { getStorageBucket } from "@/lib/server/supabase-admin";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { getStorageBucket, getSupabaseAdmin } from "@/lib/server/supabase-admin";
 import { isSupabaseConfigured } from "@/lib/server/supabase-config";
 import { requireAuthUserId } from "@/lib/server/require-auth-api";
+import { ASSET_DETAIL_SELECT } from "@/lib/server/asset-row-select";
 import { toAsset } from "@/lib/server/asset-map";
 import { objectPathFromSignedUrl } from "@/lib/server/signed-url-path";
 
@@ -15,8 +16,30 @@ type PatchBody = {
   hidden_from_guests?: boolean;
   /** 0–359 o null per esborrar l’assignació manual. */
   color_hue?: number | null;
-  location?: { lat: number; lng: number; city: string; country: string } | null;
+  /** `id` opcional = PK de `locations` per reutilitzar fila (evita duplicats). */
+  location?: { id?: number; lat: number; lng: number; city: string; country: string } | null;
 };
+
+function assertValidLatLng(lat: number, lng: number): string | null {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return "location lat/lng must be finite numbers";
+  if (lat < -90 || lat > 90) return "location lat out of range (-90–90)";
+  if (lng < -180 || lng > 180) return "location lng out of range (-180–180)";
+  return null;
+}
+
+/** Elimina la fila `locations` si ja no hi ha cap `asset_locations` que la referenciï. */
+async function deleteLocationIfOrphaned(supabase: SupabaseClient, locationId: number): Promise<string | null> {
+  const { count, error } = await supabase
+    .from("asset_locations")
+    .select("*", { count: "exact", head: true })
+    .eq("location_id", locationId);
+  if (error) return error.message;
+  if ((count ?? 0) === 0) {
+    const { error: delErr } = await supabase.from("locations").delete().eq("id", locationId);
+    return delErr?.message ?? null;
+  }
+  return null;
+}
 
 async function resolveParams(context: { params: Promise<{ id: string }> }) {
   const params = await context.params;
@@ -98,31 +121,68 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     }
 
     if (body.location === null) {
+      const { data: prevLink, error: prevLinkErr } = await supabase
+        .from("asset_locations")
+        .select("location_id")
+        .eq("asset_id", id)
+        .maybeSingle();
+      if (prevLinkErr) return NextResponse.json({ error: prevLinkErr.message }, { status: 500 });
+      const prevLocId = typeof prevLink?.location_id === "number" ? prevLink.location_id : null;
+
       const { error: delLocErr } = await supabase.from("asset_locations").delete().eq("asset_id", id);
       if (delLocErr) return NextResponse.json({ error: delLocErr.message }, { status: 500 });
-    } else if (body.location) {
-      const { lat, lng, city, country } = body.location;
-      const { data: locInsert, error: locErr } = await supabase
-        .from("locations")
-        .insert({ lat, lng, city, country })
-        .select("id")
-        .single();
-      if (locErr) return NextResponse.json({ error: locErr.message }, { status: 500 });
 
-      const { error: linkErr } = await supabase.from("asset_locations").upsert(
-        { asset_id: id, location_id: locInsert.id },
-        { onConflict: "asset_id" }
-      );
+      if (prevLocId != null) {
+        const orphanErr = await deleteLocationIfOrphaned(supabase, prevLocId);
+        if (orphanErr) return NextResponse.json({ error: orphanErr }, { status: 500 });
+      }
+    } else if (body.location) {
+      const { lat, lng, city, country, id: existingPlaceId } = body.location;
+      const geoErr = assertValidLatLng(lat, lng);
+      if (geoErr) return NextResponse.json({ error: geoErr }, { status: 400 });
+
+      const { data: prevLink } = await supabase.from("asset_locations").select("location_id").eq("asset_id", id).maybeSingle();
+      const prevLocId = typeof prevLink?.location_id === "number" ? prevLink.location_id : null;
+
+      let newLocationId: number;
+
+      if (typeof existingPlaceId === "number" && Number.isFinite(existingPlaceId) && existingPlaceId > 0) {
+        const { data: locExists, error: locLookupErr } = await supabase
+          .from("locations")
+          .select("id")
+          .eq("id", existingPlaceId)
+          .maybeSingle();
+        if (locLookupErr) return NextResponse.json({ error: locLookupErr.message }, { status: 500 });
+        if (!locExists) return NextResponse.json({ error: "Location not found" }, { status: 400 });
+        const { error: updLocErr } = await supabase
+          .from("locations")
+          .update({ lat, lng, city, country })
+          .eq("id", existingPlaceId);
+        if (updLocErr) return NextResponse.json({ error: updLocErr.message }, { status: 500 });
+        newLocationId = existingPlaceId;
+      } else {
+        const { data: locInsert, error: locErr } = await supabase
+          .from("locations")
+          .insert({ lat, lng, city, country })
+          .select("id")
+          .single();
+        if (locErr) return NextResponse.json({ error: locErr.message }, { status: 500 });
+        if (!locInsert?.id) return NextResponse.json({ error: "Location insert failed" }, { status: 500 });
+        newLocationId = locInsert.id as number;
+      }
+
+      const { error: linkErr } = await supabase
+        .from("asset_locations")
+        .upsert({ asset_id: id, location_id: newLocationId }, { onConflict: "asset_id" });
       if (linkErr) return NextResponse.json({ error: linkErr.message }, { status: 500 });
+
+      if (prevLocId != null && prevLocId !== newLocationId) {
+        const orphanErr = await deleteLocationIfOrphaned(supabase, prevLocId);
+        if (orphanErr) return NextResponse.json({ error: orphanErr }, { status: 500 });
+      }
     }
 
-    const { data: row, error: fetchErr } = await supabase
-      .from("assets")
-      .select(
-        "id,user_id,type,title,description,taken_at,uploaded_at,width,height,duration,favorite,hidden_from_guests,asset_files(original_url,preview_url,medium_url,thumb_url,checksum,size),asset_locations(location_id,locations(lat,lng,city,country)),asset_tags(tag,origin)"
-      )
-      .eq("id", id)
-      .maybeSingle();
+    const { data: row, error: fetchErr } = await supabase.from("assets").select(ASSET_DETAIL_SELECT).eq("id", id).maybeSingle();
 
     if (fetchErr) return NextResponse.json({ error: fetchErr.message }, { status: 500 });
     if (!row) return NextResponse.json({ error: "Not found after update" }, { status: 500 });

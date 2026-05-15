@@ -450,33 +450,37 @@ function HomeContent() {
     [imageEditorAsset, onImageSaved]
   );
 
-  const onPhotoSave = useCallback(async (updated: Asset): Promise<Asset | null> => {
+  const onPhotoSave = useCallback(async (updated: Asset): Promise<Asset> => {
     // Fallback local només quan sabem segur que Supabase NO està configurat.
     // Si l'estat encara és "undefined" (càrrega inicial), intentem persistir al servidor.
     if (supabaseConfiguredRef.current === false) {
       setLibrary((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
       return updated;
     }
+    const patchBody: Record<string, unknown> = {
+      title: updated.title,
+      description: updated.description ?? null,
+      tags: updated.tags,
+      taken_at: updated.takenAt,
+      favorite: updated.favorite,
+      hidden_from_guests: updated.hiddenFromGuests === true,
+      color_hue: updated.colorHue ?? null
+    };
+    if (Object.prototype.hasOwnProperty.call(updated, "location")) {
+      patchBody.location = updated.location ?? null;
+    }
     const response = await fetch(`/api/assets/${updated.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: updated.title,
-        description: updated.description ?? null,
-        tags: updated.tags,
-        taken_at: updated.takenAt,
-        favorite: updated.favorite,
-        hidden_from_guests: updated.hiddenFromGuests === true,
-        color_hue: updated.colorHue ?? null,
-        location: updated.location ?? null
-      })
+      body: JSON.stringify(patchBody)
     });
     const payload = (await response.json()) as { asset?: Asset; error?: string };
     if (!response.ok) {
+      const msg = typeof payload.error === "string" ? payload.error : response.statusText;
       if (process.env.NODE_ENV !== "production") {
-        console.error("PATCH asset failed:", payload.error ?? response.statusText);
+        console.error("PATCH asset failed:", msg);
       }
-      return null;
+      throw new Error(msg || "Error en desar la foto");
     }
     if (payload.asset) {
       setLibrary((prev) => prev.map((a) => (a.id === payload.asset!.id ? payload.asset! : a)));
@@ -496,8 +500,12 @@ function HomeContent() {
 
   const handleViewerFavoriteToggle = useCallback(
     async (asset: Asset, favorite: boolean) => {
-      const mergedSaved = await onPhotoSave({ ...asset, favorite });
-      if (mergedSaved) mergeAssetIntoViewerLists(mergedSaved);
+      try {
+        const mergedSaved = await onPhotoSave({ ...asset, favorite });
+        mergeAssetIntoViewerLists(mergedSaved);
+      } catch {
+        /* error ja gestionat al visor si cal */
+      }
     },
     [onPhotoSave, mergeAssetIntoViewerLists]
   );
@@ -759,13 +767,13 @@ function HomeContent() {
           setImageEditorAsset(asset);
         }}
         onQuickUpdate={async (asset, patch) => {
-          const merged: Asset = {
-            ...asset,
-            ...patch,
-            location: patch.location === undefined ? undefined : patch.location
-          };
+          const merged: Asset = { ...asset, ...patch };
           setLibrary((prev) => prev.map((a) => (a.id === asset.id ? merged : a)));
-          await onPhotoSave(merged);
+          try {
+            await onPhotoSave(merged);
+          } catch {
+            await refreshLibraryRef.current();
+          }
         }}
         onDelete={async (asset) => {
           const res = await fetch(`/api/assets/${asset.id}`, { method: "DELETE" });

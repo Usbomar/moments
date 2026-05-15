@@ -2954,6 +2954,17 @@ button.danger {
   flex-wrap: wrap;
 }
 
+.admin-color-form-error {
+  margin: 8px 0 12px;
+  color: var(--danger, #c62828);
+  font-size: 13px;
+}
+
+.admin-tab-panel--colors .admin-stats-table td:nth-child(3),
+.admin-tab-panel--colors .admin-stats-table th:nth-child(3) {
+  white-space: nowrap;
+}
+
 .admin-stats-expanded-row td {
   background: color-mix(in srgb, var(--bg-secondary) 82%, var(--bg-primary));
 }

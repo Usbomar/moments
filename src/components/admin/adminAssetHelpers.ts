@@ -1,25 +1,6 @@
-export const COLOR_PRESETS: Array<{ label: string; hue: number }> = [
-  { label: "Rojo", hue: 0 },
-  { label: "Rojo anaranjado", hue: 15 },
-  { label: "Naranja", hue: 30 },
-  { label: "Ámbar", hue: 45 },
-  { label: "Amarillo", hue: 60 },
-  { label: "Lima", hue: 75 },
-  { label: "Verde lima", hue: 95 },
-  { label: "Verde", hue: 120 },
-  { label: "Verde menta", hue: 145 },
-  { label: "Turquesa", hue: 165 },
-  { label: "Cian", hue: 180 },
-  { label: "Azul cielo", hue: 200 },
-  { label: "Azul", hue: 220 },
-  { label: "Índigo", hue: 240 },
-  { label: "Violeta", hue: 275 },
-  { label: "Púrpura", hue: 290 },
-  { label: "Magenta", hue: 310 },
-  { label: "Rosa", hue: 330 },
-  { label: "Coral", hue: 345 },
-  { label: "Marrón", hue: 24 }
-];
+import { COLOR_PRESETS } from "@/lib/admin-color-palette";
+
+export { COLOR_PRESETS };
 
 export function cmpText(a: string, b: string): number {
   return a.localeCompare(b, "es", { sensitivity: "base", numeric: true });

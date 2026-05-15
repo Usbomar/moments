@@ -1,12 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { Asset } from "@/lib/types";
 import type { CollectionMusicTrack } from "@/lib/collection-music";
 import type { SliderTransition } from "@/lib/grid-library";
 import { ViewerFavoriteButton } from "@/components/ViewerFavoriteButton";
 
-const FADE_MS = 450;
+const BASE_FADE_MS = 450;
+
+export const SLIDESHOW_SPEEDS = [0.5, 1, 1.25, 1.5, 1.75, 2] as const;
+export type SlideshowSpeed = (typeof SLIDESHOW_SPEEDS)[number];
 
 type Props = {
   items: Asset[];
@@ -27,6 +30,13 @@ export function FadingSlideshow({ items, onClose, onEditDetails, onFavoriteToggl
   const [previousIndex, setPreviousIndex] = useState<number | null>(null);
   const [playing, setPlaying] = useState(true);
   const [shuffle, setShuffle] = useState(false);
+  const [speed, setSpeed] = useState<SlideshowSpeed>(1);
+  const fadeMs = useMemo(() => Math.max(120, Math.round(BASE_FADE_MS / speed)), [speed]);
+  const effectiveDwellMs = useMemo(() => Math.max(500, Math.round(dwellMs / speed)), [dwellMs, speed]);
+  const transitionStyle = useMemo(
+    (): CSSProperties => ({ ["--slideshow-transition-ms" as string]: `${fadeMs}ms` }),
+    [fadeMs]
+  );
   const [favBusy, setFavBusy] = useState(false);
   const [musicSrc] = useState<string | null>(() => musicTrack?.url ?? null);
   const [musicName] = useState<string | null>(() => musicTrack?.title ?? null);
@@ -87,7 +97,7 @@ export function FadingSlideshow({ items, onClose, onEditDetails, onFavoriteToggl
       window.setTimeout(() => {
         setPreviousIndex(null);
         busyRef.current = false;
-      }, FADE_MS);
+      }, fadeMs);
     },
     [n]
   );
@@ -123,13 +133,13 @@ export function FadingSlideshow({ items, onClose, onEditDetails, onFavoriteToggl
 
   useEffect(() => {
     if (!playing || n < 2) return;
-    const cycleMs = dwellMs + 2 * FADE_MS;
+    const cycleMs = effectiveDwellMs + 2 * fadeMs;
     const id = window.setInterval(() => {
       if (busyRef.current) return;
       goNext();
     }, cycleMs);
     return () => window.clearInterval(id);
-  }, [playing, n, dwellMs, goNext]);
+  }, [playing, n, effectiveDwellMs, fadeMs, goNext]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -183,7 +193,7 @@ export function FadingSlideshow({ items, onClose, onEditDetails, onFavoriteToggl
       aria-label="Presentació de la col·lecció"
       onClick={onClose}
     >
-      <div className="fading-slideshow-layout" onClick={(e) => e.stopPropagation()}>
+      <div className="fading-slideshow-layout" style={transitionStyle} onClick={(e) => e.stopPropagation()}>
         <aside className="fading-slideshow-rail fading-slideshow-rail--left" aria-label="Controls de diapositives i so">
           <div className="fading-slideshow-rail-group" role="toolbar" aria-label="Diapositives">
             <button
@@ -225,6 +235,23 @@ export function FadingSlideshow({ items, onClose, onEditDetails, onFavoriteToggl
             >
               <span className="viewer-icon viewer-icon-shuffle" aria-hidden />
             </button>
+            <label className="fading-slideshow-speed">
+              <span className="fading-slideshow-speed-label" aria-hidden>
+                ×
+              </span>
+              <select
+                value={speed}
+                onChange={(e) => setSpeed(Number(e.target.value) as SlideshowSpeed)}
+                aria-label="Velocitat de les transicions"
+                title="Velocitat"
+              >
+                {SLIDESHOW_SPEEDS.map((value) => (
+                  <option key={value} value={value}>
+                    {value === 1 ? "1" : String(value)}×
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
 
           {musicSrc ? (
@@ -265,7 +292,7 @@ export function FadingSlideshow({ items, onClose, onEditDetails, onFavoriteToggl
             <span className="fading-slideshow-counter" aria-live="polite">
               {label}
             </span>
-            <div className="fading-slideshow-img-wrap">
+            <div className="fading-slideshow-img-wrap" style={transitionStyle}>
               {previous && previousSrc ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img

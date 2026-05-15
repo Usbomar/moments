@@ -518,6 +518,7 @@ button.active {
 }
 
 .fading-slideshow-layout {
+  --slideshow-transition-ms: 450ms;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   width: 100vw;
@@ -556,6 +557,42 @@ button.active {
   margin-top: 20px;
   padding-top: 16px;
   border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.fading-slideshow-speed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.fading-slideshow-speed-label {
+  color: rgba(230, 234, 240, 0.55);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.fading-slideshow-speed select {
+  min-width: 52px;
+  padding: 6px 4px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #e6eaf0;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+}
+
+.fading-slideshow-speed select:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.fading-slideshow-speed select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .fading-slideshow-main {
@@ -607,8 +644,8 @@ button.active {
   opacity: 1;
   transform: scale(1.01);
   transition:
-    opacity 450ms ease,
-    transform 520ms ease;
+    opacity var(--slideshow-transition-ms) ease,
+    transform calc(var(--slideshow-transition-ms) * 1.15) ease;
 }
 
 .fading-slideshow-img--current,
@@ -625,47 +662,47 @@ button.active {
 
 .fading-slideshow-img--current-crossfade,
 .slider-view-media--current-crossfade {
-  animation: slideshowCrossfadeIn 450ms ease both;
+  animation: slideshowCrossfadeIn var(--slideshow-transition-ms) ease both;
 }
 
 .fading-slideshow-img--previous-crossfade,
 .slider-view-media--previous-crossfade {
-  animation: slideshowCrossfadeOut 450ms ease both;
+  animation: slideshowCrossfadeOut var(--slideshow-transition-ms) ease both;
 }
 
 .fading-slideshow-img--current-fade,
 .slider-view-media--current-fade {
-  animation: slideshowFadeIn 450ms ease both;
+  animation: slideshowFadeIn var(--slideshow-transition-ms) ease both;
 }
 
 .fading-slideshow-img--previous-fade,
 .slider-view-media--previous-fade {
-  animation: slideshowFadeOut 450ms ease both;
+  animation: slideshowFadeOut var(--slideshow-transition-ms) ease both;
 }
 
 .fading-slideshow-img--current-slide,
 .slider-view-media--current-slide {
-  animation: slideshowSlideIn 450ms cubic-bezier(0.22, 0.78, 0.28, 1) both;
+  animation: slideshowSlideIn var(--slideshow-transition-ms) cubic-bezier(0.22, 0.78, 0.28, 1) both;
 }
 
 .fading-slideshow-img--previous-slide,
 .slider-view-media--previous-slide {
-  animation: slideshowSlideOut 450ms cubic-bezier(0.22, 0.78, 0.28, 1) both;
+  animation: slideshowSlideOut var(--slideshow-transition-ms) cubic-bezier(0.22, 0.78, 0.28, 1) both;
 }
 
 .fading-slideshow-img--current-zoom,
 .slider-view-media--current-zoom {
-  animation: slideshowZoomIn 520ms ease both;
+  animation: slideshowZoomIn calc(var(--slideshow-transition-ms) * 1.15) ease both;
 }
 
 .fading-slideshow-img--previous-zoom,
 .slider-view-media--previous-zoom {
-  animation: slideshowZoomOut 520ms ease both;
+  animation: slideshowZoomOut calc(var(--slideshow-transition-ms) * 1.15) ease both;
 }
 
 .fading-slideshow-img--current-wipe,
 .slider-view-media--current-wipe {
-  animation: slideshowWipeIn 520ms cubic-bezier(0.2, 0.82, 0.2, 1) both;
+  animation: slideshowWipeIn calc(var(--slideshow-transition-ms) * 1.15) cubic-bezier(0.2, 0.82, 0.2, 1) both;
 }
 
 .fading-slideshow-img--previous-wipe,

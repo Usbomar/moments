@@ -13,20 +13,11 @@ import { useAdminAssetStats, type SortState, type SortKey } from "@/components/a
 import {
   colorHueToPreset,
   fromDateInputValue,
-  hexToHue,
   parseLocationText,
   toDateInputValue
 } from "@/components/admin/adminAssetHelpers";
-import {
-  buildColorOptions,
-  buildPaletteRows,
-  loadStoredPalette,
-  newCustomColorId,
-  normalizeHue,
-  saveStoredPalette,
-  type CustomColorDef,
-  type PaletteRow
-} from "@/lib/admin-color-palette";
+import { AdminColorsPanel } from "@/components/admin/AdminColorsPanel";
+import { buildColorOptions, type StoredPalette } from "@/lib/admin-color-palette";
 import {
   DEFAULT_PHOTO_COLUMNS,
   DEFAULT_TAB_ORDER,
@@ -81,6 +72,8 @@ type Props = {
   onQuickUpdate: (asset: Asset, patch: Partial<Asset>) => Promise<void>;
   onRefreshCollections?: () => Promise<void>;
   libraryGridPrefs: LibraryGridPreferencesBinder;
+  colorPalette: StoredPalette;
+  onColorPaletteChange: (palette: StoredPalette) => void;
 };
 
 type DraftPatch = Partial<Pick<Asset, "title" | "takenAt" | "favorite" | "colorHue" | "location" | "hiddenFromGuests">>;
@@ -136,7 +129,9 @@ export function AdminAssetManager({
   onDelete,
   onQuickUpdate,
   onRefreshCollections,
-  libraryGridPrefs
+  libraryGridPrefs,
+  colorPalette,
+  onColorPaletteChange
 }: Props) {
   const [activeTab, setActiveTab] = useState<AdminTabId>("photos");
   const [sort, setSort] = useState<SortState[]>([{ key: "takenAt", dir: "desc" }]);
@@ -145,17 +140,9 @@ export function AdminAssetManager({
   const [showContent, setShowContent] = useState(true);
   const [savingById, setSavingById] = useState<Record<string, "idle" | "saving" | "saved" | "error">>({});
   const [draftById, setDraftById] = useState<Record<string, DraftPatch>>({});
-  const [customColors, setCustomColors] = useState<CustomColorDef[]>([]);
-  const [presetLabels, setPresetLabels] = useState<Record<string, string>>({});
-  const [paletteHydrated, setPaletteHydrated] = useState(false);
-  const [colorFormError, setColorFormError] = useState<string | null>(null);
-  const [newColorHex, setNewColorHex] = useState("#2255ff");
-  const [newColorName, setNewColorName] = useState("");
   const [previewAsset, setPreviewAsset] = useState<{ assetId: string; sourceIds: string[] } | null>(null);
   const [previewZoom, setPreviewZoom] = useState<1 | 2>(1);
   const [previewFavBusy, setPreviewFavBusy] = useState(false);
-  const [editingColorRowId, setEditingColorRowId] = useState<string | null>(null);
-  const [editingColorName, setEditingColorName] = useState("");
   const [openTagRows, setOpenTagRows] = useState<Record<string, boolean>>({});
   const [openLocationRows, setOpenLocationRows] = useState<Record<string, boolean>>({});
   const [openCollectionRows, setOpenCollectionRows] = useState<Record<string, boolean>>({});
@@ -201,12 +188,8 @@ export function AdminAssetManager({
   const saveTimersRef = useRef<Record<string, number>>({});
   const musicFileInputRef = useRef<HTMLInputElement>(null);
   const allColorOptions = useMemo(
-    () => buildColorOptions(customColors, presetLabels),
-    [customColors, presetLabels]
-  );
-  const paletteRows = useMemo(
-    () => buildPaletteRows(assets, customColors, presetLabels),
-    [assets, customColors, presetLabels]
+    () => buildColorOptions(colorPalette.custom, colorPalette.presetLabels),
+    [colorPalette]
   );
   const { tagStats, locationStats, tagsToAssets, locationsToAssets, assetById, sorted } = useAdminAssetStats(assets, sort);
 
@@ -371,19 +354,6 @@ export function AdminAssetManager({
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const stored = loadStoredPalette();
-    setCustomColors(stored.custom);
-    setPresetLabels(stored.presetLabels);
-    setPaletteHydrated(true);
-  }, []);
-
-  useEffect(() => {
-    if (!paletteHydrated || typeof window === "undefined") return;
-    saveStoredPalette({ custom: customColors, presetLabels });
-  }, [customColors, presetLabels, paletteHydrated]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
     try {
       localStorage.setItem(STORAGE_TAB_ORDER, JSON.stringify(tabOrder));
     } catch {
@@ -449,77 +419,6 @@ export function AdminAssetManager({
 
   const loadMore = () => setVisibleCount((prev) => Math.min(prev + 100, sorted.length));
 
-  const addCustomColor = () => {
-    setColorFormError(null);
-    const hue = hexToHue(newColorHex);
-    if (hue === null) {
-      setColorFormError("Color no vàlid. Tria un color amb el selector.");
-      return;
-    }
-    const normalized = normalizeHue(hue);
-    if (customColors.some((c) => c.hue === normalized)) {
-      setColorFormError("Ja existeix un color personalitzat amb aquest to.");
-      return;
-    }
-    const label = newColorName.trim() || `Personalitzat ${customColors.length + 1}`;
-    setCustomColors((prev) => [...prev, { id: newCustomColorId(), label, hue: normalized }]);
-    setNewColorName("");
-  };
-
-  const startEditColorRow = (row: PaletteRow) => {
-    setColorFormError(null);
-    setEditingColorRowId(row.rowId);
-    setEditingColorName(row.label);
-  };
-
-  const commitEditColor = () => {
-    if (editingColorRowId === null) return;
-    const next = editingColorName.trim();
-    if (!next) {
-      setColorFormError("El nom no pot estar buit.");
-      return;
-    }
-    const row = paletteRows.find((r) => r.rowId === editingColorRowId);
-    if (!row) {
-      setEditingColorRowId(null);
-      return;
-    }
-    if (row.kind === "preset") {
-      setPresetLabels((prev) => ({ ...prev, [String(row.hue)]: next }));
-    } else if (row.kind === "custom" && row.customId) {
-      setCustomColors((prev) => prev.map((c) => (c.id === row.customId ? { ...c, label: next } : c)));
-    } else if (row.kind === "in_use") {
-      if (!customColors.some((c) => c.hue === row.hue)) {
-        setCustomColors((prev) => [...prev, { id: newCustomColorId(), label: next, hue: row.hue }]);
-      }
-    }
-    setEditingColorRowId(null);
-    setEditingColorName("");
-    setColorFormError(null);
-  };
-
-  const removeColorRow = (row: PaletteRow) => {
-    setColorFormError(null);
-    if (row.kind === "preset") {
-      setPresetLabels((prev) => {
-        const next = { ...prev };
-        delete next[String(row.hue)];
-        return next;
-      });
-    } else if (row.kind === "custom" && row.customId) {
-      setCustomColors((prev) => prev.filter((c) => c.id !== row.customId));
-    }
-    if (editingColorRowId === row.rowId) {
-      setEditingColorRowId(null);
-      setEditingColorName("");
-    }
-  };
-
-  const promoteInUseColor = (row: PaletteRow) => {
-    if (row.kind !== "in_use") return;
-    if (customColors.some((c) => c.hue === row.hue)) return;
-    setCustomColors((prev) => [...prev, { id: newCustomColorId(), label: `To ${row.hue}°`, hue: row.hue }]);
-  };
   const toggleTagRow = (tag: string) => setOpenTagRows((prev) => ({ ...prev, [tag]: !prev[tag] }));
   const toggleLocationRow = (loc: string) => setOpenLocationRows((prev) => ({ ...prev, [loc]: !prev[loc] }));
   const toggleCollectionRow = (id: string) => setOpenCollectionRows((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -1106,6 +1005,7 @@ export function AdminAssetManager({
           </button>
         </header>
 
+        <div className="admin-assets-body">
         {activeTab === "photos" ? (
         <>
         <div className="admin-assets-subhead">
@@ -1704,91 +1604,7 @@ export function AdminAssetManager({
 
         {activeTab === "colors" ? (
           <div className="admin-tab-panel admin-tab-panel--colors">
-            <p className="modal-muted" style={{ marginBottom: 12, maxWidth: 720 }}>
-              Paleta base, colors personalitzats i tons assignats a fotos. Els personalitzats apareixen als desplegables de la
-              graella i a l&apos;editor de dades.
-            </p>
-            <div className="admin-assets-custom-color">
-              <input type="color" value={newColorHex} onChange={(e) => setNewColorHex(e.target.value)} aria-label="Escull color personalitzat" />
-              <input
-                type="text"
-                value={newColorName}
-                onChange={(e) => setNewColorName(e.target.value)}
-                placeholder="Nom del color"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") addCustomColor();
-                }}
-              />
-              <button type="button" className="btn btn-sm" onClick={addCustomColor}>
-                Afegir color
-              </button>
-            </div>
-            {colorFormError ? (
-              <p className="admin-color-form-error" role="alert">
-                {colorFormError}
-              </p>
-            ) : null}
-            <table className="admin-stats-table">
-              <thead>
-                <tr>
-                  <th>Mostra</th>
-                  <th>Nom</th>
-                  <th>To</th>
-                  <th>Fotos</th>
-                  <th>Tipus</th>
-                  <th>Accions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paletteRows.map((row) => (
-                  <tr key={row.rowId}>
-                    <td>
-                      <span className="admin-assets-color-chip" style={{ backgroundColor: `hsl(${row.hue} 72% 46%)` }} />
-                    </td>
-                    <td>
-                      {editingColorRowId === row.rowId ? (
-                        <input type="text" value={editingColorName} onChange={(e) => setEditingColorName(e.target.value)} />
-                      ) : (
-                        row.label
-                      )}
-                    </td>
-                    <td>{row.hue}°</td>
-                    <td>{row.photoCount}</td>
-                    <td>
-                      {row.kind === "preset" ? "Base" : row.kind === "custom" ? "Personalitzat" : "Només en fotos"}
-                    </td>
-                    <td className="admin-color-actions">
-                      {editingColorRowId === row.rowId ? (
-                        <>
-                          <button type="button" className="btn btn-sm" onClick={commitEditColor}>
-                            Desar
-                          </button>
-                          <button type="button" className="btn btn-sm" onClick={() => setEditingColorRowId(null)}>
-                            Cancel·lar
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button type="button" className="btn btn-sm" onClick={() => startEditColorRow(row)}>
-                            Editar
-                          </button>
-                          {row.kind === "in_use" ? (
-                            <button type="button" className="btn btn-sm" onClick={() => promoteInUseColor(row)}>
-                              Afegir a paleta
-                            </button>
-                          ) : null}
-                          {row.kind !== "in_use" ? (
-                            <button type="button" className="btn btn-sm danger" onClick={() => removeColorRow(row)}>
-                              {row.kind === "preset" ? "Restaurar nom" : "Eliminar"}
-                            </button>
-                          ) : null}
-                        </>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <AdminColorsPanel assets={assets} palette={colorPalette} onPaletteChange={onColorPaletteChange} />
           </div>
         ) : null}
       </div>
@@ -1903,6 +1719,7 @@ export function AdminAssetManager({
           onConfirm={handleAssetPickerConfirm}
         />
       ) : null}
+      </div>
     </div>
   );
 }

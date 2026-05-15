@@ -19,6 +19,7 @@ import { loadCollections } from "@/lib/collections-storage";
 import type { AppCollection } from "@/lib/collections";
 import type { CollectionMusicTrack } from "@/lib/collection-music";
 import { AdminAssetManager } from "@/components/AdminAssetManager";
+import { loadStoredPalette, saveStoredPalette, type StoredPalette } from "@/lib/admin-color-palette";
 import { GridOptionsPopover } from "@/components/GridOptionsPopover";
 import {
   clampTileMinPx,
@@ -124,6 +125,7 @@ function HomeContent() {
   const [viewerQueue, setViewerQueue] = useState<Asset[] | null>(null);
   const [collectionSlideshow, setCollectionSlideshow] = useState<CollectionSlideshowState | null>(null);
   const [adminOpen, setAdminOpen] = useState(false);
+  const [colorPalette, setColorPalette] = useState<StoredPalette>(() => loadStoredPalette());
   const [photoModalFront, setPhotoModalFront] = useState(false);
   const [adminCollections, setAdminCollections] = useState<AppCollection[]>([]);
   const [library, setLibrary] = useState<Asset[]>([]);
@@ -786,6 +788,11 @@ function HomeContent() {
           await refreshAdminCollections();
         }}
         onRefreshCollections={refreshAdminCollections}
+        colorPalette={colorPalette}
+        onColorPaletteChange={(next) => {
+          setColorPalette(next);
+          saveStoredPalette(next);
+        }}
         libraryGridPrefs={{
           distribution: gridDistribution,
           onDistributionChange: setGridDistribution,

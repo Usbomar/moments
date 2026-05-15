@@ -2960,6 +2960,49 @@ button.danger {
   font-size: 13px;
 }
 
+.admin-color-form-success {
+  margin: 8px 0 12px;
+  color: var(--success, #2e7d32);
+  font-size: 13px;
+}
+
+.admin-assets-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.admin-colors-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 900px;
+}
+
+.admin-colors-intro {
+  margin: 0;
+  max-width: 720px;
+}
+
+.admin-colors-section {
+  margin-top: 4px;
+}
+
+.admin-colors-section-title {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.admin-colors-section summary.admin-colors-section-title {
+  cursor: pointer;
+  list-style: none;
+}
+
+.admin-colors-section summary.admin-colors-section-title::-webkit-details-marker {
+  display: none;
+}
+
 .admin-tab-panel--colors .admin-stats-table td:nth-child(3),
 .admin-tab-panel--colors .admin-stats-table th:nth-child(3) {
   white-space: nowrap;

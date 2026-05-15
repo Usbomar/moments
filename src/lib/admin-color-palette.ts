@@ -138,7 +138,8 @@ export function buildColorOptions(custom: CustomColorDef[], presetLabels: Record
   const customRows = custom.map((c) => ({ label: c.label, hue: c.hue }));
   const seen = new Set<number>();
   const merged: Array<{ label: string; hue: number }> = [];
-  for (const row of [...presetRows, ...customRows]) {
+  // Personalitzats primer: si comparteixen to amb un preset, es veu el nom personalitzat al desplegable.
+  for (const row of [...customRows, ...presetRows]) {
     const h = normalizeHue(row.hue);
     if (seen.has(h)) continue;
     seen.add(h);

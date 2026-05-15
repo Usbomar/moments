@@ -12,37 +12,32 @@ type Props = {
   items: Asset[];
   onClose: () => void;
   onEditDetails?: (asset: Asset) => void;
-  /** Commuta preferit (mateix flux que la biblioteca). */
   onFavoriteToggle?: (asset: Asset, favorite: boolean) => void | Promise<void>;
   musicTrack?: CollectionMusicTrack | null;
   transition: SliderTransition;
-  /** Temps que cada foto resta visible (després del fade d’entrada, abans del següent fos) */
   dwellMs?: number;
 };
 
 function urlFor(asset: Asset): string {
-  return (asset.files.mediumUrl || asset.files.previewUrl || asset.files.originalUrl).trim();
+  return (asset.files.thumbUrl || asset.files.mediumUrl || asset.files.previewUrl || asset.files.originalUrl).trim();
 }
 
-/**
- * Presentació a pantalla completa amb crossfade entre imatges i música local opcional.
- */
 export function FadingSlideshow({ items, onClose, onEditDetails, onFavoriteToggle, musicTrack, transition, dwellMs = 2800 }: Props) {
   const [index, setIndex] = useState(0);
   const [previousIndex, setPreviousIndex] = useState<number | null>(null);
   const [playing, setPlaying] = useState(true);
   const [shuffle, setShuffle] = useState(false);
   const [favBusy, setFavBusy] = useState(false);
-  const [musicSrc, setMusicSrc] = useState<string | null>(() => musicTrack?.url ?? null);
-  const [musicName, setMusicName] = useState<string | null>(() => musicTrack?.title ?? null);
-  const [musicPlaying, setMusicPlaying] = useState(() => !!musicTrack?.url);
+  const [musicSrc] = useState<string | null>(() => musicTrack?.url ?? null);
+  const [musicName] = useState<string | null>(() => musicTrack?.title ?? null);
+  const [musicMuted, setMusicMuted] = useState(false);
   const [musicVolume, setMusicVolume] = useState(0.42);
+  const volumeBeforeMuteRef = useRef(0.42);
   const busyRef = useRef(false);
   const indexRef = useRef(0);
   const audioRef = useRef<HTMLAudioElement>(null);
-  const musicInputRef = useRef<HTMLInputElement>(null);
-  const musicSrcRef = useRef<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const filmstripRef = useRef<HTMLDivElement>(null);
 
   const n = items.length;
   const current = n > 0 ? items[Math.min(index, n - 1)] : null;
@@ -65,33 +60,20 @@ export function FadingSlideshow({ items, onClose, onEditDetails, onFavoriteToggl
   }, [itemsKey]);
 
   useEffect(() => {
-    return () => {
-      if (musicSrcRef.current) {
-        URL.revokeObjectURL(musicSrcRef.current);
-        musicSrcRef.current = null;
-      }
-    };
-  }, []);
-
-  useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-    audio.volume = musicVolume;
-  }, [musicVolume]);
+    audio.volume = musicMuted ? 0 : musicVolume;
+  }, [musicVolume, musicMuted]);
 
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !musicSrc) return;
-
-    if (!musicPlaying) {
+    if (musicMuted) {
       audio.pause();
       return;
     }
-
-    void audio.play().catch(() => {
-      setMusicPlaying(false);
-    });
-  }, [musicPlaying, musicSrc]);
+    void audio.play().catch(() => undefined);
+  }, [musicMuted, musicSrc]);
 
   const goToIndex = useCallback(
     (nextRaw: number) => {
@@ -110,6 +92,8 @@ export function FadingSlideshow({ items, onClose, onEditDetails, onFavoriteToggl
     [n]
   );
 
+  const goPrev = useCallback(() => goToIndex(indexRef.current - 1), [goToIndex]);
+
   const goNext = useCallback(() => {
     if (!shuffle || n < 3) {
       goToIndex(indexRef.current + 1);
@@ -123,12 +107,19 @@ export function FadingSlideshow({ items, onClose, onEditDetails, onFavoriteToggl
   }, [goToIndex, n, shuffle]);
 
   const togglePlayback = useCallback(() => {
-    setPlaying((currentPlaying) => {
-      const nextPlaying = !currentPlaying;
-      if (musicSrcRef.current) setMusicPlaying(nextPlaying);
-      return nextPlaying;
-    });
+    setPlaying((v) => !v);
   }, []);
+
+  const toggleMute = useCallback(() => {
+    setMusicMuted((was) => {
+      if (!was) {
+        volumeBeforeMuteRef.current = musicVolume > 0 ? musicVolume : 0.42;
+        return true;
+      }
+      setMusicVolume(volumeBeforeMuteRef.current);
+      return false;
+    });
+  }, [musicVolume]);
 
   useEffect(() => {
     if (!playing || n < 2) return;
@@ -150,7 +141,7 @@ export function FadingSlideshow({ items, onClose, onEditDetails, onFavoriteToggl
         goNext();
       } else if (e.key === "ArrowLeft") {
         e.preventDefault();
-        goToIndex(indexRef.current - 1);
+        goPrev();
       } else if (e.key === " ") {
         e.preventDefault();
         togglePlayback();
@@ -158,28 +149,13 @@ export function FadingSlideshow({ items, onClose, onEditDetails, onFavoriteToggl
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose, goToIndex, goNext, togglePlayback]);
+  }, [onClose, goNext, goPrev, togglePlayback]);
 
-  const handleMusicPick = useCallback((file: File | undefined) => {
-    if (!file) return;
-    if (musicSrcRef.current) URL.revokeObjectURL(musicSrcRef.current);
-    const nextSrc = URL.createObjectURL(file);
-    musicSrcRef.current = nextSrc;
-    setMusicSrc(nextSrc);
-    setMusicName(file.name);
-    setMusicPlaying(true);
-  }, []);
-
-  const clearMusic = useCallback(() => {
-    const audio = audioRef.current;
-    audio?.pause();
-    if (musicSrcRef.current) URL.revokeObjectURL(musicSrcRef.current);
-    musicSrcRef.current = null;
-    setMusicSrc(null);
-    setMusicName(null);
-    setMusicPlaying(false);
-    if (musicInputRef.current) musicInputRef.current.value = "";
-  }, []);
+  useEffect(() => {
+    const strip = filmstripRef.current;
+    const active = strip?.querySelector(".fading-slideshow-filmstrip-item.is-active");
+    active?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+  }, [index]);
 
   const requestBrowserFullscreen = useCallback(() => {
     const el = rootRef.current;
@@ -196,6 +172,7 @@ export function FadingSlideshow({ items, onClose, onEditDetails, onFavoriteToggl
   const src = urlFor(current);
   const previousSrc = previous ? urlFor(previous) : "";
   const label = `${index + 1} / ${n}`;
+  const effectiveVolume = musicMuted ? 0 : musicVolume;
 
   return (
     <div
@@ -206,77 +183,166 @@ export function FadingSlideshow({ items, onClose, onEditDetails, onFavoriteToggl
       aria-label="Presentació de la col·lecció"
       onClick={onClose}
     >
-      <div className="fading-slideshow-inner" onClick={(e) => e.stopPropagation()}>
-        <header className="fading-slideshow-top">
-          <span className="fading-slideshow-counter" aria-live="polite">
-            {label}
-          </span>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <ViewerFavoriteButton
-              favorite={!!current.favorite}
-              disabled={!onFavoriteToggle}
-              busy={favBusy}
-              onClick={() => {
-                if (!onFavoriteToggle) return;
-                const next = !current.favorite;
-                setFavBusy(true);
-                void Promise.resolve(onFavoriteToggle(current, next)).finally(() => setFavBusy(false));
-              }}
-            />
-            <button type="button" className="viewer-toolbar-btn" onClick={onClose} aria-label="Tancar presentació">
-              ×
+      <div className="fading-slideshow-layout" onClick={(e) => e.stopPropagation()}>
+        <aside className="fading-slideshow-rail fading-slideshow-rail--left" aria-label="Controls de diapositives i so">
+          <div className="fading-slideshow-rail-group" role="toolbar" aria-label="Diapositives">
+            <button
+              type="button"
+              className="viewer-toolbar-btn viewer-toolbar-btn--icon"
+              onClick={goPrev}
+              disabled={n < 2}
+              aria-label="Diapositiva anterior"
+              title="Anterior"
+            >
+              <span className="viewer-icon viewer-icon-prev" aria-hidden />
+            </button>
+            <button
+              type="button"
+              className={`viewer-toolbar-btn viewer-toolbar-btn--icon viewer-toolbar-btn--primary${playing ? "" : ""}`}
+              onClick={togglePlayback}
+              aria-label={playing ? "Pausar presentació" : "Reproduir presentació"}
+              title={playing ? "Pausa" : "Reprodueix"}
+            >
+              <span className={`viewer-icon ${playing ? "viewer-icon-pause" : "viewer-icon-play"}`} aria-hidden />
+            </button>
+            <button
+              type="button"
+              className="viewer-toolbar-btn viewer-toolbar-btn--icon"
+              onClick={goNext}
+              disabled={n < 2}
+              aria-label="Diapositiva següent"
+              title="Següent"
+            >
+              <span className="viewer-icon viewer-icon-next" aria-hidden />
+            </button>
+            <button
+              type="button"
+              className={`viewer-toolbar-btn viewer-toolbar-btn--icon viewer-toolbar-btn--shuffle${shuffle ? " viewer-toolbar-btn--active" : ""}`}
+              aria-label={shuffle ? "Desactivar ordre aleatori" : "Activar ordre aleatori"}
+              title="Aleatori"
+              aria-pressed={shuffle}
+              onClick={() => setShuffle((v) => !v)}
+            >
+              <span className="viewer-icon viewer-icon-shuffle" aria-hidden />
             </button>
           </div>
-        </header>
 
-        <div className="fading-slideshow-stage">
-          <div className="fading-slideshow-img-wrap">
-            {previous && previousSrc ? (
-              // eslint-disable-next-line @next/next/no-img-element -- URL signades
-              <img
-                key={`previous-${previous.id}`}
-                className={`fading-slideshow-img fading-slideshow-img--previous fading-slideshow-img--previous-${transition}`}
-                src={previousSrc}
-                alt=""
-                aria-hidden
-                referrerPolicy="no-referrer"
-                decoding="async"
-              />
-            ) : null}
-            {src ? (
-              // eslint-disable-next-line @next/next/no-img-element -- URL signades
-              <img
-                key={`current-${current.id}`}
-                className={`fading-slideshow-img fading-slideshow-img--current fading-slideshow-img--current-${transition}`}
-                src={src}
-                alt={current.title}
-                referrerPolicy="no-referrer"
-                decoding="async"
-                fetchPriority="high"
-              />
+          {musicSrc ? (
+            <div className="fading-slideshow-rail-group fading-slideshow-rail-group--audio" aria-label="Volum">
+              <label className="fading-slideshow-volume-vertical">
+                <span className="sr-only">Volum</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={effectiveVolume}
+                  disabled={musicMuted}
+                  onChange={(e) => {
+                    const v = Number(e.target.value);
+                    setMusicVolume(v);
+                    volumeBeforeMuteRef.current = v;
+                    if (v > 0) setMusicMuted(false);
+                  }}
+                  aria-valuetext={`${Math.round(effectiveVolume * 100)}%`}
+                />
+              </label>
+              <button
+                type="button"
+                className={`viewer-toolbar-btn viewer-toolbar-btn--icon${musicMuted ? " viewer-toolbar-btn--active" : ""}`}
+                onClick={toggleMute}
+                aria-label={musicMuted ? "Activar so" : "Silenciar música"}
+                title={musicMuted ? "Activar so" : "Silenciar"}
+              >
+                <span className={`viewer-icon ${musicMuted ? "viewer-icon-mute" : "viewer-icon-volume"}`} aria-hidden />
+              </button>
+            </div>
+          ) : null}
+        </aside>
+
+        <main className="fading-slideshow-main">
+          <div className="fading-slideshow-stage">
+            <span className="fading-slideshow-counter" aria-live="polite">
+              {label}
+            </span>
+            <div className="fading-slideshow-img-wrap">
+              {previous && previousSrc ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={`previous-${previous.id}`}
+                  className={`fading-slideshow-img fading-slideshow-img--previous fading-slideshow-img--previous-${transition}`}
+                  src={previousSrc}
+                  alt=""
+                  aria-hidden
+                  referrerPolicy="no-referrer"
+                  decoding="async"
+                />
+              ) : null}
+              {src ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={`current-${current.id}`}
+                  className={`fading-slideshow-img fading-slideshow-img--current fading-slideshow-img--current-${transition}`}
+                  src={src}
+                  alt={current.title}
+                  referrerPolicy="no-referrer"
+                  decoding="async"
+                  fetchPriority="high"
+                />
+              ) : (
+                <div className="fading-slideshow-placeholder">{current.title}</div>
+              )}
+            </div>
+          </div>
+
+          <div className="fading-slideshow-bottom">
+            <div ref={filmstripRef} className="fading-slideshow-filmstrip" role="tablist" aria-label="Fotos de la col·lecció">
+              {items.map((item, i) => {
+                const thumb = urlFor(item);
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={i === index}
+                    aria-label={`${item.title}, foto ${i + 1} de ${n}`}
+                    className={`fading-slideshow-filmstrip-item${i === index ? " is-active" : ""}`}
+                    onClick={() => goToIndex(i)}
+                  >
+                    {thumb ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={thumb} alt="" referrerPolicy="no-referrer" decoding="async" />
+                    ) : (
+                      <span className="fading-slideshow-filmstrip-fallback" aria-hidden />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            {musicName ? (
+              <p className="fading-slideshow-track" title={musicName}>
+                ♪ {musicName}
+              </p>
             ) : (
-              <div className="fading-slideshow-placeholder">{current.title}</div>
+              <p className="fading-slideshow-track fading-slideshow-track--empty" aria-hidden>
+                &nbsp;
+              </p>
             )}
           </div>
-        </div>
+        </main>
 
-        <div className="viewer-toolbar fading-slideshow-toolbar" role="toolbar" aria-label="Controls de la presentació">
-          <button type="button" className="viewer-toolbar-btn" onClick={() => goToIndex(indexRef.current - 1)} disabled={n < 2}>
-            Anterior
-          </button>
-          <button type="button" className="viewer-toolbar-btn viewer-toolbar-btn--primary" onClick={togglePlayback}>
-            {playing ? "Pausa" : "Reprodueix"}
-          </button>
-          <button
-            type="button"
-            className={`viewer-toolbar-btn viewer-toolbar-btn--icon viewer-toolbar-btn--shuffle${shuffle ? " viewer-toolbar-btn--active" : ""}`}
-            aria-label={shuffle ? "Desactivar ordre aleatori" : "Activar ordre aleatori"}
-            title={shuffle ? "Aleatori activat" : "Aleatori"}
-            aria-pressed={shuffle}
-            onClick={() => setShuffle((value) => !value)}
-          >
-            <span className="viewer-icon viewer-icon-shuffle" aria-hidden />
-          </button>
+        <aside className="fading-slideshow-rail fading-slideshow-rail--right" aria-label="Accions">
+          <ViewerFavoriteButton
+            favorite={!!current.favorite}
+            disabled={!onFavoriteToggle}
+            busy={favBusy}
+            onClick={() => {
+              if (!onFavoriteToggle) return;
+              const next = !current.favorite;
+              setFavBusy(true);
+              void Promise.resolve(onFavoriteToggle(current, next)).finally(() => setFavBusy(false));
+            }}
+          />
           <button
             type="button"
             className="viewer-toolbar-btn viewer-toolbar-btn--icon"
@@ -286,67 +352,28 @@ export function FadingSlideshow({ items, onClose, onEditDetails, onFavoriteToggl
           >
             <span className="viewer-icon viewer-icon-fullscreen" aria-hidden />
           </button>
-          <button type="button" className="viewer-toolbar-btn" onClick={goNext} disabled={n < 2}>
-            Següent
-          </button>
           {onEditDetails ? (
             <button
               type="button"
-              className="viewer-toolbar-btn"
+              className="viewer-toolbar-btn viewer-toolbar-btn--icon"
+              aria-label="Editar dades de la foto"
+              title="Editar dades"
               onClick={() => {
                 const a = current;
                 onClose();
                 queueMicrotask(() => onEditDetails(a));
               }}
             >
-              Editar dades
+              <span className="viewer-icon viewer-icon-edit" aria-hidden />
             </button>
           ) : null}
-        </div>
-
-        <div className="fading-slideshow-music" aria-label="Música de la presentació">
-          <audio
-            ref={audioRef}
-            src={musicSrc ?? undefined}
-            loop
-            onEnded={() => setMusicPlaying(false)}
-            onPlay={() => setMusicPlaying(true)}
-            onPause={() => setMusicPlaying(false)}
-          />
-          <input
-            ref={musicInputRef}
-            className="fading-slideshow-music-input"
-            type="file"
-            accept="audio/*"
-            onChange={(e) => handleMusicPick(e.target.files?.[0])}
-          />
-          <button type="button" className="viewer-toolbar-btn" onClick={() => musicInputRef.current?.click()}>
-            {musicName ? "Canviar música" : "Afegir música"}
+          <button type="button" className="viewer-toolbar-btn viewer-toolbar-btn--icon" onClick={onClose} aria-label="Tancar presentació" title="Tancar">
+            <span className="viewer-icon viewer-icon-close" aria-hidden />
           </button>
-          {musicSrc ? (
-            <>
-              <button type="button" className="viewer-toolbar-btn" onClick={() => setMusicPlaying((v) => !v)}>
-                {musicPlaying ? "Pausar música" : "Reprendre música"}
-              </button>
-              <label className="fading-slideshow-volume">
-                <span>Volum</span>
-                <input
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  value={musicVolume}
-                  onChange={(e) => setMusicVolume(Number(e.target.value))}
-                />
-              </label>
-              <button type="button" className="viewer-toolbar-btn viewer-toolbar-btn--subtle" onClick={clearMusic}>
-                Treure música
-              </button>
-            </>
-          ) : null}
-          {musicName ? <span className="fading-slideshow-track" title={musicName}>{musicName}</span> : null}
-        </div>
+        </aside>
       </div>
+
+      {musicSrc ? <audio ref={audioRef} src={musicSrc} loop preload="auto" /> : null}
     </div>
   );
 }

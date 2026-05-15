@@ -23,6 +23,7 @@ import {
   buildColorOptionsFromPalette,
   loadStoredPalette,
   saveStoredPalette,
+  sanitizePalette,
   type StoredPalette
 } from "@/lib/admin-color-palette";
 import { GridOptionsPopover } from "@/components/GridOptionsPopover";
@@ -133,6 +134,29 @@ function HomeContent() {
   const [colorPalette, setColorPalette] = useState<StoredPalette>(() => loadStoredPalette());
   const colorOptions = useMemo(() => buildColorOptionsFromPalette(colorPalette), [colorPalette]);
   const [photoModalFront, setPhotoModalFront] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/profile/color-palette", { cache: "no-store" });
+        const body = (await res.json().catch(() => ({}))) as {
+          palette?: Partial<StoredPalette>;
+          schemaReady?: boolean;
+        };
+        if (cancelled || !res.ok || body.schemaReady === false || !body.palette) return;
+        const next = sanitizePalette(body.palette);
+        setColorPalette(next);
+        saveStoredPalette(next);
+      } catch {
+        /* manté localStorage */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const [adminCollections, setAdminCollections] = useState<AppCollection[]>([]);
   const [library, setLibrary] = useState<Asset[]>([]);
   const [loadingLibrary, setLoadingLibrary] = useState(false);

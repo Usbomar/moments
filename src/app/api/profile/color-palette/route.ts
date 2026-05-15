@@ -66,7 +66,10 @@ export async function PUT(request: Request) {
     if (ensured.error) return NextResponse.json({ error: ensured.error }, { status: 500 });
 
     const supabase = getSupabaseAdmin();
-    const { error } = await supabase.from("profiles").update({ color_palette: palette }).eq("id", userId);
+    const { error } = await supabase.from("profiles").upsert(
+      { id: userId, role: "owner", color_palette: palette },
+      { onConflict: "id" }
+    );
 
     if (error) {
       if (/color_palette/i.test(error.message)) {

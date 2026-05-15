@@ -30,14 +30,11 @@ export type CustomColorDef = {
 export type PaletteRowKind = "preset" | "custom" | "in_use";
 
 export type PaletteRow = {
-  /** Clau estable per a la fila de la taula */
   rowId: string;
   label: string;
   hue: number;
   kind: PaletteRowKind;
-  /** Només per a `custom` */
   customId?: string;
-  /** Fotos que usen aquest to (arrodonit) */
   photoCount: number;
 };
 
@@ -46,26 +43,33 @@ const STORAGE_LEGACY = "moments_admin_custom_colors_v1";
 
 export type StoredPalette = {
   custom: CustomColorDef[];
-  /** Sobreescriu el nom visible d’un preset (clau = hue en string) */
   presetLabels: Record<string, string>;
+  /** Presets base (hue) que l'usuari ha eliminat de la paleta i del desplegable */
+  hiddenPresetHues: number[];
+};
+
+export const EMPTY_PALETTE: StoredPalette = {
+  custom: [],
+  presetLabels: {},
+  hiddenPresetHues: []
 };
 
 export function normalizeHue(hue: number): number {
   return Math.min(359, Math.max(0, Math.round(hue)));
 }
 
+function hiddenSet(hidden: number[]): Set<number> {
+  return new Set(hidden.map(normalizeHue));
+}
+
 export function loadStoredPalette(): StoredPalette {
   if (typeof window === "undefined") {
-    return { custom: [], presetLabels: {} };
+    return { ...EMPTY_PALETTE };
   }
   try {
     const rawV2 = window.localStorage.getItem(STORAGE_V2);
     if (rawV2) {
-      const parsed = JSON.parse(rawV2) as Partial<StoredPalette>;
-      return {
-        custom: sanitizeCustomList(parsed.custom),
-        presetLabels: sanitizePresetLabels(parsed.presetLabels)
-      };
+      return sanitizePalette(JSON.parse(rawV2) as Partial<StoredPalette>);
     }
     const legacy = window.localStorage.getItem(STORAGE_LEGACY);
     if (legacy) {
@@ -78,13 +82,14 @@ export function loadStoredPalette(): StoredPalette {
             hue: x.hue
           }))
         ),
-        presetLabels: {}
+        presetLabels: {},
+        hiddenPresetHues: []
       };
     }
   } catch {
     /* ignore */
   }
-  return { custom: [], presetLabels: {} };
+  return { ...EMPTY_PALETTE };
 }
 
 export function saveStoredPalette(data: StoredPalette): void {
@@ -93,9 +98,18 @@ export function saveStoredPalette(data: StoredPalette): void {
     STORAGE_V2,
     JSON.stringify({
       custom: data.custom,
-      presetLabels: data.presetLabels
+      presetLabels: data.presetLabels,
+      hiddenPresetHues: data.hiddenPresetHues
     })
   );
+}
+
+export function sanitizePalette(raw: Partial<StoredPalette>): StoredPalette {
+  return {
+    custom: sanitizeCustomList(raw.custom),
+    presetLabels: sanitizePresetLabels(raw.presetLabels),
+    hiddenPresetHues: sanitizeHiddenPresets(raw.hiddenPresetHues)
+  };
 }
 
 function sanitizeCustomList(raw: unknown): CustomColorDef[] {
@@ -121,6 +135,20 @@ function sanitizePresetLabels(raw: unknown): Record<string, string> {
   return out;
 }
 
+function sanitizeHiddenPresets(raw: unknown): number[] {
+  if (!Array.isArray(raw)) return [];
+  const out: number[] = [];
+  const seen = new Set<number>();
+  for (const v of raw) {
+    if (typeof v !== "number" || !Number.isFinite(v)) continue;
+    const h = normalizeHue(v);
+    if (seen.has(h)) continue;
+    seen.add(h);
+    out.push(h);
+  }
+  return out;
+}
+
 export function presetLabel(hue: number, presetLabels: Record<string, string>): string {
   const key = String(normalizeHue(hue));
   const override = presetLabels[key];
@@ -129,16 +157,31 @@ export function presetLabel(hue: number, presetLabels: Record<string, string>): 
   return base?.label ?? `To ${key}°`;
 }
 
-/** Opcions per als desplegables de la graella / editor */
-export function buildColorOptions(custom: CustomColorDef[], presetLabels: Record<string, string>): Array<{ label: string; hue: number }> {
-  const presetRows = COLOR_PRESETS.map((p) => ({
+export function visiblePresets(palette: StoredPalette): Array<{ label: string; hue: number }> {
+  const hidden = hiddenSet(palette.hiddenPresetHues);
+  return COLOR_PRESETS.filter((p) => !hidden.has(normalizeHue(p.hue))).map((p) => ({
+    label: presetLabel(p.hue, palette.presetLabels),
+    hue: p.hue
+  }));
+}
+
+export function buildColorOptionsFromPalette(palette: StoredPalette): Array<{ label: string; hue: number }> {
+  return buildColorOptions(palette.custom, palette.presetLabels, palette.hiddenPresetHues);
+}
+
+export function buildColorOptions(
+  custom: CustomColorDef[],
+  presetLabels: Record<string, string>,
+  hiddenPresetHues: number[] = []
+): Array<{ label: string; hue: number }> {
+  const hidden = hiddenSet(hiddenPresetHues);
+  const presetRows = COLOR_PRESETS.filter((p) => !hidden.has(normalizeHue(p.hue))).map((p) => ({
     label: presetLabel(p.hue, presetLabels),
     hue: p.hue
   }));
   const customRows = custom.map((c) => ({ label: c.label, hue: c.hue }));
   const seen = new Set<number>();
   const merged: Array<{ label: string; hue: number }> = [];
-  // Personalitzats primer: si comparteixen to amb un preset, es veu el nom personalitzat al desplegable.
   for (const row of [...customRows, ...presetRows]) {
     const h = normalizeHue(row.hue);
     if (seen.has(h)) continue;
@@ -158,24 +201,25 @@ function hueUsedByAssets(assets: Array<{ colorHue?: number | null }>): Map<numbe
   return counts;
 }
 
-function isHueInPalette(hue: number, custom: CustomColorDef[], presetLabels: Record<string, string>): boolean {
+function isHueInVisiblePalette(hue: number, palette: StoredPalette): boolean {
   const h = normalizeHue(hue);
-  if (COLOR_PRESETS.some((p) => p.hue === h)) return true;
-  if (custom.some((c) => c.hue === h)) return true;
-  return false;
+  if (palette.custom.some((c) => normalizeHue(c.hue) === h)) return true;
+  if (hiddenSet(palette.hiddenPresetHues).has(h)) return false;
+  return COLOR_PRESETS.some((p) => p.hue === h);
 }
 
-/** Llista completa per a Configuració → Colors */
 export function buildPaletteRows(
   assets: Array<{ colorHue?: number | null }>,
-  custom: CustomColorDef[],
-  presetLabels: Record<string, string>
+  palette: StoredPalette
 ): PaletteRow[] {
+  const { custom, presetLabels, hiddenPresetHues } = palette;
+  const hidden = hiddenSet(hiddenPresetHues);
   const usage = hueUsedByAssets(assets);
   const rows: PaletteRow[] = [];
 
   for (const p of COLOR_PRESETS) {
     const h = normalizeHue(p.hue);
+    if (hidden.has(h)) continue;
     rows.push({
       rowId: `preset-${h}`,
       label: presetLabel(h, presetLabels),
@@ -198,7 +242,7 @@ export function buildPaletteRows(
   }
 
   for (const [h, count] of usage) {
-    if (isHueInPalette(h, custom, presetLabels)) continue;
+    if (isHueInVisiblePalette(h, palette)) continue;
     rows.push({
       rowId: `in_use-${h}`,
       label: `En ús (${h}°)`,

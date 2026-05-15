@@ -2,38 +2,22 @@ import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/server/supabase-admin";
 import { isSupabaseConfigured } from "@/lib/server/supabase-config";
 import { requireAuthUserId } from "@/lib/server/require-auth-api";
-import type { CustomColorDef, StoredPalette } from "@/lib/admin-color-palette";
-import { normalizeHue } from "@/lib/admin-color-palette";
+import { EMPTY_PALETTE, sanitizePalette, type StoredPalette } from "@/lib/admin-color-palette";
 
-const EMPTY: StoredPalette = { custom: [], presetLabels: {} };
-
-function parsePalette(raw: unknown): StoredPalette {
-  if (!raw || typeof raw !== "object") return EMPTY;
-  const o = raw as Record<string, unknown>;
-  const custom: CustomColorDef[] = [];
-  if (Array.isArray(o.custom)) {
-    for (const item of o.custom) {
-      if (!item || typeof item !== "object") continue;
-      const row = item as Record<string, unknown>;
-      if (typeof row.hue !== "number" || !Number.isFinite(row.hue)) continue;
-      const id = typeof row.id === "string" && row.id.trim() ? row.id.trim() : crypto.randomUUID();
-      const label = typeof row.label === "string" && row.label.trim() ? row.label.trim() : "Personalitzat";
-      custom.push({ id, label, hue: normalizeHue(row.hue) });
-    }
-  }
-  const presetLabels: Record<string, string> = {};
-  if (o.presetLabels && typeof o.presetLabels === "object") {
-    for (const [k, v] of Object.entries(o.presetLabels as Record<string, unknown>)) {
-      if (typeof v === "string" && v.trim()) presetLabels[k] = v.trim();
-    }
-  }
-  return { custom, presetLabels };
+async function ensureProfileRow(userId: string): Promise<{ error: string | null }> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase.from("profiles").select("id").eq("id", userId).maybeSingle();
+  if (error) return { error: error.message };
+  if (data) return { error: null };
+  const { error: insErr } = await supabase.from("profiles").insert({ id: userId, role: "owner" });
+  if (insErr) return { error: insErr.message };
+  return { error: null };
 }
 
 export async function GET() {
   try {
     if (!isSupabaseConfigured()) {
-      return NextResponse.json({ palette: EMPTY, persisted: false });
+      return NextResponse.json({ palette: EMPTY_PALETTE, persisted: false });
     }
     const auth = await requireAuthUserId();
     if (auth instanceof NextResponse) return auth;
@@ -44,13 +28,19 @@ export async function GET() {
 
     if (error) {
       if (/color_palette/i.test(error.message)) {
-        return NextResponse.json({ palette: EMPTY, persisted: false, schemaReady: false });
+        return NextResponse.json({ palette: EMPTY_PALETTE, persisted: false, schemaReady: false });
       }
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    if (!data) {
+      const ensured = await ensureProfileRow(userId);
+      if (ensured.error) return NextResponse.json({ error: ensured.error }, { status: 500 });
+      return NextResponse.json({ palette: EMPTY_PALETTE, persisted: true, schemaReady: true });
+    }
+
     return NextResponse.json({
-      palette: parsePalette(data?.color_palette),
+      palette: sanitizePalette((data.color_palette ?? EMPTY_PALETTE) as Partial<StoredPalette>),
       persisted: true,
       schemaReady: true
     });
@@ -70,7 +60,10 @@ export async function PUT(request: Request) {
     const { userId } = auth;
 
     const body = (await request.json()) as Partial<StoredPalette>;
-    const palette = parsePalette(body);
+    const palette = sanitizePalette(body);
+
+    const ensured = await ensureProfileRow(userId);
+    if (ensured.error) return NextResponse.json({ error: ensured.error }, { status: 500 });
 
     const supabase = getSupabaseAdmin();
     const { error } = await supabase.from("profiles").update({ color_palette: palette }).eq("id", userId);
@@ -78,7 +71,7 @@ export async function PUT(request: Request) {
     if (error) {
       if (/color_palette/i.test(error.message)) {
         return NextResponse.json(
-          { error: "Falta la migració SQL color_palette a profiles. Executa les migracions de Supabase." },
+          { error: "Falta la columna color_palette a profiles. Executa la migració SQL." },
           { status: 503 }
         );
       }

@@ -19,7 +19,12 @@ import { loadCollections } from "@/lib/collections-storage";
 import type { AppCollection } from "@/lib/collections";
 import type { CollectionMusicTrack } from "@/lib/collection-music";
 import { AdminAssetManager } from "@/components/AdminAssetManager";
-import { loadStoredPalette, saveStoredPalette, type StoredPalette } from "@/lib/admin-color-palette";
+import {
+  buildColorOptionsFromPalette,
+  loadStoredPalette,
+  saveStoredPalette,
+  type StoredPalette
+} from "@/lib/admin-color-palette";
 import { GridOptionsPopover } from "@/components/GridOptionsPopover";
 import {
   clampTileMinPx,
@@ -126,6 +131,7 @@ function HomeContent() {
   const [collectionSlideshow, setCollectionSlideshow] = useState<CollectionSlideshowState | null>(null);
   const [adminOpen, setAdminOpen] = useState(false);
   const [colorPalette, setColorPalette] = useState<StoredPalette>(() => loadStoredPalette());
+  const colorOptions = useMemo(() => buildColorOptionsFromPalette(colorPalette), [colorPalette]);
   const [photoModalFront, setPhotoModalFront] = useState(false);
   const [adminCollections, setAdminCollections] = useState<AppCollection[]>([]);
   const [library, setLibrary] = useState<Asset[]>([]);
@@ -732,6 +738,7 @@ function HomeContent() {
           <PhotoModal
             key={selectedAsset.id}
             asset={selectedAsset}
+            colorOptions={colorOptions}
             libraryTagSuggestions={libraryTagSuggestions}
             front={photoModalFront}
             onClose={() => {
@@ -771,6 +778,7 @@ function HomeContent() {
         onQuickUpdate={async (asset, patch) => {
           const merged: Asset = { ...asset, ...patch };
           setLibrary((prev) => prev.map((a) => (a.id === asset.id ? merged : a)));
+          if (selectedAsset?.id === asset.id) setSelectedAsset(merged);
           try {
             await onPhotoSave(merged);
           } catch {

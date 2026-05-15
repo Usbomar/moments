@@ -10,14 +10,10 @@ import { AdminAssetPickerModal } from "@/components/AdminAssetPickerModal";
 import { LibraryGridPreferencesPanel } from "@/components/LibraryGridPreferencesPanel";
 import { ViewerFavoriteButton } from "@/components/ViewerFavoriteButton";
 import { useAdminAssetStats, type SortState, type SortKey } from "@/components/admin/useAdminAssetStats";
-import {
-  colorHueToPreset,
-  fromDateInputValue,
-  parseLocationText,
-  toDateInputValue
-} from "@/components/admin/adminAssetHelpers";
+import { fromDateInputValue, parseLocationText, toDateInputValue } from "@/components/admin/adminAssetHelpers";
 import { AdminColorsPanel } from "@/components/admin/AdminColorsPanel";
-import { buildColorOptions, type StoredPalette } from "@/lib/admin-color-palette";
+import { ColorHueSelect } from "@/components/admin/ColorHueSelect";
+import { buildColorOptionsFromPalette, normalizeHue, type StoredPalette } from "@/lib/admin-color-palette";
 import {
   DEFAULT_PHOTO_COLUMNS,
   DEFAULT_TAB_ORDER,
@@ -187,9 +183,19 @@ export function AdminAssetManager({
   });
   const saveTimersRef = useRef<Record<string, number>>({});
   const musicFileInputRef = useRef<HTMLInputElement>(null);
-  const allColorOptions = useMemo(
-    () => buildColorOptions(colorPalette.custom, colorPalette.presetLabels),
-    [colorPalette]
+  const allColorOptions = useMemo(() => buildColorOptionsFromPalette(colorPalette), [colorPalette]);
+
+  const clearPhotosWithHue = useCallback(
+    async (hue: number) => {
+      const target = normalizeHue(hue);
+      const affected = assets.filter(
+        (a) => typeof a.colorHue === "number" && Number.isFinite(a.colorHue) && normalizeHue(a.colorHue) === target
+      );
+      for (const a of affected) {
+        await onQuickUpdate(a, { colorHue: null });
+      }
+    },
+    [assets, onQuickUpdate]
   );
   const { tagStats, locationStats, tagsToAssets, locationsToAssets, assetById, sorted } = useAdminAssetStats(assets, sort);
 
@@ -846,27 +852,11 @@ export function AdminAssetManager({
       case "color":
         return (
           <td key={col} className={PHOTO_COL_CLASS.color}>
-            <span className="admin-assets-inline-color">
-              <span
-                className="admin-assets-color-chip"
-                style={{
-                  backgroundColor: `hsl(${draftById[a.id]?.colorHue ?? a.colorHue ?? 0} 72% 46%)`,
-                  opacity: typeof (draftById[a.id]?.colorHue ?? a.colorHue) === "number" ? 1 : 0.2
-                }}
-                aria-hidden
-              />
-              <select
-                value={colorHueToPreset(draftById[a.id]?.colorHue ?? a.colorHue, allColorOptions)}
-                onChange={(e) => updateDraft(a, { colorHue: e.target.value ? Number(e.target.value) : null })}
-              >
-                <option value="">Sense color</option>
-                {allColorOptions.map((preset) => (
-                  <option key={preset.hue} value={preset.hue}>
-                    {preset.label}
-                  </option>
-                ))}
-              </select>
-            </span>
+            <ColorHueSelect
+              value={draftById[a.id]?.colorHue ?? a.colorHue}
+              options={allColorOptions}
+              onChange={(hue) => updateDraft(a, { colorHue: hue })}
+            />
           </td>
         );
       case "location":
@@ -1604,7 +1594,12 @@ export function AdminAssetManager({
 
         {activeTab === "colors" ? (
           <div className="admin-tab-panel admin-tab-panel--colors">
-            <AdminColorsPanel assets={assets} palette={colorPalette} onPaletteChange={onColorPaletteChange} />
+            <AdminColorsPanel
+              assets={assets}
+              palette={colorPalette}
+              onPaletteChange={onColorPaletteChange}
+              onClearPhotosWithHue={clearPhotosWithHue}
+            />
           </div>
         ) : null}
       </div>

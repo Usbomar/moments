@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import type { Map as LeafletMap, Marker as LeafletMarker } from "leaflet";
 import type { Asset, LocationInfo } from "@/lib/types";
 import type { AppCollection } from "@/lib/collections";
+import { ColorHueSelect, type ColorOption } from "@/components/admin/ColorHueSelect";
 
 interface Props {
   asset: Asset | null;
@@ -13,6 +14,8 @@ interface Props {
   front?: boolean;
   /** Tags ja usats en altres fotos (minúscules, únics); per suggerir mentre s’escriu. */
   libraryTagSuggestions?: string[];
+  /** Mateix llistat que Configuració → Fotos / Colors */
+  colorOptions: ColorOption[];
 }
 
 function toDateInputValue(iso: string): string {
@@ -58,7 +61,7 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
   return debounced;
 }
 
-export function PhotoModal({ asset, onClose, onSave, libraryTagSuggestions = [], front = false }: Props) {
+export function PhotoModal({ asset, onClose, onSave, libraryTagSuggestions = [], front = false, colorOptions }: Props) {
   const [title, setTitle] = useState(() => asset?.title ?? "");
   const [description, setDescription] = useState(() => asset?.description ?? "");
   const [tagInput, setTagInput] = useState("");
@@ -480,52 +483,14 @@ export function PhotoModal({ asset, onClose, onSave, libraryTagSuggestions = [],
         </div>
 
         <div className="form-group">
-          <p className="photo-modal__section-title">Vista per colors</p>
-          <label htmlFor="photo-color-enabled" style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-            <input
-              id="photo-color-enabled"
-              type="checkbox"
-              checked={colorHue !== null}
-              onChange={(e) => {
-                if (e.target.checked) {
-                  setColorHue(
-                    typeof asset.colorHue === "number" && Number.isFinite(asset.colorHue)
-                      ? Math.min(359, Math.max(0, Math.round(asset.colorHue)))
-                      : 42
-                  );
-                } else {
-                  setColorHue(null);
-                }
-              }}
-            />
-            Assignar manualment un to (cap valor automàtic de l’aplicació)
-          </label>
-          {colorHue !== null ? (
-            <div className="photo-modal-color-row">
-              <label htmlFor="photo-color-hue" className="modal-muted" style={{ fontSize: 13 }}>
-                To 0–359°
-              </label>
-              <div className="photo-modal__row" style={{ alignItems: "center", marginTop: 8 }}>
-                <input
-                  id="photo-color-hue"
-                  type="range"
-                  min={0}
-                  max={359}
-                  value={colorHue}
-                  onChange={(e) => setColorHue(Number.parseInt(e.target.value, 10))}
-                  style={{ flex: 1 }}
-                />
-                <span className="photo-modal-color-value" aria-live="polite">
-                  {colorHue}°
-                </span>
-                <span
-                  className="photo-modal-color-swatch"
-                  style={{ background: `hsl(${colorHue} 72% 46%)` }}
-                  aria-hidden
-                />
-              </div>
-            </div>
-          ) : null}
+          <label htmlFor="photo-color-hue">Color</label>
+          <ColorHueSelect
+            id="photo-color-hue"
+            value={colorHue}
+            options={colorOptions}
+            onChange={setColorHue}
+            className="photo-modal-color-select"
+          />
         </div>
 
         <div className="form-group">

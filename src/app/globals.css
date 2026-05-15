@@ -2805,10 +2805,40 @@ button.danger {
 }
 
 .admin-assets-color-chip {
-  width: 14px;
-  height: 14px;
-  border: 1px solid var(--border);
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 2px;
   flex-shrink: 0;
+  display: inline-block;
+}
+
+@media (prefers-color-scheme: dark) {
+  .admin-assets-color-chip {
+    border: 1px solid var(--border);
+  }
+}
+
+.admin-colors-swatch-cell {
+  width: 36px;
+  min-width: 36px;
+}
+
+.admin-colors-table .admin-assets-color-chip {
+  vertical-align: middle;
+}
+
+.admin-colors-edit-swatch {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.photo-modal-color-select select {
+  min-width: 12rem;
 }
 
 .admin-assets-col-delete {

@@ -26,6 +26,7 @@ import {
   type StoredPalette
 } from "@/lib/admin-color-palette";
 import { GridOptionsPopover } from "@/components/GridOptionsPopover";
+import { AdminAssetManager } from "@/components/AdminAssetManager";
 import {
   clampTileMinPx,
   GRID_DENSITY_PRESET_TILE_MIN,
@@ -83,11 +84,6 @@ const PhotoModal = dynamic(() => import("@/components/PhotoModal").then((mod) =>
 const ImageEditorV2 = dynamic(() => import("@/components/ImageEditor/ImageEditorV2").then((mod) => mod.ImageEditorV2), {
   loading: () => <TabLoadingHint label="editor d’imatge" />
 });
-
-const AdminAssetManager = dynamic(
-  () => import("@/components/AdminAssetManager").then((m) => ({ default: m.AdminAssetManager })),
-  { ssr: false }
-);
 
 function TabLoadingHint({ label }: { label: string }) {
   return (
@@ -575,7 +571,21 @@ function HomeContent() {
         searchInputRef={searchRef}
         topBarRetractable={topBarRetractable}
         onAdminClick={() => {
-          // Deixa que el clic acabi i el navegador pugui pintar abans de muntar el modal (millora INP).
+          // #region agent log
+          fetch("http://127.0.0.1:7438/ingest/7331e6b2-572e-4d6a-9e78-f59c870b6fb3", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "213d72" },
+            body: JSON.stringify({
+              sessionId: "213d72",
+              runId: "collections-ui",
+              hypothesisId: "C",
+              location: "page.tsx:onAdminClick",
+              message: "opening admin config modal",
+              data: { adminBundle: "inline-20260516b" },
+              timestamp: Date.now()
+            })
+          }).catch(() => {});
+          // #endregion
           window.requestAnimationFrame(() => {
             startTransition(() => setAdminOpen(true));
             void refreshAdminCollections();

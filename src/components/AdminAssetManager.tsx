@@ -30,6 +30,8 @@ import {
   type PhotoColumnKey
 } from "@/components/admin/adminDnD";
 
+export const ADMIN_UI_BUILD = "20260516b";
+
 const TAB_LABELS: Record<AdminTabId, string> = {
   photos: "Fotos",
   libraryGrid: "Graella",
@@ -287,7 +289,26 @@ export function AdminAssetManager({
         hypothesisId: "B",
         location: "AdminAssetManager.tsx:admin-open",
         message: "admin modal state",
-        data: { open, activeTab, collectionsSubTab, build: "20260516-collections-subtabs" },
+        data: { open, activeTab, collectionsSubTab, build: ADMIN_UI_BUILD },
+        timestamp: Date.now()
+      })
+    }).catch(() => {});
+    // #endregion
+  }, [open, activeTab, collectionsSubTab]);
+
+  useEffect(() => {
+    if (!open || activeTab !== "collections") return;
+    // #region agent log
+    fetch("http://127.0.0.1:7438/ingest/7331e6b2-572e-4d6a-9e78-f59c870b6fb3", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "213d72" },
+      body: JSON.stringify({
+        sessionId: "213d72",
+        runId: "collections-ui",
+        hypothesisId: "D",
+        location: "AdminAssetManager.tsx:collections-tab",
+        message: "collections tab rendered",
+        data: { build: ADMIN_UI_BUILD, collectionsSubTab },
         timestamp: Date.now()
       })
     }).catch(() => {});
@@ -1041,10 +1062,10 @@ export function AdminAssetManager({
   };
 
   return (
-    <div className="modal-overlay modal-overlay--front admin-assets-overlay" role="dialog" aria-modal="true" aria-label="Configuració de la biblioteca" data-admin-ui-build="20260516-collections-subtabs" onClick={onClose}>
+    <div className="modal-overlay modal-overlay--front admin-assets-overlay" role="dialog" aria-modal="true" aria-label="Configuració de la biblioteca" data-admin-ui-build={ADMIN_UI_BUILD} onClick={onClose}>
       <div className="modal-content admin-assets-modal admin-assets-modal--fullscreen" onClick={(e) => e.stopPropagation()}>
         <header className="admin-assets-head">
-          <h2>Configuració</h2>
+          <h2>{activeTab === "collections" ? "Col·leccions — Apartats / Cançons" : "Configuració"}</h2>
           <div className="admin-assets-head-actions">
             <div className="admin-tabs" role="tablist" aria-label="Pestanyes de configuració">
               {tabOrder.map((tabId) => (
@@ -1072,7 +1093,7 @@ export function AdminAssetManager({
 
         {activeTab === "collections" ? (
           <div className="admin-collections-subtabs admin-collections-subtabs--bar" role="tablist" aria-label="Seccions de col·leccions">
-            <span className="admin-collections-build" title="Versió UI">20260516-collections-subtabs</span>
+            <span className="admin-collections-build" title="Versió UI">{ADMIN_UI_BUILD}</span>
             <button
               type="button"
               role="tab"

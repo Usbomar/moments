@@ -3185,6 +3185,23 @@ button.danger {
   min-width: 36px;
 }
 
+.admin-colors-table th button {
+  border: none;
+  background: transparent;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--text-primary);
+  padding: 0;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.admin-colors-table th button:hover {
+  color: var(--accent);
+}
+
 .admin-colors-table .admin-colors-swatch-btn {
   vertical-align: middle;
 }

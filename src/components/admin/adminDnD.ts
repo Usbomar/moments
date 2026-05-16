@@ -63,9 +63,51 @@ export function reorderPhotoColumns(order: PhotoColumnKey[], dragKey: PhotoColum
 
 export type AdminTabId = "photos" | "libraryGrid" | "guest" | "collections" | "tags" | "locations" | "colors";
 
-export const DEFAULT_TAB_ORDER: AdminTabId[] = ["photos", "libraryGrid", "guest", "collections", "tags", "locations", "colors"];
+/** Ordre antic (v1 localStorage): es substitueix pel nou per defecte si l’usuari no havia reordenat pestanyes. */
+export const LEGACY_DEFAULT_TAB_ORDER: AdminTabId[] = [
+  "photos",
+  "libraryGrid",
+  "guest",
+  "collections",
+  "tags",
+  "locations",
+  "colors"
+];
+
+/** Fotos → Col·leccions → TAGS → Ubicacions → Colors → Graella → Convidat */
+export const DEFAULT_TAB_ORDER: AdminTabId[] = [
+  "photos",
+  "collections",
+  "tags",
+  "locations",
+  "colors",
+  "libraryGrid",
+  "guest"
+];
 
 const ALL_TABS = new Set<string>(DEFAULT_TAB_ORDER);
+
+function tabOrdersEqual(a: readonly AdminTabId[], b: readonly AdminTabId[]): boolean {
+  return a.length === b.length && a.every((id, i) => id === b[i]);
+}
+
+/** Llegeix ordre de pestanyes; migra v1 → v2 si encara tenia el default antic. */
+export function loadStoredTabOrder(): AdminTabId[] {
+  if (typeof window === "undefined") return [...DEFAULT_TAB_ORDER];
+  try {
+    const v2 = localStorage.getItem(STORAGE_TAB_ORDER);
+    if (v2) return normalizeTabOrder(JSON.parse(v2));
+    const v1 = localStorage.getItem(STORAGE_TAB_ORDER_LEGACY);
+    if (v1) {
+      const order = normalizeTabOrder(JSON.parse(v1));
+      if (tabOrdersEqual(order, LEGACY_DEFAULT_TAB_ORDER)) return [...DEFAULT_TAB_ORDER];
+      return order;
+    }
+  } catch {
+    /* ignore */
+  }
+  return [...DEFAULT_TAB_ORDER];
+}
 
 export function normalizeTabOrder(raw: unknown): AdminTabId[] {
   if (!Array.isArray(raw)) return [...DEFAULT_TAB_ORDER];
@@ -96,4 +138,5 @@ export function reorderTabs(order: AdminTabId[], dragId: AdminTabId, dropId: Adm
 }
 
 export const STORAGE_PHOTO_COLS = "moments_admin_photo_columns_v1";
-export const STORAGE_TAB_ORDER = "moments_admin_tab_order_v1";
+export const STORAGE_TAB_ORDER = "moments_admin_tab_order_v2";
+export const STORAGE_TAB_ORDER_LEGACY = "moments_admin_tab_order_v1";

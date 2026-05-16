@@ -25,6 +25,7 @@ import {
   reorderTabs,
   STORAGE_PHOTO_COLS,
   STORAGE_TAB_ORDER,
+  loadStoredTabOrder,
   type AdminTabId,
   type PhotoColumnKey
 } from "@/components/admin/adminDnD";
@@ -165,16 +166,7 @@ export function AdminAssetManager({
   const [musicLinkTitle, setMusicLinkTitle] = useState("");
   const [musicLinkUrl, setMusicLinkUrl] = useState("");
   const [assetPickerTarget, setAssetPickerTarget] = useState<AssetPickerTarget | null>(null);
-  const [tabOrder, setTabOrder] = useState<AdminTabId[]>(() => {
-    if (typeof window === "undefined") return [...DEFAULT_TAB_ORDER];
-    try {
-      const raw = localStorage.getItem(STORAGE_TAB_ORDER);
-      if (raw) return normalizeTabOrder(JSON.parse(raw));
-    } catch {
-      /* ignore */
-    }
-    return [...DEFAULT_TAB_ORDER];
-  });
+  const [tabOrder, setTabOrder] = useState<AdminTabId[]>(() => loadStoredTabOrder());
   const [photoColumnOrder, setPhotoColumnOrder] = useState<PhotoColumnKey[]>(() => {
     if (typeof window === "undefined") return [...DEFAULT_PHOTO_COLUMNS];
     try {

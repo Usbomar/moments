@@ -3,14 +3,69 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Asset } from "@/lib/types";
 import { hexEquals, normalizeHex } from "@/lib/color-utils";
+import { cmpText } from "@/components/admin/adminAssetHelpers";
 import {
   buildPaletteRows,
   loadStoredPalette,
   newCustomColorId,
   saveStoredPalette,
   type PaletteRow,
+  type PaletteRowKind,
   type StoredPalette
 } from "@/lib/admin-color-palette";
+
+type ColorsSortKey = "hex" | "label" | "kind" | "photoCount";
+type ColorsSortState = { key: ColorsSortKey; dir: "asc" | "desc" };
+
+const KIND_LABEL: Record<PaletteRowKind, string> = {
+  preset: "Base",
+  custom: "Personalitzat",
+  in_use: "Només en fotos"
+};
+
+function sortPaletteRows(rows: PaletteRow[], sort: ColorsSortState[]): PaletteRow[] {
+  const list = [...rows];
+  list.sort((a, b) => {
+    for (const s of sort) {
+      let cmp = 0;
+      switch (s.key) {
+        case "label":
+          cmp = cmpText(a.label, b.label);
+          break;
+        case "kind":
+          cmp = cmpText(KIND_LABEL[a.kind], KIND_LABEL[b.kind]);
+          break;
+        case "hex":
+          cmp = cmpText(a.hex, b.hex);
+          break;
+        case "photoCount":
+          cmp = a.photoCount - b.photoCount;
+          break;
+        default:
+          break;
+      }
+      if (cmp !== 0) return s.dir === "asc" ? cmp : -cmp;
+    }
+    return 0;
+  });
+  return list;
+}
+
+function toggleColorsSort(prev: ColorsSortState[], key: ColorsSortKey, keepExisting: boolean): ColorsSortState[] {
+  const existing = prev.find((s) => s.key === key);
+  if (!keepExisting) {
+    if (!existing) return [{ key, dir: "asc" }];
+    return [{ key, dir: existing.dir === "asc" ? "desc" : "asc" }];
+  }
+  const base = [...prev];
+  if (existing) {
+    const idx = base.findIndex((s) => s.key === key);
+    base[idx] = { key, dir: existing.dir === "asc" ? "desc" : "asc" };
+  } else {
+    base.push({ key, dir: "asc" });
+  }
+  return base.slice(-2);
+}
 
 type Props = {
   assets: Asset[];
@@ -58,6 +113,7 @@ export function AdminColorsPanel({
   const [editingName, setEditingName] = useState("");
   const [editingHex, setEditingHex] = useState("#4466ff");
   const [pickerHex, setPickerHex] = useState("#808080");
+  const [sort, setSort] = useState<ColorsSortState[]>([{ key: "label", dir: "asc" }]);
   const swatchPickerTargetRef = useRef<PaletteRow | null>(null);
   const swatchPickerInputRef = useRef<HTMLInputElement>(null);
   const editingRowIdRef = useRef<string | null>(null);
@@ -67,8 +123,18 @@ export function AdminColorsPanel({
   const deferColorPickRef = useRef(false);
 
   const rows = useMemo(() => buildPaletteRows(assets, palette), [assets, palette]);
-  const mainRows = useMemo(() => rows.filter((r) => r.kind !== "in_use"), [rows]);
-  const inUseRows = useMemo(() => rows.filter((r) => r.kind === "in_use"), [rows]);
+  const mainRows = useMemo(() => sortPaletteRows(
+      rows.filter((r) => r.kind !== "in_use"),
+      sort
+    ), [rows, sort]);
+  const inUseRows = useMemo(() => sortPaletteRows(
+      rows.filter((r) => r.kind === "in_use"),
+      sort
+    ), [rows, sort]);
+
+  const onToggleSort = useCallback((key: ColorsSortKey, keepExisting: boolean) => {
+    setSort((prev) => toggleColorsSort(prev, key, keepExisting));
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -366,6 +432,37 @@ export function AdminColorsPanel({
     } as const;
   };
 
+  const renderColorsHeader = () => (
+    <tr>
+      <th>
+        <button type="button" onClick={(e) => onToggleSort("hex", e.shiftKey)}>
+          Mostra
+        </button>
+      </th>
+      <th>
+        <button type="button" onClick={(e) => onToggleSort("label", e.shiftKey)}>
+          Nom
+        </button>
+      </th>
+      <th>
+        <button type="button" onClick={(e) => onToggleSort("kind", e.shiftKey)}>
+          Tipus
+        </button>
+      </th>
+      <th>
+        <button type="button" onClick={(e) => onToggleSort("hex", e.shiftKey)}>
+          Codi
+        </button>
+      </th>
+      <th>
+        <button type="button" onClick={(e) => onToggleSort("photoCount", e.shiftKey)}>
+          Fotos
+        </button>
+      </th>
+      <th>Accions</th>
+    </tr>
+  );
+
   const renderRow = (row: PaletteRow) => (
     <tr key={row.rowId}>
       <td className="admin-colors-swatch-cell">
@@ -482,16 +579,7 @@ export function AdminColorsPanel({
       ) : null}
 
       <table className="admin-stats-table admin-colors-table">
-        <thead>
-          <tr>
-            <th>Mostra</th>
-            <th>Nom</th>
-            <th>Tipus</th>
-            <th>Codi</th>
-            <th>Fotos</th>
-            <th>Accions</th>
-          </tr>
-        </thead>
+        <thead>{renderColorsHeader()}</thead>
         <tbody>
           {mainRows.length === 0 ? (
             <tr>
@@ -509,16 +597,7 @@ export function AdminColorsPanel({
         <>
           <h3 className="admin-colors-section-title">Colors en fotos sense entrada a la paleta ({inUseRows.length})</h3>
           <table className="admin-stats-table admin-colors-table">
-            <thead>
-              <tr>
-                <th>Mostra</th>
-                <th>Nom</th>
-                <th>Tipus</th>
-                <th>Codi</th>
-                <th>Fotos</th>
-                <th>Accions</th>
-              </tr>
-            </thead>
+            <thead>{renderColorsHeader()}</thead>
             <tbody>{inUseRows.map(renderRow)}</tbody>
           </table>
         </>

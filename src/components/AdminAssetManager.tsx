@@ -179,7 +179,41 @@ export function AdminAssetManager({
   });
   const saveTimersRef = useRef<Record<string, number>>({});
   const musicFileInputRef = useRef<HTMLInputElement>(null);
+  const musicPreviewAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [collectionsSubTab, setCollectionsSubTab] = useState<"apartats" | "cancions">("apartats");
+  const [musicPreviewTrackId, setMusicPreviewTrackId] = useState<string | null>(null);
   const allColorOptions = useMemo(() => buildColorOptionsFromPalette(colorPalette), [colorPalette]);
+
+  const stopMusicPreview = useCallback(() => {
+    const audio = musicPreviewAudioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.currentTime = 0;
+    }
+    setMusicPreviewTrackId(null);
+  }, []);
+
+  const toggleMusicPreview = useCallback(
+    (track: CollectionMusicTrack) => {
+      const url = track.url.trim();
+      if (!url) return;
+      let audio = musicPreviewAudioRef.current;
+      if (!audio) {
+        audio = new Audio();
+        audio.addEventListener("ended", () => setMusicPreviewTrackId(null));
+        musicPreviewAudioRef.current = audio;
+      }
+      if (musicPreviewTrackId === track.id && !audio.paused) {
+        audio.pause();
+        setMusicPreviewTrackId(null);
+        return;
+      }
+      audio.src = url;
+      setMusicPreviewTrackId(track.id);
+      void audio.play().catch(() => setMusicPreviewTrackId(null));
+    },
+    [musicPreviewTrackId]
+  );
 
   const clearPhotosWithHex = useCallback(
     async (hex: string) => {
@@ -234,6 +268,12 @@ export function AdminAssetManager({
     if (!open || activeTab !== "collections") return;
     void refreshMusicTracks();
   }, [activeTab, open, refreshMusicTracks]);
+
+  useEffect(() => {
+    if (!open || activeTab !== "collections") stopMusicPreview();
+  }, [activeTab, collectionsSubTab, open, stopMusicPreview]);
+
+  useEffect(() => () => stopMusicPreview(), [stopMusicPreview]);
 
   const pickerAvailableAssets = useMemo(() => {
     if (!assetPickerTarget) return [];
@@ -621,6 +661,7 @@ export function AdminAssetManager({
         return;
       }
       await refreshMusicTracks();
+      if (musicPreviewTrackId === track.id) stopMusicPreview();
       await onRefreshCollections?.();
     } finally {
       setMusicBusy(false);
@@ -1218,7 +1259,29 @@ export function AdminAssetManager({
 
         {activeTab === "collections" ? (
           <div className="admin-tab-panel admin-tab-panel--collections">
-            <div className="admin-collections-layout">
+            <div className="admin-collections-subtabs" role="tablist" aria-label="Seccions de col·leccions">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={collectionsSubTab === "apartats"}
+                className={collectionsSubTab === "apartats" ? "is-active" : undefined}
+                onClick={() => setCollectionsSubTab("apartats")}
+              >
+                Apartats
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={collectionsSubTab === "cancions"}
+                className={collectionsSubTab === "cancions" ? "is-active" : undefined}
+                onClick={() => setCollectionsSubTab("cancions")}
+              >
+                Cançons
+              </button>
+            </div>
+            {collectionsSubTab === "apartats" ? (
+            <div className="admin-collections-panel admin-collections-panel--apartats">
+            <div className="admin-collections-layout admin-collections-layout--apartats">
               <div className="admin-collections-main">
                 <div className="admin-collection-toolbar">
                   <input
@@ -1237,7 +1300,7 @@ export function AdminAssetManager({
                   </button>
                 </div>
                 <p className="modal-muted admin-collection-hint">
-                  Edita el nom, assigna una cançó, elimina la col·lecció o obre el selector per afegir fotos.
+                  Edita el nom, assigna una cançó, elimina la col·lecció o obre el selector per afegir fotos. Les cançons es gestionen a la sub-pestanya «Cançons».
                 </p>
                 <table className="admin-stats-table">
                   <thead>
@@ -1395,12 +1458,14 @@ export function AdminAssetManager({
                   </tbody>
                 </table>
               </div>
-
-              <aside className="admin-collection-music-panel" aria-label="Música per a col·leccions">
-                <div>
-                  <h3>Música</h3>
-                  <p className="modal-muted">Puja MP3 a Supabase o vincula un àudio directe d’internet. Després assigna&apos;l a cada col·lecció.</p>
-                </div>
+            </div>
+            </div>
+            ) : (
+              <div className="admin-collections-panel admin-collections-panel--cancions" aria-label="Cançons per a col·leccions">
+                <p className="modal-muted admin-collection-hint">
+                  Puja MP3 a Supabase o vincula un àudio directe. Després assigna cada cançó a un apartat des de la sub-pestanya «Apartats».
+                </p>
+                <div className="admin-collection-music-uploads">
                 <div className="admin-collection-music-card">
                   <strong>Pujar MP3</strong>
                   <input
@@ -1438,32 +1503,80 @@ export function AdminAssetManager({
                     Afegir enllaç
                   </button>
                 </div>
-                {musicError ? <p className="modal-error">{musicError}</p> : null}
-                <div className="admin-collection-music-list">
-                  <div className="admin-collection-music-list-head">
-                    <strong>Cançons</strong>
-                    <button type="button" className="btn btn-sm" disabled={musicLoading} onClick={() => void refreshMusicTracks()}>
-                      Actualitzar
-                    </button>
-                  </div>
-                  {musicLoading ? <p className="modal-muted">Carregant música…</p> : null}
-                  {!musicLoading && musicTracks.length === 0 ? <p className="modal-muted">Encara no hi ha cançons.</p> : null}
-                  {musicTracks.map((track) => (
-                    <div key={track.id} className="admin-collection-music-track">
-                      <div>
-                        <strong>{track.title}</strong>
-                        <span>{track.source === "uploaded" ? "MP3 pujat" : "Enllaç extern"}</span>
-                      </div>
-                      <small>{formatMusicDuration(track.durationSeconds)}</small>
-                      <small>{track.source === "uploaded" ? formatMusicSize(track.sizeBytes) : "0 MB a Supabase"}</small>
-                      <button type="button" className="btn btn-icon btn-sm btn-icon--danger" aria-label={`Eliminar ${track.title}`} onClick={() => void deleteMusicTrack(track)}>
-                        <span aria-hidden>×</span>
-                      </button>
-                    </div>
-                  ))}
                 </div>
-              </aside>
-            </div>
+                {musicError ? <p className="modal-error">{musicError}</p> : null}
+                <div className="admin-collection-music-list-head">
+                  <strong>Llista de cançons</strong>
+                  <button type="button" className="btn btn-sm" disabled={musicLoading} onClick={() => void refreshMusicTracks()}>
+                    Actualitzar
+                  </button>
+                </div>
+                <table className="admin-stats-table admin-collection-music-table">
+                  <thead>
+                    <tr>
+                      <th className="admin-collection-music-play-col" aria-label="Reproduir" />
+                      <th>Títol</th>
+                      <th>Origen</th>
+                      <th>Durada</th>
+                      <th>Mida</th>
+                      <th className="admin-collection-actions-col">Accions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {musicLoading ? (
+                      <tr>
+                        <td colSpan={6} className="modal-muted">
+                          Carregant música…
+                        </td>
+                      </tr>
+                    ) : null}
+                    {!musicLoading && musicTracks.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="modal-muted">
+                          Encara no hi ha cançons.
+                        </td>
+                      </tr>
+                    ) : null}
+                    {musicTracks.map((track) => {
+                      const isPlaying = musicPreviewTrackId === track.id;
+                      return (
+                        <tr key={track.id}>
+                          <td className="admin-collection-music-play-cell">
+                            <button
+                              type="button"
+                              className={`viewer-toolbar-btn viewer-toolbar-btn--icon admin-collection-music-play-btn${isPlaying ? " is-playing" : ""}`}
+                              aria-label={isPlaying ? `Pausar ${track.title}` : `Reproduir ${track.title}`}
+                              title={isPlaying ? "Pausar" : "Reproduir"}
+                              disabled={!track.url.trim()}
+                              onClick={() => toggleMusicPreview(track)}
+                            >
+                              <span className={`viewer-icon ${isPlaying ? "viewer-icon-pause" : "viewer-icon-play"}`} aria-hidden />
+                            </button>
+                          </td>
+                          <td>
+                            <strong>{track.title}</strong>
+                          </td>
+                          <td>{track.source === "uploaded" ? "MP3 pujat" : "Enllaç extern"}</td>
+                          <td>{formatMusicDuration(track.durationSeconds)}</td>
+                          <td>{track.source === "uploaded" ? formatMusicSize(track.sizeBytes) : "—"}</td>
+                          <td className="admin-collection-actions-cell">
+                            <button
+                              type="button"
+                              className="btn btn-icon btn-sm btn-icon--danger"
+                              aria-label={`Eliminar ${track.title}`}
+                              disabled={musicBusy}
+                              onClick={() => void deleteMusicTrack(track)}
+                            >
+                              <span aria-hidden>×</span>
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         ) : null}
 

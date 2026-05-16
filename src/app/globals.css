@@ -3494,6 +3494,43 @@ button.danger {
 
 .admin-tab-panel--collections {
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+
+.admin-collections-subtabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.admin-collections-subtabs button {
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.admin-collections-subtabs button.is-active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent-light) 65%, var(--bg-primary));
+  color: var(--accent);
+}
+
+.admin-collections-panel {
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .admin-collections-layout {
@@ -3501,6 +3538,10 @@ button.danger {
   grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
   gap: 12px;
   min-height: 0;
+}
+
+.admin-collections-layout--apartats {
+  display: block;
 }
 
 .admin-collections-main {
@@ -3685,6 +3726,43 @@ button.danger {
   bottom: 2px;
   border-radius: 1px;
   opacity: 0.9;
+}
+
+.admin-collection-music-uploads {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 10px;
+}
+
+.admin-collection-music-table .admin-collection-music-play-col {
+  width: 52px;
+  min-width: 52px;
+}
+
+.admin-collection-music-play-cell {
+  text-align: center;
+  vertical-align: middle;
+}
+
+.admin-collection-music-play-btn.viewer-toolbar-btn--icon {
+  width: 36px;
+  height: 36px;
+  margin: 0 auto;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.admin-collection-music-play-btn.viewer-toolbar-btn--icon:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent-light) 50%, var(--bg-primary));
+}
+
+.admin-collection-music-play-btn.is-playing {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .admin-collection-music-panel {

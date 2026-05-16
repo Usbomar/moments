@@ -3,7 +3,7 @@ import { getSupabaseAdmin } from "@/lib/server/supabase-admin";
 import { isSupabaseConfigured } from "@/lib/server/supabase-config";
 import { requireAuthUserId } from "@/lib/server/require-auth-api";
 import { errorJson, getRequestId, logApi, okJson } from "@/lib/server/api-observability";
-import { ASSET_DETAIL_SELECT } from "@/lib/server/asset-row-select";
+import { ASSET_DETAIL_SELECT, ASSET_DETAIL_SELECT_LEGACY, queryWithAssetDetailSelect } from "@/lib/server/asset-row-select";
 import { toAsset } from "@/lib/server/asset-map";
 
 function parseYears(raw: string | null): [number, number] | null {
@@ -98,25 +98,22 @@ export async function GET(request: Request) {
       return okJson(requestId, { assets: [], supabaseConfigured: true });
     }
 
-    let query = supabase
-      .from("assets")
-      .select(ASSET_DETAIL_SELECT)
-      .eq("user_id", userId)
-      .order("taken_at", { ascending: false });
+    const applyListFilters = <S extends string>(select: S) => {
+      let query = supabase.from("assets").select(select).eq("user_id", userId).order("taken_at", { ascending: false });
+      if (!q) query = query.range(offset, offset + limit - 1);
+      if (years) {
+        query = query
+          .gte("taken_at", `${years[0]}-01-01T00:00:00.000Z`)
+          .lte("taken_at", `${years[1]}-12-31T23:59:59.999Z`);
+      }
+      if (allowedIds) query = query.in("id", allowedIds);
+      return query;
+    };
 
-    if (!q) {
-      query = query.range(offset, offset + limit - 1);
-    }
-
-    if (years) {
-      query = query
-        .gte("taken_at", `${years[0]}-01-01T00:00:00.000Z`)
-        .lte("taken_at", `${years[1]}-12-31T23:59:59.999Z`);
-    }
-    if (allowedIds) {
-      query = query.in("id", allowedIds);
-    }
-    const { data, error } = await query;
+    const { data, error } = await queryWithAssetDetailSelect(
+      async () => applyListFilters(ASSET_DETAIL_SELECT),
+      async () => applyListFilters(ASSET_DETAIL_SELECT_LEGACY)
+    );
 
     if (error) {
       logApi("error", "/api/assets", requestId, "Supabase query failed", { detail: error.message });

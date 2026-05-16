@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/server/supabase-admin";
 import { isSupabaseConfigured } from "@/lib/server/supabase-config";
 import { errorJson, getRequestId, logApi, okJson } from "@/lib/server/api-observability";
-import { ASSET_DETAIL_SELECT } from "@/lib/server/asset-row-select";
+import { ASSET_DETAIL_SELECT, ASSET_DETAIL_SELECT_LEGACY, queryWithAssetDetailSelect } from "@/lib/server/asset-row-select";
 import { toAsset } from "@/lib/server/asset-map";
 import { normalizeGuestSlug } from "@/lib/guest-slug";
 
@@ -58,24 +58,26 @@ export async function GET(request: Request, context: { params: Promise<{ slug: s
     const limit = parsePositiveInt(url.searchParams.get("limit"), 200, 1, 500);
     const offset = parsePositiveInt(url.searchParams.get("offset"), 0, 0, 1_000_000);
 
-    let query = supabase
-      .from("assets")
-      .select(ASSET_DETAIL_SELECT)
-      .eq("user_id", ownerId)
-      .eq("hidden_from_guests", false)
-      .order("taken_at", { ascending: false });
+    const applyGuestFilters = <S extends string>(select: S) => {
+      let query = supabase
+        .from("assets")
+        .select(select)
+        .eq("user_id", ownerId)
+        .eq("hidden_from_guests", false)
+        .order("taken_at", { ascending: false });
+      if (!q) query = query.range(offset, offset + limit - 1);
+      if (years) {
+        query = query
+          .gte("taken_at", `${years[0]}-01-01T00:00:00.000Z`)
+          .lte("taken_at", `${years[1]}-12-31T23:59:59.999Z`);
+      }
+      return query;
+    };
 
-    if (!q) {
-      query = query.range(offset, offset + limit - 1);
-    }
-
-    if (years) {
-      query = query
-        .gte("taken_at", `${years[0]}-01-01T00:00:00.000Z`)
-        .lte("taken_at", `${years[1]}-12-31T23:59:59.999Z`);
-    }
-
-    const { data, error } = await query;
+    const { data, error } = await queryWithAssetDetailSelect(
+      async () => applyGuestFilters(ASSET_DETAIL_SELECT),
+      async () => applyGuestFilters(ASSET_DETAIL_SELECT_LEGACY)
+    );
     if (error) {
       logApi("error", "/api/guest/.../assets", requestId, "Supabase query failed", { detail: error.message });
       return errorJson(500, requestId, "ASSETS_QUERY_FAILED", error.message);

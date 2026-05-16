@@ -23,7 +23,7 @@ import {
   makeThumbWebp
 } from "@/lib/server/apply-image-operations";
 import { pickFirstAssetFile, toAsset } from "@/lib/server/asset-map";
-import { ASSET_DETAIL_SELECT } from "@/lib/server/asset-row-select";
+import { ASSET_DETAIL_SELECT, ASSET_DETAIL_SELECT_LEGACY, queryWithAssetDetailSelect } from "@/lib/server/asset-row-select";
 import { extractStoragePath, generateSignedUrls } from "@/lib/server/storage-utils";
 import { objectPathFromSignedUrl } from "@/lib/server/signed-url-path";
 import { getStorageBucket, getSupabaseAdmin } from "@/lib/server/supabase-admin";
@@ -99,7 +99,10 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const supabase = getSupabaseAdmin();
     const bucket = getStorageBucket();
 
-    const { data: row, error: rowErr } = await supabase.from("assets").select(ASSET_DETAIL_SELECT).eq("id", id).maybeSingle();
+    const { data: row, error: rowErr } = await queryWithAssetDetailSelect(
+      async () => supabase.from("assets").select(ASSET_DETAIL_SELECT).eq("id", id).maybeSingle(),
+      async () => supabase.from("assets").select(ASSET_DETAIL_SELECT_LEGACY).eq("id", id).maybeSingle()
+    );
 
     if (rowErr) return NextResponse.json({ error: rowErr.message }, { status: 500 });
     if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -230,7 +233,10 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       .eq("asset_id", id);
     if (upFiles) return NextResponse.json({ error: upFiles.message }, { status: 500 });
 
-    const { data: fresh, error: freshErr } = await supabase.from("assets").select(ASSET_DETAIL_SELECT).eq("id", id).maybeSingle();
+    const { data: fresh, error: freshErr } = await queryWithAssetDetailSelect(
+      async () => supabase.from("assets").select(ASSET_DETAIL_SELECT).eq("id", id).maybeSingle(),
+      async () => supabase.from("assets").select(ASSET_DETAIL_SELECT_LEGACY).eq("id", id).maybeSingle()
+    );
 
     if (freshErr || !fresh) {
       return NextResponse.json({ error: freshErr?.message ?? "Failed to reload asset" }, { status: 500 });

@@ -30,6 +30,8 @@ export function parseLocationText(value: string) {
 }
 
 /** Valor del &lt;select&gt;: hex exacte de paleta o el color triat. */
+export { hexToHue } from "@/lib/color-utils";
+
 export function colorHexToPaletteOption(
   hex: string | null | undefined,
   options: Array<{ label: string; hex: string }>

@@ -61,6 +61,25 @@ export function hexColorDistance(a: string, b: string): number {
   return dr * dr + dg * dg + db * db;
 }
 
+/** Extreu el to 0–359 d’un #RRGGBB (grisos → 0). */
+export function hexToHue(hex: string): number | null {
+  const clean = normalizeHex(hex);
+  if (!clean) return null;
+  const r = Number.parseInt(clean.slice(1, 3), 16) / 255;
+  const g = Number.parseInt(clean.slice(3, 5), 16) / 255;
+  const b = Number.parseInt(clean.slice(5, 7), 16) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const delta = max - min;
+  if (delta === 0) return 0;
+  let hue = 0;
+  if (max === r) hue = ((g - b) / delta) % 6;
+  else if (max === g) hue = (b - r) / delta + 2;
+  else hue = (r - g) / delta + 4;
+  const deg = Math.round(hue * 60);
+  return deg < 0 ? deg + 360 : deg;
+}
+
 /** Resol el color d’una foto: hex explícit o conversió del hue antic. */
 export function resolveAssetColorHex(asset: { colorHex?: string | null; colorHue?: number | null }): string | null {
   const fromHex = normalizeHex(asset.colorHex ?? undefined);

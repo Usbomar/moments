@@ -3,10 +3,15 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getStorageBucket, getSupabaseAdmin } from "@/lib/server/supabase-admin";
 import { isSupabaseConfigured } from "@/lib/server/supabase-config";
 import { requireAuthUserId } from "@/lib/server/require-auth-api";
-import { ASSET_DETAIL_SELECT } from "@/lib/server/asset-row-select";
+import {
+  ASSET_DETAIL_SELECT,
+  ASSET_DETAIL_SELECT_LEGACY,
+  isMissingColorHexColumn,
+  queryWithAssetDetailSelect
+} from "@/lib/server/asset-row-select";
 import { toAsset } from "@/lib/server/asset-map";
 import { objectPathFromSignedUrl } from "@/lib/server/signed-url-path";
-import { legacyHueToHex, normalizeHex } from "@/lib/color-utils";
+import { hexToHue, legacyHueToHex, normalizeHex } from "@/lib/color-utils";
 
 type PatchBody = {
   title?: string;
@@ -123,10 +128,20 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     }
 
     let { error: updateErr } = await supabase.from("assets").update(patch).eq("id", id).eq("user_id", userId);
-    if (updateErr && /color_(hue|hex)/i.test(updateErr.message)) {
+    if (updateErr && isMissingColorHexColumn(updateErr.message) && "color_hex" in patch) {
+      const rest = { ...patch };
+      delete rest.color_hex;
+      if (patch.color_hex === null) {
+        rest.color_hue = null;
+      } else if (typeof patch.color_hex === "string") {
+        const hue = hexToHue(patch.color_hex);
+        rest.color_hue = hue;
+      }
+      const retry = await supabase.from("assets").update(rest).eq("id", id).eq("user_id", userId);
+      updateErr = retry.error;
+    } else if (updateErr && /color_hue/i.test(updateErr.message) && "color_hue" in patch) {
       const rest = { ...patch };
       delete rest.color_hue;
-      delete rest.color_hex;
       const retry = await supabase.from("assets").update(rest).eq("id", id).eq("user_id", userId);
       updateErr = retry.error;
     }
@@ -203,7 +218,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       }
     }
 
-    const { data: row, error: fetchErr } = await supabase.from("assets").select(ASSET_DETAIL_SELECT).eq("id", id).maybeSingle();
+    const { data: row, error: fetchErr } = await queryWithAssetDetailSelect(
+      async () => supabase.from("assets").select(ASSET_DETAIL_SELECT).eq("id", id).maybeSingle(),
+      async () => supabase.from("assets").select(ASSET_DETAIL_SELECT_LEGACY).eq("id", id).maybeSingle()
+    );
 
     if (fetchErr) return NextResponse.json({ error: fetchErr.message }, { status: 500 });
     if (!row) return NextResponse.json({ error: "Not found after update" }, { status: 500 });

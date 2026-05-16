@@ -20,7 +20,7 @@ type Props = {
   libraryUploadSlot?: ReactNode;
   /** Opcions de graella (només Quadrícula) */
   libraryGridOptionsSlot?: ReactNode;
-  /** Presentació amb música: la barra superior es mostra només en passar el ratolí pel vora superior. */
+  /** Mode presentació: la barra superior s’amaga i es mostra amb mouseover al marge superior. */
   topBarRetractable?: boolean;
 };
 

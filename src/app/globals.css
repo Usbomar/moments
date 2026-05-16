@@ -2154,7 +2154,7 @@ button.danger {
   left: 0;
   right: 0;
   height: 0;
-  z-index: 200;
+  z-index: 270;
   pointer-events: none;
   overflow: visible;
 }
@@ -2165,8 +2165,16 @@ button.danger {
   left: 0;
   right: 0;
   height: 48px;
+  pointer-events: auto;
+  z-index: 2;
+}
+
+.moments-topbar-zone--auto-hide .moments-topbar-hover-wrap {
   pointer-events: none;
-  z-index: 0;
+}
+
+.moments-topbar-zone--auto-hide .moments-topbar-hover-wrap .moments-topbar {
+  pointer-events: auto;
 }
 
 .moments-topbar-zone--auto-hide .moments-topbar {
@@ -2189,6 +2197,11 @@ button.danger {
 .moments-app--immersive-topbar .moments-body {
   min-height: 100vh;
   min-height: 100dvh;
+}
+
+/* Slider biblioteca (z-index 260): sota la barra retràctil (270) quan és mode presentació */
+.moments-app--immersive-topbar .moments-main .viewer {
+  z-index: 100;
 }
 
 .moments-topbar-left,

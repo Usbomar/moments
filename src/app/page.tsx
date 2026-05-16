@@ -550,8 +550,9 @@ function HomeContent() {
   const gridCatalogItems = useMemo(() => sortAssetsForGrid(library, gridSortOrder), [library, gridSortOrder]);
   const viewerItems = useMemo(() => slideshowItems ?? viewerQueue ?? viewItems, [slideshowItems, viewerQueue, viewItems]);
 
-  /** Presentació col·lecció a pantalla completa: barra superior autoamagada. */
-  const topBarRetractable = !!(collectionSlideshow?.assets.length);
+  /** Presentació (biblioteca o col·lecció): barra superior amagada fins mouseover al marge superior. */
+  const topBarRetractable =
+    !!(collectionSlideshow?.assets.length) || (mainTab === "library" && view === "slider");
 
   const libraryTagSuggestions = useMemo(() => {
     const s = new Set<string>();

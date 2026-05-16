@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useId } from "react";
-import { colorHexToPaletteOption } from "@/components/admin/adminAssetHelpers";
-import { normalizeHex } from "@/lib/color-utils";
+import { hexEquals, normalizeHex } from "@/lib/color-utils";
 
 export type ColorOption = { label: string; hex: string };
 
@@ -18,8 +17,11 @@ type Props = {
 export function ColorSelect({ value, options, onChange, disabled, id, className }: Props) {
   const pickerId = useId();
   const hex = normalizeHex(value ?? undefined);
-  const selectValue = colorHexToPaletteOption(hex, options);
-  const inPalette = hex !== null && options.some((o) => normalizeHex(o.hex) === hex);
+  const inPalette = hex !== null && options.some((o) => hexEquals(o.hex, hex));
+  const selectValue =
+    hex !== null && inPalette
+      ? normalizeHex(options.find((o) => hexEquals(o.hex, hex))!.hex)!
+      : hex ?? "";
   const pickerValue = hex ?? "#808080";
 
   const onPickerChange = useCallback(

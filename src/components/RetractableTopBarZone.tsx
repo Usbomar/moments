@@ -1,17 +1,22 @@
 "use client";
 
-import { useCallback, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
-const HIDE_DELAY_MS = 450;
+const HIDE_DELAY_MS = 400;
+const TOP_EDGE_PX = 48;
 
 type Props = {
   children: ReactNode;
 };
 
-/** Mostra la barra superior en passar el ratolí pel marge superior; la amaga en sortir. */
+/**
+ * Barra superior amagada durant la presentació; es mostra en acostar el punter al marge superior
+ * o mentre el punter és sobre la barra (funciona encara amb el slideshow a pantalla completa).
+ */
 export function RetractableTopBarZone({ children }: Props) {
   const [revealed, setRevealed] = useState(false);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const zoneRef = useRef<HTMLDivElement>(null);
 
   const clearHideTimer = useCallback(() => {
     if (hideTimerRef.current !== null) {
@@ -30,8 +35,28 @@ export function RetractableTopBarZone({ children }: Props) {
     hideTimerRef.current = setTimeout(() => setRevealed(false), HIDE_DELAY_MS);
   }, [clearHideTimer]);
 
+  const pointerOverZone = useCallback((clientX: number, clientY: number) => {
+    const el = zoneRef.current;
+    if (!el) return false;
+    const r = el.getBoundingClientRect();
+    return clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom;
+  }, []);
+
+  useEffect(() => {
+    const onPointerMove = (e: PointerEvent) => {
+      if (e.clientY <= TOP_EDGE_PX || pointerOverZone(e.clientX, e.clientY)) {
+        show();
+        return;
+      }
+      scheduleHide();
+    };
+    window.addEventListener("pointermove", onPointerMove, { passive: true });
+    return () => window.removeEventListener("pointermove", onPointerMove);
+  }, [pointerOverZone, scheduleHide, show]);
+
   return (
     <div
+      ref={zoneRef}
       className={`moments-topbar-zone moments-topbar-zone--auto-hide${revealed ? " is-revealed" : ""}`}
       onMouseEnter={show}
       onMouseLeave={scheduleHide}

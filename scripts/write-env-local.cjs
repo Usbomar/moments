@@ -45,15 +45,17 @@ function main() {
 
   const vars = parseEnvBlock(text);
   const apiUrl = vars.API_URL;
+  const anonKey = vars.ANON_KEY;
   const serviceKey = vars.SERVICE_ROLE_KEY;
 
-  if (!apiUrl || !serviceKey) {
+  if (!apiUrl || !anonKey || !serviceKey) {
     console.error("Sortida inesperada de `supabase status`. Claus trobades:", Object.keys(vars));
     process.exit(1);
   }
 
   const body = [
     `NEXT_PUBLIC_SUPABASE_URL=${apiUrl}`,
+    `NEXT_PUBLIC_SUPABASE_ANON_KEY=${anonKey}`,
     `SUPABASE_SERVICE_ROLE_KEY=${serviceKey}`,
     "SUPABASE_STORAGE_BUCKET=fotos",
     ""

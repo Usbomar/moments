@@ -550,6 +550,9 @@ function HomeContent() {
   const gridCatalogItems = useMemo(() => sortAssetsForGrid(library, gridSortOrder), [library, gridSortOrder]);
   const viewerItems = useMemo(() => slideshowItems ?? viewerQueue ?? viewItems, [slideshowItems, viewerQueue, viewItems]);
 
+  /** Presentació col·lecció a pantalla completa: barra superior autoamagada. */
+  const topBarRetractable = !!(collectionSlideshow?.assets.length);
+
   const libraryTagSuggestions = useMemo(() => {
     const s = new Set<string>();
     for (const a of library) {
@@ -569,9 +572,7 @@ function HomeContent() {
         libraryView={view}
         onLibraryViewChange={setView}
         searchInputRef={searchRef}
-        topBarRetractable={
-          !!(collectionSlideshow?.assets.length && collectionSlideshow.musicTrack?.url)
-        }
+        topBarRetractable={topBarRetractable}
         onAdminClick={() => {
           // Deixa que el clic acabi i el navegador pugui pintar abans de muntar el modal (millora INP).
           window.requestAnimationFrame(() => {

@@ -428,9 +428,9 @@ export function AdminColorsPanel({
   return (
     <div className="admin-colors-panel">
       <p className="modal-muted admin-colors-intro">
-        Gestiona colors base i personalitzats amb el selector complet (#RRGGBB): blanc, negre, grisos, marrons, etc. El mateix
-        llistat apareix a Configuració → Fotos i a l&apos;editor de cada foto. Clica <strong>Mostra</strong> per canviar el color;
-        en editar una fila, es desa amb <strong>Desar</strong>.
+        Cada color és un codi <strong>#RRGGBB</strong> (negre, blanc, gris, qualsevol to). Clica el quadrat <strong>Mostra</strong> o
+        el selector de color per triar el valor exacte. Les fotos desen <code>color_hex</code> a Supabase: cal haver executat la
+        migració <code>20260516120000_assets_color_hex.sql</code> al projecte.
       </p>
 
       <input

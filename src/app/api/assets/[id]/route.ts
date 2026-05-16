@@ -11,7 +11,7 @@ import {
 } from "@/lib/server/asset-row-select";
 import { toAsset } from "@/lib/server/asset-map";
 import { objectPathFromSignedUrl } from "@/lib/server/signed-url-path";
-import { hexToHue, legacyHueToHex, normalizeHex } from "@/lib/color-utils";
+import { legacyHueToHex, normalizeHex } from "@/lib/color-utils";
 
 type PatchBody = {
   title?: string;
@@ -129,17 +129,15 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
 
     let { error: updateErr } = await supabase.from("assets").update(patch).eq("id", id).eq("user_id", userId);
     if (updateErr && isMissingColorHexColumn(updateErr.message) && "color_hex" in patch) {
-      const rest = { ...patch };
-      delete rest.color_hex;
-      if (patch.color_hex === null) {
-        rest.color_hue = null;
-      } else if (typeof patch.color_hex === "string") {
-        const hue = hexToHue(patch.color_hex);
-        rest.color_hue = hue;
-      }
-      const retry = await supabase.from("assets").update(rest).eq("id", id).eq("user_id", userId);
-      updateErr = retry.error;
-    } else if (updateErr && /color_hue/i.test(updateErr.message) && "color_hue" in patch) {
+      return NextResponse.json(
+        {
+          error:
+            "Falta la columna color_hex a Supabase. Executa la migració supabase/migrations/20260516120000_assets_color_hex.sql al SQL Editor."
+        },
+        { status: 503 }
+      );
+    }
+    if (updateErr && /color_hue/i.test(updateErr.message) && "color_hue" in patch) {
       const rest = { ...patch };
       delete rest.color_hue;
       const retry = await supabase.from("assets").update(rest).eq("id", id).eq("user_id", userId);

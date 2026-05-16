@@ -3,9 +3,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Asset } from "@/lib/types";
 import type { SliderTransition } from "@/lib/grid-library";
+import { BreadcrumbTemporal } from "@/components/BreadcrumbTemporal";
 import { ViewerFavoriteButton } from "@/components/ViewerFavoriteButton";
+import {
+  getAssetDate,
+  getConsecutiveNearbyRun,
+  getConsecutiveSameDayRun,
+  indicesWithCalendarDay,
+  SMART_DAY_MIN_PHOTOS,
+  SMART_LOCATION_MIN_PHOTOS,
+  SMART_LOCATION_RADIUS_KM
+} from "@/lib/slider-temporal-nav";
 
 const SLIDER_TRANSITION_MS = 450;
+const SMART_SUGGESTION_DISMISS_MS = 3000;
+
+type SmartSuggestion =
+  | { id: string; kind: "day"; count: number; indices: number[] }
+  | { id: string; kind: "location"; count: number; indices: number[]; placeLabel: string };
 
 interface Props {
   items: Asset[];
@@ -24,6 +39,8 @@ export function SliderView({ items, transition, onEditPhoto, onOpenViewer, onFav
   const [speedMs, setSpeedMs] = useState(2400);
   const [fullscreen, setFullscreen] = useState(true);
   const [favBusy, setFavBusy] = useState(false);
+  const [subsetIndices, setSubsetIndices] = useState<number[] | null>(null);
+  const [dismissedSuggestions, setDismissedSuggestions] = useState<Set<string>>(() => new Set());
   const itemsKeyRef = useRef<string>("");
   const busyRef = useRef(false);
   const sectionRef = useRef<HTMLElement>(null);
@@ -39,6 +56,8 @@ export function SliderView({ items, transition, onEditPhoto, onOpenViewer, onFav
     queueMicrotask(() => {
       setPreviousIndex(null);
       busyRef.current = false;
+      setSubsetIndices(null);
+      setDismissedSuggestions(new Set());
       setIndex(0);
     });
   }, [itemsKey]);
@@ -59,7 +78,33 @@ export function SliderView({ items, transition, onEditPhoto, onOpenViewer, onFav
     [index, items.length]
   );
 
+  const applySubset = useCallback(
+    (indices: number[]) => {
+      if (!indices.length) return;
+      setSubsetIndices(indices);
+      goToIndex(indices[0]!);
+    },
+    [goToIndex]
+  );
+
+  const clearSubset = useCallback(() => {
+    setSubsetIndices(null);
+  }, []);
+
+  const advanceInSubset = useCallback(
+    (delta: number) => {
+      if (!subsetIndices?.length) return false;
+      const pos = subsetIndices.indexOf(index);
+      const base = pos >= 0 ? pos : 0;
+      const nextPos = (base + delta + subsetIndices.length) % subsetIndices.length;
+      goToIndex(subsetIndices[nextPos]!);
+      return true;
+    },
+    [goToIndex, index, subsetIndices]
+  );
+
   const goNext = useCallback(() => {
+    if (advanceInSubset(1)) return;
     if (!shuffle || items.length < 3) {
       goToIndex(index + 1);
       return;
@@ -69,11 +114,95 @@ export function SliderView({ items, transition, onEditPhoto, onOpenViewer, onFav
       next = Math.floor(Math.random() * items.length);
     }
     goToIndex(next);
-  }, [goToIndex, index, items.length, shuffle]);
+  }, [advanceInSubset, goToIndex, index, items.length, shuffle]);
 
   const goPrev = useCallback(() => {
+    if (advanceInSubset(-1)) return;
     goToIndex(index - 1);
-  }, [goToIndex, index]);
+  }, [advanceInSubset, goToIndex, index]);
+
+  const smartSuggestion = useMemo((): SmartSuggestion | null => {
+    if (!items.length) return null;
+
+    const dayRun = getConsecutiveSameDayRun(items, index);
+    if (dayRun.length >= SMART_DAY_MIN_PHOTOS) {
+      return { id: `day-${dayRun[0]}-${dayRun[dayRun.length - 1]}`, kind: "day", count: dayRun.length, indices: dayRun };
+    }
+
+    const locRun = getConsecutiveNearbyRun(items, index, SMART_LOCATION_RADIUS_KM);
+    if (locRun.length >= SMART_LOCATION_MIN_PHOTOS) {
+      const city = items[index]?.location?.city?.trim();
+      const placeLabel = city || "aquesta zona";
+      return {
+        id: `loc-${locRun[0]}-${locRun[locRun.length - 1]}`,
+        kind: "location",
+        count: locRun.length,
+        indices: locRun,
+        placeLabel
+      };
+    }
+
+    return null;
+  }, [index, items]);
+
+  const visibleSuggestion = smartSuggestion && !dismissedSuggestions.has(smartSuggestion.id) ? smartSuggestion : null;
+
+  useEffect(() => {
+    if (!visibleSuggestion) return;
+    const timer = window.setTimeout(() => {
+      setDismissedSuggestions((prev) => {
+        const next = new Set(prev);
+        next.add(visibleSuggestion.id);
+        return next;
+      });
+    }, SMART_SUGGESTION_DISMISS_MS);
+    return () => window.clearTimeout(timer);
+  }, [visibleSuggestion]);
+
+  useEffect(() => {
+    if (!subsetIndices?.length) return;
+    if (!subsetIndices.includes(index)) {
+      setSubsetIndices(null);
+    }
+  }, [index, subsetIndices]);
+
+  const dismissSuggestion = useCallback((id: string) => {
+    setDismissedSuggestions((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  }, []);
+
+  const acceptSuggestion = useCallback(
+    (suggestion: SmartSuggestion) => {
+      dismissSuggestion(suggestion.id);
+      if (suggestion.kind === "day") {
+        const d = getAssetDate(items[index]!);
+        if (d) {
+          applySubset(indicesWithCalendarDay(items, d));
+          return;
+        }
+      }
+      applySubset(suggestion.indices);
+    },
+    [applySubset, dismissSuggestion, index, items]
+  );
+
+  const handleBreadcrumbJump = useCallback(
+    (targetIndex: number) => {
+      clearSubset();
+      goToIndex(targetIndex);
+    },
+    [clearSubset, goToIndex]
+  );
+
+  const handleBreadcrumbSubset = useCallback(
+    (indices: number[]) => {
+      applySubset(indices);
+    },
+    [applySubset]
+  );
 
   useEffect(() => {
     if (!playing || !items.length) return;
@@ -123,6 +252,8 @@ export function SliderView({ items, transition, onEditPhoto, onOpenViewer, onFav
   const currentSrc = (current.files.mediumUrl || current.files.previewUrl || current.files.originalUrl).trim();
   const previousSrc = previous ? (previous.files.mediumUrl || previous.files.previewUrl || previous.files.originalUrl).trim() : "";
 
+  const subsetActive = subsetIndices != null && subsetIndices.length > 0;
+
   return (
     <section
       ref={sectionRef}
@@ -135,6 +266,13 @@ export function SliderView({ items, transition, onEditPhoto, onOpenViewer, onFav
         style={{ transition: "opacity 260ms ease, transform 260ms ease" }}
       >
         <div className={`slider-view-media-box slider-view-media-box--transition-${transition}`}>
+          <BreadcrumbTemporal
+            asset={current}
+            items={items}
+            currentIndex={index}
+            onJumpToIndex={handleBreadcrumbJump}
+            onNavigateToIndices={handleBreadcrumbSubset}
+          />
           {previous && previousSrc ? (
             // eslint-disable-next-line @next/next/no-img-element -- URL signades / emmagatzematge
             <img
@@ -159,13 +297,44 @@ export function SliderView({ items, transition, onEditPhoto, onOpenViewer, onFav
             fetchPriority="high"
             onClick={() => onEditPhoto(current)}
           />
+          {visibleSuggestion ? (
+            <div className="slider-smart-nav" role="status" aria-live="polite">
+              <button
+                type="button"
+                className="slider-smart-nav__btn"
+                onClick={() => acceptSuggestion(visibleSuggestion)}
+              >
+                {visibleSuggestion.kind === "day" ? (
+                  <>
+                    Vull veure totes les fotos d&apos;aquest dia? ({visibleSuggestion.count} fotos)
+                  </>
+                ) : (
+                  <>
+                    Viatge detectat a {visibleSuggestion.placeLabel}? ({visibleSuggestion.count} fotos)
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                className="slider-smart-nav__dismiss"
+                aria-label="Ignorar suggeriment"
+                onClick={() => dismissSuggestion(visibleSuggestion.id)}
+              >
+                ×
+              </button>
+            </div>
+          ) : null}
         </div>
+        {subsetActive ? (
+          <p className="slider-view-subset-hint">
+            Navegant una subsecció ({subsetIndices!.length} fotos).{" "}
+            <button type="button" className="slider-view-subset-hint__clear" onClick={clearSubset}>
+              Mostrar tota la biblioteca
+            </button>
+          </p>
+        ) : null}
         <div className={toolbarClass} role="toolbar" aria-label="Controls del slider">
-          <button
-            type="button"
-            className={btnClass}
-            onClick={goPrev}
-          >
+          <button type="button" className={btnClass} onClick={goPrev}>
             Anterior
           </button>
           <button type="button" className={btnClass} onClick={() => setPlaying((prev) => !prev)}>

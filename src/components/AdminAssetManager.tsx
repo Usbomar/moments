@@ -275,6 +275,25 @@ export function AdminAssetManager({
 
   useEffect(() => () => stopMusicPreview(), [stopMusicPreview]);
 
+  useEffect(() => {
+    if (!open) return;
+    // #region agent log
+    fetch("http://127.0.0.1:7438/ingest/7331e6b2-572e-4d6a-9e78-f59c870b6fb3", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "213d72" },
+      body: JSON.stringify({
+        sessionId: "213d72",
+        runId: "collections-ui",
+        hypothesisId: "B",
+        location: "AdminAssetManager.tsx:admin-open",
+        message: "admin modal state",
+        data: { open, activeTab, collectionsSubTab, build: "20260516-collections-subtabs" },
+        timestamp: Date.now()
+      })
+    }).catch(() => {});
+    // #endregion
+  }, [open, activeTab, collectionsSubTab]);
+
   const pickerAvailableAssets = useMemo(() => {
     if (!assetPickerTarget) return [];
     if (assetPickerTarget.kind === "collection") {
@@ -1022,7 +1041,7 @@ export function AdminAssetManager({
   };
 
   return (
-    <div className="modal-overlay modal-overlay--front admin-assets-overlay" role="dialog" aria-modal="true" aria-label="Configuració de la biblioteca" onClick={onClose}>
+    <div className="modal-overlay modal-overlay--front admin-assets-overlay" role="dialog" aria-modal="true" aria-label="Configuració de la biblioteca" data-admin-ui-build="20260516-collections-subtabs" onClick={onClose}>
       <div className="modal-content admin-assets-modal admin-assets-modal--fullscreen" onClick={(e) => e.stopPropagation()}>
         <header className="admin-assets-head">
           <h2>Configuració</h2>
@@ -1050,6 +1069,30 @@ export function AdminAssetManager({
             ×
           </button>
         </header>
+
+        {activeTab === "collections" ? (
+          <div className="admin-collections-subtabs admin-collections-subtabs--bar" role="tablist" aria-label="Seccions de col·leccions">
+            <span className="admin-collections-build" title="Versió UI">20260516-collections-subtabs</span>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={collectionsSubTab === "apartats"}
+              className={collectionsSubTab === "apartats" ? "is-active" : undefined}
+              onClick={() => setCollectionsSubTab("apartats")}
+            >
+              Apartats
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={collectionsSubTab === "cancions"}
+              className={collectionsSubTab === "cancions" ? "is-active" : undefined}
+              onClick={() => setCollectionsSubTab("cancions")}
+            >
+              Cançons
+            </button>
+          </div>
+        ) : null}
 
         <div className="admin-assets-body">
         {activeTab === "photos" ? (
@@ -1259,26 +1302,6 @@ export function AdminAssetManager({
 
         {activeTab === "collections" ? (
           <div className="admin-tab-panel admin-tab-panel--collections">
-            <div className="admin-collections-subtabs" role="tablist" aria-label="Seccions de col·leccions">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={collectionsSubTab === "apartats"}
-                className={collectionsSubTab === "apartats" ? "is-active" : undefined}
-                onClick={() => setCollectionsSubTab("apartats")}
-              >
-                Apartats
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={collectionsSubTab === "cancions"}
-                className={collectionsSubTab === "cancions" ? "is-active" : undefined}
-                onClick={() => setCollectionsSubTab("cancions")}
-              >
-                Cançons
-              </button>
-            </div>
             {collectionsSubTab === "apartats" ? (
             <div className="admin-collections-panel admin-collections-panel--apartats">
             <div className="admin-collections-layout admin-collections-layout--apartats">

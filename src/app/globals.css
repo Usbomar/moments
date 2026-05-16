@@ -3505,6 +3505,28 @@ button.danger {
   flex-wrap: wrap;
   gap: 6px;
   flex-shrink: 0;
+  align-items: center;
+}
+
+.admin-collections-subtabs--bar {
+  flex-shrink: 0;
+  margin: 0 0 8px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--accent-light) 55%, var(--bg-primary));
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+  border-radius: 8px;
+}
+
+.admin-collections-build {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+  padding: 4px 8px;
+  border: 1px dashed color-mix(in srgb, var(--accent) 50%, var(--border));
+  border-radius: 4px;
+  margin-right: 4px;
 }
 
 .admin-collections-subtabs button {

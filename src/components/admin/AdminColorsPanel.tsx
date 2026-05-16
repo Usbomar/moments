@@ -2,12 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Asset } from "@/lib/types";
-import { hexToHue } from "@/components/admin/adminAssetHelpers";
+import { hexEquals, normalizeHex } from "@/lib/color-utils";
 import {
   buildPaletteRows,
   loadStoredPalette,
   newCustomColorId,
-  normalizeHue,
   saveStoredPalette,
   type PaletteRow,
   type StoredPalette
@@ -17,9 +16,8 @@ type Props = {
   assets: Asset[];
   palette: StoredPalette;
   onPaletteChange: (next: StoredPalette) => void;
-  onClearPhotosWithHue: (hue: number) => Promise<void>;
-  /** Actualitza les fotos que tenien `fromHue` perquè passin a `toHue` (p. ex. en canviar el to d’un personalitzat). */
-  onMigratePhotosHue?: (fromHue: number, toHue: number) => Promise<void>;
+  onClearPhotosWithHex: (hex: string) => Promise<void>;
+  onMigratePhotosHex?: (fromHex: string, toHex: string) => Promise<void>;
 };
 
 async function fetchPaletteFromServer(): Promise<StoredPalette> {
@@ -47,8 +45,8 @@ export function AdminColorsPanel({
   assets,
   palette,
   onPaletteChange,
-  onClearPhotosWithHue,
-  onMigratePhotosHue
+  onClearPhotosWithHex,
+  onMigratePhotosHex
 }: Props) {
   const [hydrated, setHydrated] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -58,16 +56,15 @@ export function AdminColorsPanel({
   const [newColorName, setNewColorName] = useState("");
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
-  const [editingHueHex, setEditingHueHex] = useState("#4466ff");
+  const [editingHex, setEditingHex] = useState("#4466ff");
   const [pickerHex, setPickerHex] = useState("#808080");
   const swatchPickerTargetRef = useRef<PaletteRow | null>(null);
   const swatchPickerInputRef = useRef<HTMLInputElement>(null);
   const editingRowIdRef = useRef<string | null>(null);
   editingRowIdRef.current = editingRowId;
-  const editingHueHexRef = useRef(editingHueHex);
-  editingHueHexRef.current = editingHueHex;
-  /** Mateixa fila que s’està editant: el selector només actualitza el color local fins a «Desar». */
-  const deferHuePickRef = useRef(false);
+  const editingHexRef = useRef(editingHex);
+  editingHexRef.current = editingHex;
+  const deferColorPickRef = useRef(false);
 
   const rows = useMemo(() => buildPaletteRows(assets, palette), [assets, palette]);
   const mainRows = useMemo(() => rows.filter((r) => r.kind !== "in_use"), [rows]);
@@ -116,16 +113,19 @@ export function AdminColorsPanel({
   const handleAdd = () => {
     setError(null);
     setStatus(null);
-    const hue = hexToHue(newColorHex);
-    if (hue === null) {
+    const hex = normalizeHex(newColorHex);
+    if (!hex) {
       setError("Color no vàlid. Tria un color amb el selector.");
       return;
     }
-    const normalized = normalizeHue(hue);
+    if (palette.custom.some((c) => hexEquals(c.hex, hex))) {
+      setError("Ja existeix aquest color a la paleta.");
+      return;
+    }
     const label = newColorName.trim() || `Personalitzat ${palette.custom.length + 1}`;
     const next: StoredPalette = {
       ...palette,
-      custom: [...palette.custom, { id: newCustomColorId(), label, hue: normalized }]
+      custom: [...palette.custom, { id: newCustomColorId(), label, hex }]
     };
     setNewColorName("");
     void persist(next, `Color «${label}» afegit.`).catch(() => undefined);
@@ -135,7 +135,7 @@ export function AdminColorsPanel({
     setError(null);
     setEditingRowId(row.rowId);
     setEditingName(row.label);
-    setEditingHueHex(hueToHex(row.hue));
+    setEditingHex(normalizeHex(row.hex) ?? "#808080");
   };
 
   const commitEdit = async () => {
@@ -150,60 +150,57 @@ export function AdminColorsPanel({
       setEditingRowId(null);
       return;
     }
-    const pickedHue = hexToHue(editingHueHex);
-    if (pickedHue === null) {
+    const newHex = normalizeHex(editingHex);
+    if (!newHex) {
       setError("Color no vàlid.");
       return;
     }
-    const newH = normalizeHue(pickedHue);
-    const oldH = normalizeHue(row.hue);
+    const oldHex = normalizeHex(row.hex)!;
 
     let next: StoredPalette;
 
     if (row.kind === "preset") {
-      if (newH === oldH) {
-        next = { ...palette, presetLabels: { ...palette.presetLabels, [String(row.hue)]: name } };
+      if (hexEquals(newHex, oldHex)) {
+        next = { ...palette, presetLabels: { ...palette.presetLabels, [oldHex]: name } };
       } else {
-        if (palette.custom.some((c) => normalizeHue(c.hue) === newH)) {
-          setError("Ja hi ha un color personalitzat amb aquest to.");
+        if (palette.custom.some((c) => hexEquals(c.hex, newHex))) {
+          setError("Ja hi ha un color personalitzat amb aquest codi.");
           return;
         }
-        const hidden = new Set(palette.hiddenPresetHues.map(normalizeHue));
-        hidden.add(oldH);
+        const hidden = new Set(palette.hiddenPresetHexes.map((h) => normalizeHex(h)).filter(Boolean) as string[]);
+        hidden.add(oldHex);
         const pl = { ...palette.presetLabels };
-        delete pl[String(oldH)];
+        delete pl[oldHex];
         next = {
           ...palette,
-          hiddenPresetHues: [...hidden],
+          hiddenPresetHexes: [...hidden],
           presetLabels: pl,
-          custom: [...palette.custom, { id: newCustomColorId(), label: name, hue: newH }]
+          custom: [...palette.custom, { id: newCustomColorId(), label: name, hex: newHex }]
         };
       }
     } else if (row.kind === "custom" && row.customId) {
-      if (palette.custom.some((c) => c.id !== row.customId && normalizeHue(c.hue) === newH)) {
-        setError("Ja existeix un color personalitzat amb aquest to.");
+      if (palette.custom.some((c) => c.id !== row.customId && hexEquals(c.hex, newHex))) {
+        setError("Ja existeix un color personalitzat amb aquest codi.");
         return;
       }
       try {
-        if (newH !== oldH && onMigratePhotosHue) await onMigratePhotosHue(oldH, newH);
+        if (!hexEquals(newHex, oldHex) && onMigratePhotosHex) await onMigratePhotosHex(oldHex, newHex);
       } catch {
-        setError("No s’han pogut actualitzar les fotos amb el nou to.");
+        setError("No s’han pogut actualitzar les fotos amb el nou color.");
         return;
       }
       next = {
         ...palette,
-        custom: palette.custom.map((c) =>
-          c.id === row.customId ? { ...c, label: name, hue: newH } : c
-        )
+        custom: palette.custom.map((c) => (c.id === row.customId ? { ...c, label: name, hex: newHex } : c))
       };
     } else if (row.kind === "in_use") {
-      if (palette.custom.some((c) => normalizeHue(c.hue) === newH)) {
-        setError("Ja hi ha un color amb aquest to a la paleta.");
+      if (palette.custom.some((c) => hexEquals(c.hex, newHex))) {
+        setError("Ja hi ha un color amb aquest codi a la paleta.");
         return;
       }
       next = {
         ...palette,
-        custom: [...palette.custom, { id: newCustomColorId(), label: name, hue: newH }]
+        custom: [...palette.custom, { id: newCustomColorId(), label: name, hex: newHex }]
       };
     } else {
       return;
@@ -218,16 +215,17 @@ export function AdminColorsPanel({
     setStatus(null);
     setBusy(true);
     try {
-      await onClearPhotosWithHue(row.hue);
+      await onClearPhotosWithHex(row.hex);
       let next = palette;
+      const hex = normalizeHex(row.hex)!;
       if (row.kind === "preset") {
-        const hidden = new Set(palette.hiddenPresetHues.map(normalizeHue));
-        hidden.add(normalizeHue(row.hue));
+        const hidden = new Set(palette.hiddenPresetHexes.map((h) => normalizeHex(h)).filter(Boolean) as string[]);
+        hidden.add(hex);
         const pl = { ...palette.presetLabels };
-        delete pl[String(row.hue)];
+        delete pl[hex];
         next = {
           ...palette,
-          hiddenPresetHues: [...hidden],
+          hiddenPresetHexes: [...hidden],
           presetLabels: pl
         };
       } else if (row.kind === "custom" && row.customId) {
@@ -244,9 +242,11 @@ export function AdminColorsPanel({
 
   const promoteInUse = (row: PaletteRow) => {
     if (row.kind !== "in_use") return;
+    const hex = normalizeHex(row.hex);
+    if (!hex) return;
     const next: StoredPalette = {
       ...palette,
-      custom: [...palette.custom, { id: newCustomColorId(), label: `To ${row.hue}°`, hue: row.hue }]
+      custom: [...palette.custom, { id: newCustomColorId(), label: row.label, hex }]
     };
     void persist(next, "Color afegit a la paleta.").catch(() => undefined);
   };
@@ -255,8 +255,8 @@ export function AdminColorsPanel({
     setError(null);
     swatchPickerTargetRef.current = row;
     const editingThisRow = editingRowIdRef.current === row.rowId;
-    deferHuePickRef.current = editingThisRow;
-    setPickerHex(editingThisRow ? editingHueHexRef.current : hueToHex(row.hue));
+    deferColorPickRef.current = editingThisRow;
+    setPickerHex(editingThisRow ? editingHexRef.current : normalizeHex(row.hex) ?? "#808080");
     queueMicrotask(() => {
       const el = swatchPickerInputRef.current;
       if (!el) return;
@@ -268,27 +268,31 @@ export function AdminColorsPanel({
     });
   }, []);
 
-  const applyHueFromPicker = useCallback(
-    async (row: PaletteRow, newHue: number) => {
-      const h = normalizeHue(newHue);
-      const oldHue = normalizeHue(row.hue);
-      if (h === oldHue) return;
+  const applyColorFromPicker = useCallback(
+    async (row: PaletteRow, newHexRaw: string) => {
+      const newHex = normalizeHex(newHexRaw);
+      if (!newHex) {
+        setError("Color no vàlid.");
+        return;
+      }
+      const oldHex = normalizeHex(row.hex)!;
+      if (hexEquals(newHex, oldHex)) return;
 
       setError(null);
       setStatus(null);
 
       if (row.kind === "custom" && row.customId) {
-        if (palette.custom.some((c) => c.id !== row.customId && normalizeHue(c.hue) === h)) {
-          setError("Ja existeix un color personalitzat amb aquest to.");
+        if (palette.custom.some((c) => c.id !== row.customId && hexEquals(c.hex, newHex))) {
+          setError("Ja existeix un color personalitzat amb aquest codi.");
           return;
         }
         try {
-          if (onMigratePhotosHue) await onMigratePhotosHue(oldHue, h);
+          if (onMigratePhotosHex) await onMigratePhotosHex(oldHex, newHex);
           const next: StoredPalette = {
             ...palette,
-            custom: palette.custom.map((c) => (c.id === row.customId ? { ...c, hue: h } : c))
+            custom: palette.custom.map((c) => (c.id === row.customId ? { ...c, hex: newHex } : c))
           };
-          await persist(next, "To actualitzat.");
+          await persist(next, "Color actualitzat.");
         } catch {
           /* persist ja ha posat error */
         }
@@ -296,63 +300,71 @@ export function AdminColorsPanel({
       }
 
       if (row.kind === "preset") {
-        if (palette.custom.some((c) => normalizeHue(c.hue) === h)) {
-          setError("Ja hi ha un color personalitzat amb aquest to.");
+        if (palette.custom.some((c) => hexEquals(c.hex, newHex))) {
+          setError("Ja hi ha un color personalitzat amb aquest codi.");
           return;
         }
-        const hidden = new Set(palette.hiddenPresetHues.map(normalizeHue));
-        hidden.add(oldHue);
+        const hidden = new Set(palette.hiddenPresetHexes.map((h) => normalizeHex(h)).filter(Boolean) as string[]);
+        hidden.add(oldHex);
         const pl = { ...palette.presetLabels };
-        delete pl[String(oldHue)];
+        delete pl[oldHex];
         const next: StoredPalette = {
           ...palette,
-          hiddenPresetHues: [...hidden],
+          hiddenPresetHexes: [...hidden],
           presetLabels: pl,
-          custom: [...palette.custom, { id: newCustomColorId(), label: row.label, hue: h }]
+          custom: [...palette.custom, { id: newCustomColorId(), label: row.label, hex: newHex }]
         };
         setEditingRowId(null);
-        await persist(next, "To actualitzat (color base convertit a personalitzat).").catch(() => undefined);
+        await persist(next, "Color actualitzat (base convertit a personalitzat).").catch(() => undefined);
         return;
       }
 
       if (row.kind === "in_use") {
-        if (palette.custom.some((c) => normalizeHue(c.hue) === h)) {
-          setError("Ja hi ha un color amb aquest to a la paleta.");
+        if (palette.custom.some((c) => hexEquals(c.hex, newHex))) {
+          setError("Ja hi ha un color amb aquest codi a la paleta.");
           return;
         }
         const next: StoredPalette = {
           ...palette,
-          custom: [...palette.custom, { id: newCustomColorId(), label: row.label, hue: h }]
+          custom: [...palette.custom, { id: newCustomColorId(), label: row.label, hex: newHex }]
         };
         setEditingRowId(null);
-        await persist(next, "Color afegit a la paleta amb el to triat.").catch(() => undefined);
+        await persist(next, "Color afegit a la paleta.").catch(() => undefined);
       }
     },
-    [palette, persist, onMigratePhotosHue]
+    [palette, persist, onMigratePhotosHex]
   );
 
   const onSwatchPickerChange = useCallback(
     (hex: string) => {
       const row = swatchPickerTargetRef.current;
-      const defer = deferHuePickRef.current;
+      const defer = deferColorPickRef.current;
       swatchPickerTargetRef.current = null;
-      deferHuePickRef.current = false;
+      deferColorPickRef.current = false;
       if (!row) return;
-      const rawHue = hexToHue(hex);
-      if (rawHue === null) {
+      const normalized = normalizeHex(hex);
+      if (!normalized) {
         setError("Color no vàlid.");
         return;
       }
       if (defer) {
-        setEditingHueHex(hex);
-        setPickerHex(hex);
+        setEditingHex(normalized);
+        setPickerHex(normalized);
         setError(null);
         return;
       }
-      void applyHueFromPicker(row, rawHue);
+      void applyColorFromPicker(row, normalized);
     },
-    [applyHueFromPicker]
+    [applyColorFromPicker]
   );
+
+  const swatchStyle = (hex: string) => {
+    const h = normalizeHex(hex) ?? "#808080";
+    return {
+      backgroundColor: h,
+      border: h === "#fafafa" || h === "#ffffff" ? "1px solid var(--border-dark)" : undefined
+    } as const;
+  };
 
   const renderRow = (row: PaletteRow) => (
     <tr key={row.rowId}>
@@ -360,7 +372,7 @@ export function AdminColorsPanel({
         <button
           type="button"
           className="admin-colors-swatch-btn"
-          style={{ backgroundColor: `hsl(${row.hue} 72% 46%)` }}
+          style={swatchStyle(row.hex)}
           aria-label={`Obrir selector de color: ${row.label}`}
           title="Canviar color"
           disabled={busy}
@@ -375,7 +387,9 @@ export function AdminColorsPanel({
         )}
       </td>
       <td>{row.kind === "preset" ? "Base" : row.kind === "custom" ? "Personalitzat" : "Només en fotos"}</td>
-      <td>{row.hue}°</td>
+      <td>
+        <code>{row.hex}</code>
+      </td>
       <td>{row.photoCount}</td>
       <td className="admin-color-actions">
         {editingRowId === row.rowId ? (
@@ -414,10 +428,9 @@ export function AdminColorsPanel({
   return (
     <div className="admin-colors-panel">
       <p className="modal-muted admin-colors-intro">
-        Gestiona els 20 colors base (pots eliminar els que no vulguis) i afegeix personalitzats. El mateix llistat apareix als
-        desplegables de Configuració → Fotos i a l&apos;editor de dades de cada foto. En eliminar un color, les fotos que el tenien
-        passen a «Sense color». Clica el quadrat <strong>Mostra</strong> per obrir el selector de color. Si estàs editant una fila,
-        el nou to es desa quan premis <strong>Desar</strong> junt amb el nom.
+        Gestiona colors base i personalitzats amb el selector complet (#RRGGBB): blanc, negre, grisos, marrons, etc. El mateix
+        llistat apareix a Configuració → Fotos i a l&apos;editor de cada foto. Clica <strong>Mostra</strong> per canviar el color;
+        en editar una fila, es desa amb <strong>Desar</strong>.
       </p>
 
       <input
@@ -474,7 +487,7 @@ export function AdminColorsPanel({
             <th>Mostra</th>
             <th>Nom</th>
             <th>Tipus</th>
-            <th>To</th>
+            <th>Codi</th>
             <th>Fotos</th>
             <th>Accions</th>
           </tr>
@@ -483,7 +496,7 @@ export function AdminColorsPanel({
           {mainRows.length === 0 ? (
             <tr>
               <td colSpan={6} className="modal-muted">
-                No hi ha colors a la paleta. Afegeix-ne un de personalitzat o restaura colors base eliminats des de Supabase.
+                No hi ha colors a la paleta. Afegeix-ne un de personalitzat.
               </td>
             </tr>
           ) : (
@@ -494,14 +507,14 @@ export function AdminColorsPanel({
 
       {inUseRows.length > 0 ? (
         <>
-          <h3 className="admin-colors-section-title">Tons en fotos sense entrada a la paleta ({inUseRows.length})</h3>
+          <h3 className="admin-colors-section-title">Colors en fotos sense entrada a la paleta ({inUseRows.length})</h3>
           <table className="admin-stats-table admin-colors-table">
             <thead>
               <tr>
                 <th>Mostra</th>
                 <th>Nom</th>
                 <th>Tipus</th>
-                <th>To</th>
+                <th>Codi</th>
                 <th>Fotos</th>
                 <th>Accions</th>
               </tr>
@@ -512,25 +525,4 @@ export function AdminColorsPanel({
       ) : null}
     </div>
   );
-}
-
-function hueToHex(hue: number): string {
-  const h = normalizeHue(hue) / 360;
-  const s = 0.72;
-  const l = 0.46;
-  const hue2rgb = (p: number, q: number, t: number) => {
-    let tt = t;
-    if (tt < 0) tt += 1;
-    if (tt > 1) tt -= 1;
-    if (tt < 1 / 6) return p + (q - p) * 6 * tt;
-    if (tt < 1 / 2) return q;
-    if (tt < 2 / 3) return p + (q - p) * (2 / 3 - tt) * 6;
-    return p;
-  };
-  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-  const p = 2 * l - q;
-  const r = Math.round(hue2rgb(p, q, h + 1 / 3) * 255);
-  const g = Math.round(hue2rgb(p, q, h) * 255);
-  const b = Math.round(hue2rgb(p, q, h - 1 / 3) * 255);
-  return `#${[r, g, b].map((x) => x.toString(16).padStart(2, "0")).join("")}`;
 }

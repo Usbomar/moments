@@ -6,6 +6,7 @@ import { requireAuthUserId } from "@/lib/server/require-auth-api";
 import { ASSET_DETAIL_SELECT } from "@/lib/server/asset-row-select";
 import { toAsset } from "@/lib/server/asset-map";
 import { objectPathFromSignedUrl } from "@/lib/server/signed-url-path";
+import { legacyHueToHex, normalizeHex } from "@/lib/color-utils";
 
 type PatchBody = {
   title?: string;
@@ -14,7 +15,9 @@ type PatchBody = {
   taken_at?: string;
   favorite?: boolean;
   hidden_from_guests?: boolean;
-  /** 0–359 o null per esborrar l’assignació manual. */
+  /** #RRGGBB o null per esborrar l’assignació manual. */
+  color_hex?: string | null;
+  /** Legacy: 0–359 (es converteix a color_hex). */
   color_hue?: number | null;
   /** `id` opcional = PK de `locations` per reutilitzar fila (evita duplicats). */
   location?: { id?: number; lat: number; lng: number; city: string; country: string } | null;
@@ -92,20 +95,38 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     if (typeof body.hidden_from_guests === "boolean") {
       patch.hidden_from_guests = body.hidden_from_guests;
     }
-    if (body.color_hue !== undefined) {
+    if (body.color_hex !== undefined) {
+      if (body.color_hex === null) {
+        patch.color_hex = null;
+        patch.color_hue = null;
+      } else if (typeof body.color_hex === "string") {
+        const hex = normalizeHex(body.color_hex);
+        if (!hex) {
+          return NextResponse.json({ error: "color_hex must be null or #RRGGBB" }, { status: 400 });
+        }
+        patch.color_hex = hex;
+        patch.color_hue = null;
+      } else {
+        return NextResponse.json({ error: "color_hex must be null or #RRGGBB" }, { status: 400 });
+      }
+    } else if (body.color_hue !== undefined) {
       if (body.color_hue === null) {
+        patch.color_hex = null;
         patch.color_hue = null;
       } else if (typeof body.color_hue === "number" && Number.isFinite(body.color_hue)) {
-        patch.color_hue = Math.min(359, Math.max(0, Math.round(body.color_hue)));
+        const h = Math.min(359, Math.max(0, Math.round(body.color_hue)));
+        patch.color_hex = legacyHueToHex(h);
+        patch.color_hue = null;
       } else {
         return NextResponse.json({ error: "color_hue must be null or an integer 0–359" }, { status: 400 });
       }
     }
 
     let { error: updateErr } = await supabase.from("assets").update(patch).eq("id", id).eq("user_id", userId);
-    if (updateErr && /color_hue/i.test(updateErr.message) && "color_hue" in patch) {
+    if (updateErr && /color_(hue|hex)/i.test(updateErr.message)) {
       const rest = { ...patch };
       delete rest.color_hue;
+      delete rest.color_hex;
       const retry = await supabase.from("assets").update(rest).eq("id", id).eq("user_id", userId);
       updateErr = retry.error;
     }

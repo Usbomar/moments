@@ -1,4 +1,5 @@
 import { COLOR_PRESETS } from "@/lib/admin-color-palette";
+import { hexColorDistance, hexEquals, normalizeHex } from "@/lib/color-utils";
 
 export { COLOR_PRESETS };
 
@@ -28,37 +29,24 @@ export function parseLocationText(value: string) {
   return { city, country };
 }
 
-export function colorHueToPreset(hue: number | null | undefined, options: Array<{ label: string; hue: number }>): string {
-  if (typeof hue !== "number") return "";
-  let closest = options[0] ?? COLOR_PRESETS[0]!;
-  let bestDistance = Number.POSITIVE_INFINITY;
-  for (const preset of options) {
-    const direct = Math.abs(preset.hue - hue);
-    const wrapped = 360 - direct;
-    const distance = Math.min(direct, wrapped);
-    if (distance < bestDistance) {
-      bestDistance = distance;
-      closest = preset;
+/** Valor del &lt;select&gt;: hex exacte de paleta o el color triat. */
+export function colorHexToPaletteOption(
+  hex: string | null | undefined,
+  options: Array<{ label: string; hex: string }>
+): string {
+  const n = normalizeHex(hex ?? "");
+  if (!n) return "";
+  const exact = options.find((o) => hexEquals(o.hex, n));
+  if (exact) return normalizeHex(exact.hex)!;
+  if (options.length === 0) return n;
+  let closest = options[0]!;
+  let best = hexColorDistance(n, closest.hex);
+  for (const opt of options) {
+    const d = hexColorDistance(n, opt.hex);
+    if (d < best) {
+      best = d;
+      closest = opt;
     }
   }
-  return String(closest.hue);
-}
-
-export function hexToHue(hex: string): number | null {
-  const clean = hex.trim();
-  const valid = /^#([0-9a-f]{6})$/i.test(clean);
-  if (!valid) return null;
-  const r = Number.parseInt(clean.slice(1, 3), 16) / 255;
-  const g = Number.parseInt(clean.slice(3, 5), 16) / 255;
-  const b = Number.parseInt(clean.slice(5, 7), 16) / 255;
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const delta = max - min;
-  if (delta === 0) return 0;
-  let hue = 0;
-  if (max === r) hue = ((g - b) / delta) % 6;
-  else if (max === g) hue = (b - r) / delta + 2;
-  else hue = (r - g) / delta + 4;
-  const deg = Math.round(hue * 60);
-  return deg < 0 ? deg + 360 : deg;
+  return normalizeHex(closest.hex)!;
 }

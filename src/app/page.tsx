@@ -500,7 +500,7 @@ function HomeContent() {
       taken_at: updated.takenAt,
       favorite: updated.favorite,
       hidden_from_guests: updated.hiddenFromGuests === true,
-      color_hue: updated.colorHue ?? null
+      color_hex: updated.colorHex ?? null
     };
     if (Object.prototype.hasOwnProperty.call(updated, "location")) {
       patchBody.location = updated.location ?? null;

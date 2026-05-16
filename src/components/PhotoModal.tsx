@@ -4,7 +4,8 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import type { Map as LeafletMap, Marker as LeafletMarker } from "leaflet";
 import type { Asset, LocationInfo } from "@/lib/types";
 import type { AppCollection } from "@/lib/collections";
-import { ColorHueSelect, type ColorOption } from "@/components/admin/ColorHueSelect";
+import { ColorSelect, type ColorOption } from "@/components/admin/ColorSelect";
+import { resolveAssetColorHex } from "@/lib/color-utils";
 
 interface Props {
   asset: Asset | null;
@@ -71,9 +72,7 @@ export function PhotoModal({ asset, onClose, onSave, libraryTagSuggestions = [],
   const [pickedLocation, setPickedLocation] = useState<LocationInfo | undefined>(() => asset?.location ?? undefined);
   const [favorite, setFavorite] = useState(() => asset?.favorite ?? false);
   const [hiddenFromGuests, setHiddenFromGuests] = useState(() => asset?.hiddenFromGuests ?? false);
-  const [colorHue, setColorHue] = useState<number | null>(() =>
-    typeof asset?.colorHue === "number" && Number.isFinite(asset.colorHue) ? Math.min(359, Math.max(0, Math.round(asset.colorHue))) : null
-  );
+  const [colorHex, setColorHex] = useState<string | null>(() => (asset ? resolveAssetColorHex(asset) : null));
   const [error, setError] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const [geocodeHint, setGeocodeHint] = useState<string | null>(null);
@@ -114,11 +113,7 @@ export function PhotoModal({ asset, onClose, onSave, libraryTagSuggestions = [],
     setPickedLocation(asset.location ?? undefined);
     setFavorite(asset.favorite ?? false);
     setHiddenFromGuests(asset.hiddenFromGuests ?? false);
-    setColorHue(
-      typeof asset.colorHue === "number" && Number.isFinite(asset.colorHue)
-        ? Math.min(359, Math.max(0, Math.round(asset.colorHue)))
-        : null
-    );
+    setColorHex(resolveAssetColorHex(asset));
     setError(null);
     setGeocodeHint(null);
   }, [asset]);
@@ -239,8 +234,8 @@ export function PhotoModal({ asset, onClose, onSave, libraryTagSuggestions = [],
         location,
         files: asset.files
       };
-      updated.colorHue =
-        colorHue !== null && typeof colorHue === "number" ? Math.min(359, Math.max(0, Math.round(colorHue))) : null;
+      updated.colorHex = colorHex;
+      updated.colorHue = undefined;
       try {
         await onSave(updated);
         onClose();
@@ -248,7 +243,7 @@ export function PhotoModal({ asset, onClose, onSave, libraryTagSuggestions = [],
         setError(e instanceof Error ? e.message : "No s'ha pogut desar.");
       }
     })();
-  }, [asset, colorHue, dateValue, description, favorite, hiddenFromGuests, locationText, onClose, onSave, pickedLocation, tags, title]);
+  }, [asset, colorHex, dateValue, description, favorite, hiddenFromGuests, locationText, onClose, onSave, pickedLocation, tags, title]);
 
   const toggleCollectionMembership = useCallback(
     async (collectionId: string, checked: boolean) => {
@@ -483,12 +478,15 @@ export function PhotoModal({ asset, onClose, onSave, libraryTagSuggestions = [],
         </div>
 
         <div className="form-group">
-          <label htmlFor="photo-color-hue">Color</label>
-          <ColorHueSelect
-            id="photo-color-hue"
-            value={colorHue}
+          <label htmlFor="photo-color">Color</label>
+          <p className="modal-muted" style={{ marginTop: 0, marginBottom: 8, fontSize: "0.85rem" }}>
+            Tria un color de la paleta o fes servir el selector per qualsevol to (blanc, negre, gris, etc.).
+          </p>
+          <ColorSelect
+            id="photo-color"
+            value={colorHex}
             options={colorOptions}
-            onChange={setColorHue}
+            onChange={setColorHex}
             className="photo-modal-color-select"
           />
         </div>

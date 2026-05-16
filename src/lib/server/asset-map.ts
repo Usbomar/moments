@@ -1,4 +1,5 @@
 import type { Asset } from "@/lib/types";
+import { legacyHueToHex, normalizeHex } from "@/lib/color-utils";
 
 /** One row from `asset_files` as returned by PostgREST. */
 export type AssetFileRow = {
@@ -111,6 +112,7 @@ export function toAsset(row: {
   favorite: boolean;
   hidden_from_guests?: boolean | null;
   color_hue?: number | null;
+  color_hex?: string | null;
   asset_files: AssetFilesNested;
   asset_locations: LocationNested;
   asset_tags: TagNested;
@@ -129,9 +131,15 @@ export function toAsset(row: {
     checksum: file?.checksum ?? "",
     size: file?.size ?? 0
   };
-  const ch = row.color_hue;
-  const colorHueProp =
-    typeof ch === "number" && Number.isFinite(ch) ? { colorHue: Math.min(359, Math.max(0, Math.round(ch))) } : {};
+  const colorProps: Pick<Asset, "colorHex" | "colorHue"> = {};
+  const fromHex = normalizeHex(row.color_hex ?? undefined);
+  if (fromHex) {
+    colorProps.colorHex = fromHex;
+  } else if (typeof row.color_hue === "number" && Number.isFinite(row.color_hue)) {
+    const h = Math.min(359, Math.max(0, Math.round(row.color_hue)));
+    colorProps.colorHue = h;
+    colorProps.colorHex = legacyHueToHex(h);
+  }
   const latNum = Number(locationLink?.lat);
   const lngNum = Number(locationLink?.lng);
   const hasValidCoords = Number.isFinite(latNum) && Number.isFinite(lngNum);
@@ -155,7 +163,7 @@ export function toAsset(row: {
     peopleIds: [],
     tags,
     autoTags,
-    ...colorHueProp,
+    ...colorProps,
     location:
       locationLink && hasValidCoords && hasExplicitLocationLabel
         ? {

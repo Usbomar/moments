@@ -12,8 +12,9 @@ import { ViewerFavoriteButton } from "@/components/ViewerFavoriteButton";
 import { useAdminAssetStats, type SortState, type SortKey } from "@/components/admin/useAdminAssetStats";
 import { fromDateInputValue, parseLocationText, toDateInputValue } from "@/components/admin/adminAssetHelpers";
 import { AdminColorsPanel } from "@/components/admin/AdminColorsPanel";
-import { ColorHueSelect } from "@/components/admin/ColorHueSelect";
-import { buildColorOptionsFromPalette, normalizeHue, type StoredPalette } from "@/lib/admin-color-palette";
+import { ColorSelect } from "@/components/admin/ColorSelect";
+import { buildColorOptionsFromPalette, type StoredPalette } from "@/lib/admin-color-palette";
+import { hexEquals, normalizeHex, resolveAssetColorHex } from "@/lib/color-utils";
 import {
   DEFAULT_PHOTO_COLUMNS,
   DEFAULT_TAB_ORDER,
@@ -75,7 +76,7 @@ type Props = {
   onColorPaletteChange: (palette: StoredPalette) => void;
 };
 
-type DraftPatch = Partial<Pick<Asset, "title" | "takenAt" | "favorite" | "colorHue" | "location" | "hiddenFromGuests">>;
+type DraftPatch = Partial<Pick<Asset, "title" | "takenAt" | "favorite" | "colorHex" | "location" | "hiddenFromGuests">>;
 
 function readAudioDurationFromUrl(url: string): Promise<number | null> {
   return new Promise((resolve) => {
@@ -188,29 +189,32 @@ export function AdminAssetManager({
   const musicFileInputRef = useRef<HTMLInputElement>(null);
   const allColorOptions = useMemo(() => buildColorOptionsFromPalette(colorPalette), [colorPalette]);
 
-  const clearPhotosWithHue = useCallback(
-    async (hue: number) => {
-      const target = normalizeHue(hue);
-      const affected = assets.filter(
-        (a) => typeof a.colorHue === "number" && Number.isFinite(a.colorHue) && normalizeHue(a.colorHue) === target
-      );
+  const clearPhotosWithHex = useCallback(
+    async (hex: string) => {
+      const target = normalizeHex(hex);
+      if (!target) return;
+      const affected = assets.filter((a) => {
+        const h = resolveAssetColorHex(a);
+        return h !== null && hexEquals(h, target);
+      });
       for (const a of affected) {
-        await onQuickUpdate(a, { colorHue: null });
+        await onQuickUpdate(a, { colorHex: null });
       }
     },
     [assets, onQuickUpdate]
   );
 
-  const migratePhotosHue = useCallback(
-    async (fromHue: number, toHue: number) => {
-      const from = normalizeHue(fromHue);
-      const to = normalizeHue(toHue);
-      if (from === to) return;
-      const affected = assets.filter(
-        (a) => typeof a.colorHue === "number" && Number.isFinite(a.colorHue) && normalizeHue(a.colorHue) === from
-      );
+  const migratePhotosHex = useCallback(
+    async (fromHex: string, toHex: string) => {
+      const from = normalizeHex(fromHex);
+      const to = normalizeHex(toHex);
+      if (!from || !to || hexEquals(from, to)) return;
+      const affected = assets.filter((a) => {
+        const h = resolveAssetColorHex(a);
+        return h !== null && hexEquals(h, from);
+      });
       for (const a of affected) {
-        await onQuickUpdate(a, { colorHue: to });
+        await onQuickUpdate(a, { colorHex: to });
       }
     },
     [assets, onQuickUpdate]
@@ -871,10 +875,10 @@ export function AdminAssetManager({
       case "color":
         return (
           <td key={col} className={PHOTO_COL_CLASS.color}>
-            <ColorHueSelect
-              value={draftById[a.id]?.colorHue ?? a.colorHue}
+            <ColorSelect
+              value={draftById[a.id]?.colorHex ?? resolveAssetColorHex(a)}
               options={allColorOptions}
-              onChange={(hue) => updateDraft(a, { colorHue: hue })}
+              onChange={(hex) => updateDraft(a, { colorHex: hex })}
             />
           </td>
         );
@@ -1617,8 +1621,8 @@ export function AdminAssetManager({
               assets={assets}
               palette={colorPalette}
               onPaletteChange={onColorPaletteChange}
-              onClearPhotosWithHue={clearPhotosWithHue}
-              onMigratePhotosHue={migratePhotosHue}
+              onClearPhotosWithHex={clearPhotosWithHex}
+              onMigratePhotosHex={migratePhotosHex}
             />
           </div>
         ) : null}

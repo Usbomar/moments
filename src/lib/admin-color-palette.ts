@@ -1,30 +1,37 @@
-export const COLOR_PRESETS: Array<{ label: string; hue: number }> = [
-  { label: "Rojo", hue: 0 },
-  { label: "Rojo anaranjado", hue: 15 },
-  { label: "Naranja", hue: 30 },
-  { label: "Ámbar", hue: 45 },
-  { label: "Amarillo", hue: 60 },
-  { label: "Lima", hue: 75 },
-  { label: "Verde lima", hue: 95 },
-  { label: "Verde", hue: 120 },
-  { label: "Verde menta", hue: 145 },
-  { label: "Turquesa", hue: 165 },
-  { label: "Cian", hue: 180 },
-  { label: "Azul cielo", hue: 200 },
-  { label: "Azul", hue: 220 },
-  { label: "Índigo", hue: 240 },
-  { label: "Violeta", hue: 275 },
-  { label: "Púrpura", hue: 290 },
-  { label: "Magenta", hue: 310 },
-  { label: "Rosa", hue: 330 },
-  { label: "Coral", hue: 345 },
-  { label: "Marrón", hue: 24 }
+import { hexEquals, legacyHueToHex, normalizeHex, resolveAssetColorHex } from "@/lib/color-utils";
+
+export const COLOR_PRESETS: Array<{ label: string; hex: string }> = [
+  { label: "Rojo", hex: "#e53935" },
+  { label: "Rojo anaranjado", hex: "#ff5722" },
+  { label: "Naranja", hex: "#fb8c00" },
+  { label: "Ámbar", hex: "#ffc107" },
+  { label: "Amarillo", hex: "#fdd835" },
+  { label: "Lima", hex: "#c0ca33" },
+  { label: "Verde lima", hex: "#8bc34a" },
+  { label: "Verde", hex: "#43a047" },
+  { label: "Verde menta", hex: "#26a69a" },
+  { label: "Turquesa", hex: "#00acc1" },
+  { label: "Cian", hex: "#00bcd4" },
+  { label: "Azul cielo", hex: "#29b6f6" },
+  { label: "Azul", hex: "#1e88e5" },
+  { label: "Índigo", hex: "#3949ab" },
+  { label: "Violeta", hex: "#7e57c2" },
+  { label: "Púrpura", hex: "#8e24aa" },
+  { label: "Magenta", hex: "#d81b60" },
+  { label: "Rosa", hex: "#f06292" },
+  { label: "Coral", hex: "#ff7043" },
+  { label: "Marrón", hex: "#6d4c41" },
+  { label: "Negro", hex: "#212121" },
+  { label: "Gris oscuro", hex: "#616161" },
+  { label: "Gris", hex: "#9e9e9e" },
+  { label: "Gris claro", hex: "#bdbdbd" },
+  { label: "Blanco", hex: "#fafafa" }
 ];
 
 export type CustomColorDef = {
   id: string;
   label: string;
-  hue: number;
+  hex: string;
 };
 
 export type PaletteRowKind = "preset" | "custom" | "in_use";
@@ -32,7 +39,7 @@ export type PaletteRowKind = "preset" | "custom" | "in_use";
 export type PaletteRow = {
   rowId: string;
   label: string;
-  hue: number;
+  hex: string;
   kind: PaletteRowKind;
   customId?: string;
   photoCount: number;
@@ -44,22 +51,28 @@ const STORAGE_LEGACY = "moments_admin_custom_colors_v1";
 export type StoredPalette = {
   custom: CustomColorDef[];
   presetLabels: Record<string, string>;
-  /** Presets base (hue) que l'usuari ha eliminat de la paleta i del desplegable */
-  hiddenPresetHues: number[];
+  /** Presets base (#hex) que l'usuari ha eliminat de la paleta */
+  hiddenPresetHexes: string[];
 };
 
 export const EMPTY_PALETTE: StoredPalette = {
   custom: [],
   presetLabels: {},
-  hiddenPresetHues: []
+  hiddenPresetHexes: []
 };
 
+/** @deprecated Només per migració des de dades antigues */
 export function normalizeHue(hue: number): number {
   return Math.min(359, Math.max(0, Math.round(hue)));
 }
 
-function hiddenSet(hidden: number[]): Set<number> {
-  return new Set(hidden.map(normalizeHue));
+function hiddenSet(hidden: string[]): Set<string> {
+  const out = new Set<string>();
+  for (const h of hidden) {
+    const n = normalizeHex(h);
+    if (n) out.add(n);
+  }
+  return out;
 }
 
 export function loadStoredPalette(): StoredPalette {
@@ -83,7 +96,7 @@ export function loadStoredPalette(): StoredPalette {
           }))
         ),
         presetLabels: {},
-        hiddenPresetHues: []
+        hiddenPresetHexes: []
       };
     }
   } catch {
@@ -99,16 +112,21 @@ export function saveStoredPalette(data: StoredPalette): void {
     JSON.stringify({
       custom: data.custom,
       presetLabels: data.presetLabels,
-      hiddenPresetHues: data.hiddenPresetHues
+      hiddenPresetHexes: data.hiddenPresetHexes
     })
   );
 }
 
-export function sanitizePalette(raw: Partial<StoredPalette>): StoredPalette {
+export function sanitizePalette(raw: Partial<StoredPalette> & { hiddenPresetHues?: number[] }): StoredPalette {
+  const legacyHidden =
+    Array.isArray(raw.hiddenPresetHues) && raw.hiddenPresetHues.length
+      ? raw.hiddenPresetHues.map((h) => legacyHueToHex(normalizeHue(h)))
+      : [];
+  const hiddenMerged = [...(raw.hiddenPresetHexes ?? []), ...legacyHidden];
   return {
     custom: sanitizeCustomList(raw.custom),
     presetLabels: sanitizePresetLabels(raw.presetLabels),
-    hiddenPresetHues: sanitizeHiddenPresets(raw.hiddenPresetHues)
+    hiddenPresetHexes: sanitizeHiddenPresets(hiddenMerged)
   };
 }
 
@@ -117,11 +135,15 @@ function sanitizeCustomList(raw: unknown): CustomColorDef[] {
   const out: CustomColorDef[] = [];
   for (const item of raw) {
     if (!item || typeof item !== "object") continue;
-    const row = item as Partial<CustomColorDef>;
-    if (typeof row.hue !== "number" || !Number.isFinite(row.hue)) continue;
+    const row = item as Partial<CustomColorDef> & { hue?: number };
+    let hex = normalizeHex(row.hex);
+    if (!hex && typeof row.hue === "number" && Number.isFinite(row.hue)) {
+      hex = legacyHueToHex(row.hue);
+    }
+    if (!hex) continue;
     const id = typeof row.id === "string" && row.id.trim() ? row.id.trim() : crypto.randomUUID();
     const label = typeof row.label === "string" && row.label.trim() ? row.label.trim() : `Personalitzat`;
-    out.push({ id, label, hue: normalizeHue(row.hue) });
+    out.push({ id, label, hex });
   }
   return out;
 }
@@ -130,123 +152,140 @@ function sanitizePresetLabels(raw: unknown): Record<string, string> {
   if (!raw || typeof raw !== "object") return {};
   const out: Record<string, string> = {};
   for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
-    if (typeof v === "string" && v.trim()) out[k] = v.trim();
+    if (typeof v !== "string" || !v.trim()) continue;
+    const keyTrim = k.trim();
+    let hexKey: string | null = normalizeHex(keyTrim);
+    if (!hexKey && /^\d+$/.test(keyTrim)) {
+      hexKey = legacyHueToHex(Number(keyTrim));
+    }
+    if (hexKey) out[hexKey] = v.trim();
   }
   return out;
 }
 
-function sanitizeHiddenPresets(raw: unknown): number[] {
+function sanitizeHiddenPresets(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
-  const out: number[] = [];
-  const seen = new Set<number>();
+  const out: string[] = [];
+  const seen = new Set<string>();
   for (const v of raw) {
-    if (typeof v !== "number" || !Number.isFinite(v)) continue;
-    const h = normalizeHue(v);
-    if (seen.has(h)) continue;
-    seen.add(h);
-    out.push(h);
+    let hex: string | null = null;
+    if (typeof v === "number" && Number.isFinite(v)) hex = legacyHueToHex(normalizeHue(v));
+    else if (typeof v === "string") hex = normalizeHex(v);
+    if (!hex || seen.has(hex)) continue;
+    seen.add(hex);
+    out.push(hex);
   }
   return out;
 }
 
-export function presetLabel(hue: number, presetLabels: Record<string, string>): string {
-  const key = String(normalizeHue(hue));
+export function presetLabel(hex: string, presetLabels: Record<string, string>): string {
+  const key = normalizeHex(hex);
+  if (!key) return "Color";
   const override = presetLabels[key];
   if (override) return override;
-  const base = COLOR_PRESETS.find((p) => p.hue === normalizeHue(hue));
-  return base?.label ?? `To ${key}°`;
+  const base = COLOR_PRESETS.find((p) => hexEquals(p.hex, key));
+  return base?.label ?? key;
 }
 
-export function visiblePresets(palette: StoredPalette): Array<{ label: string; hue: number }> {
-  const hidden = hiddenSet(palette.hiddenPresetHues);
-  return COLOR_PRESETS.filter((p) => !hidden.has(normalizeHue(p.hue))).map((p) => ({
-    label: presetLabel(p.hue, palette.presetLabels),
-    hue: p.hue
+export function visiblePresets(palette: StoredPalette): Array<{ label: string; hex: string }> {
+  const hidden = hiddenSet(palette.hiddenPresetHexes);
+  return COLOR_PRESETS.filter((p) => {
+    const h = normalizeHex(p.hex);
+    return h && !hidden.has(h);
+  }).map((p) => ({
+    label: presetLabel(p.hex, palette.presetLabels),
+    hex: normalizeHex(p.hex)!
   }));
 }
 
-export function buildColorOptionsFromPalette(palette: StoredPalette): Array<{ label: string; hue: number }> {
-  return buildColorOptions(palette.custom, palette.presetLabels, palette.hiddenPresetHues);
+export function buildColorOptionsFromPalette(palette: StoredPalette): Array<{ label: string; hex: string }> {
+  return buildColorOptions(palette.custom, palette.presetLabels, palette.hiddenPresetHexes);
 }
 
 export function buildColorOptions(
   custom: CustomColorDef[],
   presetLabels: Record<string, string>,
-  hiddenPresetHues: number[] = []
-): Array<{ label: string; hue: number }> {
-  const hidden = hiddenSet(hiddenPresetHues);
-  const presetRows = COLOR_PRESETS.filter((p) => !hidden.has(normalizeHue(p.hue))).map((p) => ({
-    label: presetLabel(p.hue, presetLabels),
-    hue: p.hue
+  hiddenPresetHexes: string[] = []
+): Array<{ label: string; hex: string }> {
+  const hidden = hiddenSet(hiddenPresetHexes);
+  const presetRows = COLOR_PRESETS.filter((p) => {
+    const h = normalizeHex(p.hex);
+    return h && !hidden.has(h);
+  }).map((p) => ({
+    label: presetLabel(p.hex, presetLabels),
+    hex: normalizeHex(p.hex)!
   }));
-  const customRows = custom.map((c) => ({ label: c.label, hue: c.hue }));
-  const seen = new Set<number>();
-  const merged: Array<{ label: string; hue: number }> = [];
+  const customRows = custom
+    .map((c) => ({ label: c.label, hex: normalizeHex(c.hex) }))
+    .filter((c): c is { label: string; hex: string } => c.hex !== null);
+  const seen = new Set<string>();
+  const merged: Array<{ label: string; hex: string }> = [];
   for (const row of [...customRows, ...presetRows]) {
-    const h = normalizeHue(row.hue);
-    if (seen.has(h)) continue;
-    seen.add(h);
-    merged.push({ label: row.label, hue: h });
+    if (seen.has(row.hex)) continue;
+    seen.add(row.hex);
+    merged.push(row);
   }
   return merged;
 }
 
-function hueUsedByAssets(assets: Array<{ colorHue?: number | null }>): Map<number, number> {
-  const counts = new Map<number, number>();
+function hexUsedByAssets(assets: Array<{ colorHex?: string | null; colorHue?: number | null }>): Map<string, number> {
+  const counts = new Map<string, number>();
   for (const a of assets) {
-    if (typeof a.colorHue !== "number" || !Number.isFinite(a.colorHue)) continue;
-    const h = normalizeHue(a.colorHue);
-    counts.set(h, (counts.get(h) ?? 0) + 1);
+    const hex = resolveAssetColorHex(a);
+    if (!hex) continue;
+    counts.set(hex, (counts.get(hex) ?? 0) + 1);
   }
   return counts;
 }
 
-function isHueInVisiblePalette(hue: number, palette: StoredPalette): boolean {
-  const h = normalizeHue(hue);
-  if (palette.custom.some((c) => normalizeHue(c.hue) === h)) return true;
-  if (hiddenSet(palette.hiddenPresetHues).has(h)) return false;
-  return COLOR_PRESETS.some((p) => p.hue === h);
+function isHexInVisiblePalette(hex: string, palette: StoredPalette): boolean {
+  const h = normalizeHex(hex);
+  if (!h) return false;
+  if (palette.custom.some((c) => hexEquals(c.hex, h))) return true;
+  if (hiddenSet(palette.hiddenPresetHexes).has(h)) return false;
+  return COLOR_PRESETS.some((p) => hexEquals(p.hex, h));
 }
 
 export function buildPaletteRows(
-  assets: Array<{ colorHue?: number | null }>,
+  assets: Array<{ colorHex?: string | null; colorHue?: number | null }>,
   palette: StoredPalette
 ): PaletteRow[] {
-  const { custom, presetLabels, hiddenPresetHues } = palette;
-  const hidden = hiddenSet(hiddenPresetHues);
-  const usage = hueUsedByAssets(assets);
+  const { custom, presetLabels, hiddenPresetHexes } = palette;
+  const hidden = hiddenSet(hiddenPresetHexes);
+  const usage = hexUsedByAssets(assets);
   const rows: PaletteRow[] = [];
 
   for (const p of COLOR_PRESETS) {
-    const h = normalizeHue(p.hue);
-    if (hidden.has(h)) continue;
+    const hex = normalizeHex(p.hex);
+    if (!hex || hidden.has(hex)) continue;
     rows.push({
-      rowId: `preset-${h}`,
-      label: presetLabel(h, presetLabels),
-      hue: h,
+      rowId: `preset-${hex}`,
+      label: presetLabel(hex, presetLabels),
+      hex,
       kind: "preset",
-      photoCount: usage.get(h) ?? 0
+      photoCount: usage.get(hex) ?? 0
     });
   }
 
   for (const c of custom) {
-    const h = normalizeHue(c.hue);
+    const hex = normalizeHex(c.hex);
+    if (!hex) continue;
     rows.push({
       rowId: `custom-${c.id}`,
       label: c.label,
-      hue: h,
+      hex,
       kind: "custom",
       customId: c.id,
-      photoCount: usage.get(h) ?? 0
+      photoCount: usage.get(hex) ?? 0
     });
   }
 
-  for (const [h, count] of usage) {
-    if (isHueInVisiblePalette(h, palette)) continue;
+  for (const [hex, count] of usage) {
+    if (isHexInVisiblePalette(hex, palette)) continue;
     rows.push({
-      rowId: `in_use-${h}`,
-      label: `En ús (${h}°)`,
-      hue: h,
+      rowId: `in_use-${hex}`,
+      label: `En ús (${hex})`,
+      hex,
       kind: "in_use",
       photoCount: count
     });
@@ -255,7 +294,7 @@ export function buildPaletteRows(
   rows.sort((a, b) => {
     const order = { preset: 0, custom: 1, in_use: 2 } as const;
     if (order[a.kind] !== order[b.kind]) return order[a.kind] - order[b.kind];
-    return a.hue - b.hue;
+    return a.hex.localeCompare(b.hex);
   });
 
   return rows;

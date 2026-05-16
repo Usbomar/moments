@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import type { Asset } from "@/lib/types";
+import { resolveAssetColorHex } from "@/lib/color-utils";
 import { cmpText } from "@/components/admin/adminAssetHelpers";
 
 export type SortKey = "title" | "takenAt" | "color" | "location" | "favorite";
@@ -82,8 +83,8 @@ export function useAdminAssetStats(assets: Asset[], sort: SortState[]) {
           left = `${a.location?.city ?? ""}, ${a.location?.country ?? ""}`;
           right = `${b.location?.city ?? ""}, ${b.location?.country ?? ""}`;
         } else if (s.key === "color") {
-          left = typeof a.colorHue === "number" ? String(a.colorHue) : "";
-          right = typeof b.colorHue === "number" ? String(b.colorHue) : "";
+          left = resolveAssetColorHex(a) ?? "";
+          right = resolveAssetColorHex(b) ?? "";
         } else {
           left = a.favorite ? "1" : "0";
           right = b.favorite ? "1" : "0";

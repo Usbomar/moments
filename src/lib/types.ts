@@ -47,7 +47,9 @@ export interface Asset {
   tags: string[];
   /** Tags automàtics (`asset_tags.origin = 'auto'`); només lectura des del servidor. */
   autoTags: string[];
-  /** To 0–359 per la vista per colors; `null` esborra l’assignació manual. */
+  /** Color #RRGGBB per la vista per colors; `null` esborra l’assignació. */
+  colorHex?: string | null;
+  /** Legacy (migració): to 0–359; es converteix a hex en llegir si no hi ha colorHex. */
   colorHue?: number | null;
   /** Fins a una ubicació enllaçada; `null` vol dir esborrar-la al servidor (PATCH). */
   location?: LocationInfo | null;

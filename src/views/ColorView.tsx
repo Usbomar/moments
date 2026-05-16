@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { Asset } from "@/lib/types";
 import { LibraryGrid } from "@/components/library-grid";
 import type { GridDistribution } from "@/lib/grid-library";
+import { normalizeHex, resolveAssetColorHex } from "@/lib/color-utils";
 
 interface Props {
   items: Asset[];
@@ -18,30 +19,23 @@ interface Props {
 }
 
 interface ColorBucket {
-  hue: number;
-  color: string;
+  hex: string;
   items: Asset[];
 }
 
-/** Només fotos amb `colorHue` assignat manualment a l’editor (sense cap valor per defecte de l’app). */
 function buildBuckets(items: Asset[]): ColorBucket[] {
-  const buckets = new Map<number, ColorBucket>();
+  const buckets = new Map<string, ColorBucket>();
   for (const asset of items) {
-    if (typeof asset.colorHue !== "number" || !Number.isFinite(asset.colorHue)) continue;
-    const hue = Math.min(359, Math.max(0, Math.round(asset.colorHue)));
-    const key = (Math.round(hue / 30) * 30) % 360;
-    const existing = buckets.get(key);
+    const hex = resolveAssetColorHex(asset);
+    if (!hex) continue;
+    const existing = buckets.get(hex);
     if (existing) {
       existing.items.push(asset);
       continue;
     }
-    buckets.set(key, {
-      hue: key,
-      color: `hsl(${key} 72% 46%)`,
-      items: [asset]
-    });
+    buckets.set(hex, { hex, items: [asset] });
   }
-  return Array.from(buckets.values()).sort((a, b) => a.hue - b.hue);
+  return Array.from(buckets.values()).sort((a, b) => a.hex.localeCompare(b.hex));
 }
 
 export function ColorView({
@@ -56,57 +50,57 @@ export function ColorView({
   tileHoverShadowPct
 }: Props) {
   const buckets = useMemo(() => buildBuckets(items), [items]);
-  const [activeHue, setActiveHue] = useState<number | null>(null);
+  const [activeHex, setActiveHex] = useState<string | null>(null);
 
-  const withoutColor = useMemo(
-    () => items.filter((a) => typeof a.colorHue !== "number" || !Number.isFinite(a.colorHue)),
-    [items]
-  );
+  const withoutColor = useMemo(() => items.filter((a) => !resolveAssetColorHex(a)), [items]);
 
   const visible = useMemo(() => {
-    if (activeHue == null) return items;
-    const bucket = buckets.find((b) => b.hue === activeHue);
+    if (activeHex == null) return items;
+    const bucket = buckets.find((b) => b.hex === activeHex);
     return bucket?.items ?? [];
-  }, [activeHue, buckets, items]);
+  }, [activeHex, buckets, items]);
 
   return (
     <div>
       <p className="modal-muted" style={{ marginBottom: 12, maxWidth: 720 }}>
-        Els grups de color només inclouen fotos on hagis triat el to a l’editor de dades. La resta es mostra a la graella
-        quan no hi ha filtre actiu; assigna un color des de «Editar foto».
+        Els grups de color només inclouen fotos on hagis triat un color a l’editor de dades (paleta o selector lliure). La resta
+        es mostra a la graella quan no hi ha filtre actiu.
       </p>
 
       {buckets.length > 0 ? (
-        <div className="hue-filter-bar" role="toolbar" aria-label="Filtrar per to assignat">
-          {buckets.map((bucket) => (
-            <button
-              key={bucket.hue}
-              type="button"
-              className={activeHue === bucket.hue ? "active" : ""}
-              onClick={() => setActiveHue((prev) => (prev === bucket.hue ? null : bucket.hue))}
-              aria-pressed={activeHue === bucket.hue}
-              aria-label={`To ${bucket.hue}°, ${bucket.items.length} fotos`}
-            >
-              <span
-                style={{
-                  width: 16,
-                  height: 16,
-                  borderRadius: 0,
-                  background: bucket.color,
-                  border: "1px solid var(--border-dark)"
-                }}
-              />
-              {bucket.items.length}
-            </button>
-          ))}
+        <div className="hue-filter-bar" role="toolbar" aria-label="Filtrar per color assignat">
+          {buckets.map((bucket) => {
+            const h = normalizeHex(bucket.hex)!;
+            return (
+              <button
+                key={h}
+                type="button"
+                className={activeHex === h ? "active" : ""}
+                onClick={() => setActiveHex((prev) => (prev === h ? null : h))}
+                aria-pressed={activeHex === h}
+                aria-label={`Color ${h}, ${bucket.items.length} fotos`}
+              >
+                <span
+                  style={{
+                    width: 16,
+                    height: 16,
+                    borderRadius: 0,
+                    background: h,
+                    border: h === "#fafafa" || h === "#ffffff" ? "1px solid var(--border-dark)" : "1px solid var(--border-dark)"
+                  }}
+                />
+                {bucket.items.length}
+              </button>
+            );
+          })}
         </div>
       ) : (
         <p className="view-empty" style={{ marginBottom: 12 }}>
-          Encara no hi ha cap foto amb color assignat. Obre una foto, desa un to (0–359) o esborra’l si no el vols.
+          Encara no hi ha cap foto amb color assignat. Obre una foto i tria un color amb el desplegable o el selector.
         </p>
       )}
 
-      {activeHue == null && withoutColor.length > 0 ? (
+      {activeHex == null && withoutColor.length > 0 ? (
         <p className="modal-muted" style={{ marginBottom: 8 }}>
           {withoutColor.length} foto(s) sense color assignat (es mostren a la graella inferior).
         </p>

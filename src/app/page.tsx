@@ -570,8 +570,11 @@ function HomeContent() {
         onLibraryViewChange={setView}
         searchInputRef={searchRef}
         onAdminClick={() => {
-          startTransition(() => setAdminOpen(true));
-          void refreshAdminCollections();
+          // Deixa que el clic acabi i el navegador pugui pintar abans de muntar el modal (millora INP).
+          window.requestAnimationFrame(() => {
+            startTransition(() => setAdminOpen(true));
+            void refreshAdminCollections();
+          });
         }}
         libraryUploadSlot={
           mainTab === "library" ? (

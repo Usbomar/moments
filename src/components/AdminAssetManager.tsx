@@ -38,6 +38,9 @@ const TAB_LABELS: Record<AdminTabId, string> = {
   colors: "Colors"
 };
 
+/** Referència estable: amb el modal tancat no recalculem estadístiques sobre tota la biblioteca. */
+const EMPTY_STATS_ASSETS: Asset[] = [];
+
 const PHOTO_COL_CLASS: Record<PhotoColumnKey, string> = {
   thumb: "admin-assets-col-thumb",
   title: "admin-assets-col-title",
@@ -212,7 +215,8 @@ export function AdminAssetManager({
     },
     [assets, onQuickUpdate]
   );
-  const { tagStats, locationStats, tagsToAssets, locationsToAssets, assetById, sorted } = useAdminAssetStats(assets, sort);
+  const statsAssets = open ? assets : EMPTY_STATS_ASSETS;
+  const { tagStats, locationStats, tagsToAssets, locationsToAssets, assetById, sorted } = useAdminAssetStats(statsAssets, sort);
 
   const refreshMusicTracks = useCallback(async () => {
     setMusicLoading(true);

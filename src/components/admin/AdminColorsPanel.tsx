@@ -64,6 +64,10 @@ export function AdminColorsPanel({
   const swatchPickerInputRef = useRef<HTMLInputElement>(null);
   const editingRowIdRef = useRef<string | null>(null);
   editingRowIdRef.current = editingRowId;
+  const editingHueHexRef = useRef(editingHueHex);
+  editingHueHexRef.current = editingHueHex;
+  /** Mateixa fila que s’està editant: el selector només actualitza el color local fins a «Desar». */
+  const deferHuePickRef = useRef(false);
 
   const rows = useMemo(() => buildPaletteRows(assets, palette), [assets, palette]);
   const mainRows = useMemo(() => rows.filter((r) => r.kind !== "in_use"), [rows]);
@@ -134,7 +138,7 @@ export function AdminColorsPanel({
     setEditingHueHex(hueToHex(row.hue));
   };
 
-  const commitEdit = () => {
+  const commitEdit = async () => {
     if (!editingRowId) return;
     const name = editingName.trim();
     if (!name) {
@@ -146,34 +150,67 @@ export function AdminColorsPanel({
       setEditingRowId(null);
       return;
     }
-    let next = palette;
+    const pickedHue = hexToHue(editingHueHex);
+    if (pickedHue === null) {
+      setError("Color no vàlid.");
+      return;
+    }
+    const newH = normalizeHue(pickedHue);
+    const oldH = normalizeHue(row.hue);
+
+    let next: StoredPalette;
+
     if (row.kind === "preset") {
-      next = { ...palette, presetLabels: { ...palette.presetLabels, [String(row.hue)]: name } };
+      if (newH === oldH) {
+        next = { ...palette, presetLabels: { ...palette.presetLabels, [String(row.hue)]: name } };
+      } else {
+        if (palette.custom.some((c) => normalizeHue(c.hue) === newH)) {
+          setError("Ja hi ha un color personalitzat amb aquest to.");
+          return;
+        }
+        const hidden = new Set(palette.hiddenPresetHues.map(normalizeHue));
+        hidden.add(oldH);
+        const pl = { ...palette.presetLabels };
+        delete pl[String(oldH)];
+        next = {
+          ...palette,
+          hiddenPresetHues: [...hidden],
+          presetLabels: pl,
+          custom: [...palette.custom, { id: newCustomColorId(), label: name, hue: newH }]
+        };
+      }
     } else if (row.kind === "custom" && row.customId) {
-      const hue = hexToHue(editingHueHex);
-      if (hue === null) {
-        setError("Color no vàlid.");
+      if (palette.custom.some((c) => c.id !== row.customId && normalizeHue(c.hue) === newH)) {
+        setError("Ja existeix un color personalitzat amb aquest to.");
+        return;
+      }
+      try {
+        if (newH !== oldH && onMigratePhotosHue) await onMigratePhotosHue(oldH, newH);
+      } catch {
+        setError("No s’han pogut actualitzar les fotos amb el nou to.");
         return;
       }
       next = {
         ...palette,
         custom: palette.custom.map((c) =>
-          c.id === row.customId ? { ...c, label: name, hue: normalizeHue(hue) } : c
+          c.id === row.customId ? { ...c, label: name, hue: newH } : c
         )
       };
     } else if (row.kind === "in_use") {
-      const hue = hexToHue(editingHueHex);
-      if (hue === null) {
-        setError("Color no vàlid.");
+      if (palette.custom.some((c) => normalizeHue(c.hue) === newH)) {
+        setError("Ja hi ha un color amb aquest to a la paleta.");
         return;
       }
       next = {
         ...palette,
-        custom: [...palette.custom, { id: newCustomColorId(), label: name, hue: normalizeHue(hue) }]
+        custom: [...palette.custom, { id: newCustomColorId(), label: name, hue: newH }]
       };
+    } else {
+      return;
     }
+
     setEditingRowId(null);
-    void persist(next, "Color actualitzat.").catch(() => undefined);
+    await persist(next, "Color actualitzat.").catch(() => undefined);
   };
 
   const removeRow = async (row: PaletteRow) => {
@@ -217,7 +254,9 @@ export function AdminColorsPanel({
   const openSwatchPicker = useCallback((row: PaletteRow) => {
     setError(null);
     swatchPickerTargetRef.current = row;
-    setPickerHex(hueToHex(row.hue));
+    const editingThisRow = editingRowIdRef.current === row.rowId;
+    deferHuePickRef.current = editingThisRow;
+    setPickerHex(editingThisRow ? editingHueHexRef.current : hueToHex(row.hue));
     queueMicrotask(() => {
       const el = swatchPickerInputRef.current;
       if (!el) return;
@@ -250,7 +289,6 @@ export function AdminColorsPanel({
             custom: palette.custom.map((c) => (c.id === row.customId ? { ...c, hue: h } : c))
           };
           await persist(next, "To actualitzat.");
-          if (editingRowIdRef.current === row.rowId) setEditingHueHex(hueToHex(h));
         } catch {
           /* persist ja ha posat error */
         }
@@ -296,11 +334,19 @@ export function AdminColorsPanel({
   const onSwatchPickerChange = useCallback(
     (hex: string) => {
       const row = swatchPickerTargetRef.current;
+      const defer = deferHuePickRef.current;
       swatchPickerTargetRef.current = null;
+      deferHuePickRef.current = false;
       if (!row) return;
       const rawHue = hexToHue(hex);
       if (rawHue === null) {
         setError("Color no vàlid.");
+        return;
+      }
+      if (defer) {
+        setEditingHueHex(hex);
+        setPickerHex(hex);
+        setError(null);
         return;
       }
       void applyHueFromPicker(row, rawHue);
@@ -334,7 +380,7 @@ export function AdminColorsPanel({
       <td className="admin-color-actions">
         {editingRowId === row.rowId ? (
           <>
-            <button type="button" className="btn btn-sm" disabled={busy} onClick={commitEdit}>
+            <button type="button" className="btn btn-sm" disabled={busy} onClick={() => void commitEdit()}>
               Desar
             </button>
             <button type="button" className="btn btn-sm" disabled={busy} onClick={() => setEditingRowId(null)}>
@@ -370,7 +416,8 @@ export function AdminColorsPanel({
       <p className="modal-muted admin-colors-intro">
         Gestiona els 20 colors base (pots eliminar els que no vulguis) i afegeix personalitzats. El mateix llistat apareix als
         desplegables de Configuració → Fotos i a l&apos;editor de dades de cada foto. En eliminar un color, les fotos que el tenien
-        passen a «Sense color». Clica el quadrat de la columna <strong>Mostra</strong> per obrir el selector i canviar el to.
+        passen a «Sense color». Clica el quadrat <strong>Mostra</strong> per obrir el selector de color. Si estàs editant una fila,
+        el nou to es desa quan premis <strong>Desar</strong> junt amb el nom.
       </p>
 
       <input

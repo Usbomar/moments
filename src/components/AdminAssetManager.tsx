@@ -1559,10 +1559,10 @@ export function AdminAssetManager({
                   <thead>
                     <tr>
                       <th className="admin-collection-music-play-col" aria-label="Reproduir" />
-                      <th>Títol</th>
-                      <th>Origen</th>
-                      <th>Durada</th>
-                      <th>Mida</th>
+                      <th className="admin-collection-music-col-title">Títol</th>
+                      <th className="admin-collection-music-col-origen">Origen</th>
+                      <th className="admin-collection-music-col-duration">Durada</th>
+                      <th className="admin-collection-music-col-size">Mida</th>
                       <th className="admin-collection-actions-col">Accions</th>
                     </tr>
                   </thead>
@@ -1597,12 +1597,24 @@ export function AdminAssetManager({
                               <span className={`viewer-icon ${isPlaying ? "viewer-icon-pause" : "viewer-icon-play"}`} aria-hidden />
                             </button>
                           </td>
-                          <td>
+                          <td className="admin-collection-music-text-cell admin-collection-music-col-title" title={track.title}>
                             <strong>{track.title}</strong>
                           </td>
-                          <td>{track.source === "uploaded" ? "MP3 pujat" : "Enllaç extern"}</td>
-                          <td>{formatMusicDuration(track.durationSeconds)}</td>
-                          <td>{track.source === "uploaded" ? formatMusicSize(track.sizeBytes) : "—"}</td>
+                          <td
+                            className="admin-collection-music-text-cell admin-collection-music-col-origen"
+                            title={track.source === "uploaded" ? "MP3 pujat" : "Enllaç extern"}
+                          >
+                            {track.source === "uploaded" ? "MP3 pujat" : "Enllaç extern"}
+                          </td>
+                          <td className="admin-collection-music-text-cell admin-collection-music-col-duration" title={formatMusicDuration(track.durationSeconds)}>
+                            {formatMusicDuration(track.durationSeconds)}
+                          </td>
+                          <td
+                            className="admin-collection-music-text-cell admin-collection-music-col-size"
+                            title={track.source === "uploaded" ? formatMusicSize(track.sizeBytes) : "—"}
+                          >
+                            {track.source === "uploaded" ? formatMusicSize(track.sizeBytes) : "—"}
+                          </td>
                           <td className="admin-collection-actions-cell">
                             <button
                               type="button"

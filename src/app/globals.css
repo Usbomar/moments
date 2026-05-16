@@ -3657,23 +3657,23 @@ button.danger {
   font-size: 12px;
 }
 
-.admin-tab-panel--collections .admin-stats-table th,
-.admin-tab-panel--collections .admin-stats-table td {
+.admin-collections-panel--apartats .admin-stats-table th,
+.admin-collections-panel--apartats .admin-stats-table td {
   padding: 5px 7px;
   vertical-align: middle;
 }
 
-.admin-tab-panel--collections .admin-stats-table tbody tr:hover td {
+.admin-collections-panel--apartats .admin-stats-table tbody tr:hover td {
   background: color-mix(in srgb, var(--accent-light) 16%, var(--bg-primary));
 }
 
-.admin-tab-panel--collections .admin-stats-table td:nth-child(2) {
+.admin-collections-panel--apartats .admin-stats-table td:nth-child(2) {
   width: 54px;
   color: var(--text-secondary);
   font-size: 12px;
 }
 
-.admin-tab-panel--collections .admin-stats-table td:nth-child(3) {
+.admin-collections-panel--apartats .admin-stats-table td:nth-child(3) {
   width: 210px;
 }
 
@@ -3756,9 +3756,51 @@ button.danger {
   gap: 10px;
 }
 
-.admin-collection-music-table .admin-collection-music-play-col {
+.admin-collection-music-table {
+  table-layout: fixed;
+}
+
+.admin-collection-music-table th,
+.admin-collection-music-table td.admin-collection-music-text-cell {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+}
+
+.admin-collection-music-table td.admin-collection-music-text-cell strong {
+  font-weight: 600;
+}
+
+.admin-collection-music-table .admin-collection-music-play-col,
+.admin-collection-music-table .admin-collection-music-play-cell {
   width: 52px;
   min-width: 52px;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.admin-collection-music-table .admin-collection-music-col-origen {
+  width: 7.5rem;
+}
+
+.admin-collection-music-table .admin-collection-music-col-duration {
+  width: 4.25rem;
+}
+
+.admin-collection-music-table .admin-collection-music-col-size {
+  width: 4.5rem;
+}
+
+.admin-collection-music-table .admin-collection-actions-col {
+  width: 3.25rem;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.admin-collection-music-table .admin-collection-actions-cell {
+  overflow: visible;
+  text-overflow: clip;
 }
 
 .admin-collection-music-play-cell {

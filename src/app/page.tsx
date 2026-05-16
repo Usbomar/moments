@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, startTransition } from "react";
 import dynamic from "next/dynamic";
 import { LibraryGrid } from "@/components/library-grid";
 import { FullscreenViewer } from "@/components/fullscreen-viewer";
@@ -18,7 +18,6 @@ import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { loadCollections } from "@/lib/collections-storage";
 import type { AppCollection } from "@/lib/collections";
 import type { CollectionMusicTrack } from "@/lib/collection-music";
-import { AdminAssetManager } from "@/components/AdminAssetManager";
 import {
   buildColorOptionsFromPalette,
   loadStoredPalette,
@@ -84,6 +83,11 @@ const PhotoModal = dynamic(() => import("@/components/PhotoModal").then((mod) =>
 const ImageEditorV2 = dynamic(() => import("@/components/ImageEditor/ImageEditorV2").then((mod) => mod.ImageEditorV2), {
   loading: () => <TabLoadingHint label="editor d’imatge" />
 });
+
+const AdminAssetManager = dynamic(
+  () => import("@/components/AdminAssetManager").then((m) => ({ default: m.AdminAssetManager })),
+  { ssr: false }
+);
 
 function TabLoadingHint({ label }: { label: string }) {
   return (
@@ -566,7 +570,7 @@ function HomeContent() {
         onLibraryViewChange={setView}
         searchInputRef={searchRef}
         onAdminClick={() => {
-          setAdminOpen(true);
+          startTransition(() => setAdminOpen(true));
           void refreshAdminCollections();
         }}
         libraryUploadSlot={

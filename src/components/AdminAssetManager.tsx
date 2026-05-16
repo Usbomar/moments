@@ -197,6 +197,21 @@ export function AdminAssetManager({
     },
     [assets, onQuickUpdate]
   );
+
+  const migratePhotosHue = useCallback(
+    async (fromHue: number, toHue: number) => {
+      const from = normalizeHue(fromHue);
+      const to = normalizeHue(toHue);
+      if (from === to) return;
+      const affected = assets.filter(
+        (a) => typeof a.colorHue === "number" && Number.isFinite(a.colorHue) && normalizeHue(a.colorHue) === from
+      );
+      for (const a of affected) {
+        await onQuickUpdate(a, { colorHue: to });
+      }
+    },
+    [assets, onQuickUpdate]
+  );
   const { tagStats, locationStats, tagsToAssets, locationsToAssets, assetById, sorted } = useAdminAssetStats(assets, sort);
 
   const refreshMusicTracks = useCallback(async () => {
@@ -1599,6 +1614,7 @@ export function AdminAssetManager({
               palette={colorPalette}
               onPaletteChange={onColorPaletteChange}
               onClearPhotosWithHue={clearPhotosWithHue}
+              onMigratePhotosHue={migratePhotosHue}
             />
           </div>
         ) : null}

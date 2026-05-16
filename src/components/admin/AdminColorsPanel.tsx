@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Asset } from "@/lib/types";
 import { hexToHue } from "@/components/admin/adminAssetHelpers";
 import {
@@ -18,6 +18,8 @@ type Props = {
   palette: StoredPalette;
   onPaletteChange: (next: StoredPalette) => void;
   onClearPhotosWithHue: (hue: number) => Promise<void>;
+  /** Actualitza les fotos que tenien `fromHue` perquè passin a `toHue` (p. ex. en canviar el to d’un personalitzat). */
+  onMigratePhotosHue?: (fromHue: number, toHue: number) => Promise<void>;
 };
 
 async function fetchPaletteFromServer(): Promise<StoredPalette> {
@@ -41,7 +43,13 @@ async function persistPaletteToServer(palette: StoredPalette): Promise<void> {
   if (!res.ok) throw new Error(body.error ?? "No s'ha pogut desar la paleta");
 }
 
-export function AdminColorsPanel({ assets, palette, onPaletteChange, onClearPhotosWithHue }: Props) {
+export function AdminColorsPanel({
+  assets,
+  palette,
+  onPaletteChange,
+  onClearPhotosWithHue,
+  onMigratePhotosHue
+}: Props) {
   const [hydrated, setHydrated] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
@@ -51,6 +59,11 @@ export function AdminColorsPanel({ assets, palette, onPaletteChange, onClearPhot
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
   const [editingHueHex, setEditingHueHex] = useState("#4466ff");
+  const [pickerHex, setPickerHex] = useState("#808080");
+  const swatchPickerTargetRef = useRef<PaletteRow | null>(null);
+  const swatchPickerInputRef = useRef<HTMLInputElement>(null);
+  const editingRowIdRef = useRef<string | null>(null);
+  editingRowIdRef.current = editingRowId;
 
   const rows = useMemo(() => buildPaletteRows(assets, palette), [assets, palette]);
   const mainRows = useMemo(() => rows.filter((r) => r.kind !== "in_use"), [rows]);
@@ -201,21 +214,112 @@ export function AdminColorsPanel({ assets, palette, onPaletteChange, onClearPhot
     void persist(next, "Color afegit a la paleta.").catch(() => undefined);
   };
 
+  const openSwatchPicker = useCallback((row: PaletteRow) => {
+    setError(null);
+    swatchPickerTargetRef.current = row;
+    setPickerHex(hueToHex(row.hue));
+    queueMicrotask(() => {
+      const el = swatchPickerInputRef.current;
+      if (!el) return;
+      try {
+        el.showPicker?.();
+      } catch {
+        el.click();
+      }
+    });
+  }, []);
+
+  const applyHueFromPicker = useCallback(
+    async (row: PaletteRow, newHue: number) => {
+      const h = normalizeHue(newHue);
+      const oldHue = normalizeHue(row.hue);
+      if (h === oldHue) return;
+
+      setError(null);
+      setStatus(null);
+
+      if (row.kind === "custom" && row.customId) {
+        if (palette.custom.some((c) => c.id !== row.customId && normalizeHue(c.hue) === h)) {
+          setError("Ja existeix un color personalitzat amb aquest to.");
+          return;
+        }
+        try {
+          if (onMigratePhotosHue) await onMigratePhotosHue(oldHue, h);
+          const next: StoredPalette = {
+            ...palette,
+            custom: palette.custom.map((c) => (c.id === row.customId ? { ...c, hue: h } : c))
+          };
+          await persist(next, "To actualitzat.");
+          if (editingRowIdRef.current === row.rowId) setEditingHueHex(hueToHex(h));
+        } catch {
+          /* persist ja ha posat error */
+        }
+        return;
+      }
+
+      if (row.kind === "preset") {
+        if (palette.custom.some((c) => normalizeHue(c.hue) === h)) {
+          setError("Ja hi ha un color personalitzat amb aquest to.");
+          return;
+        }
+        const hidden = new Set(palette.hiddenPresetHues.map(normalizeHue));
+        hidden.add(oldHue);
+        const pl = { ...palette.presetLabels };
+        delete pl[String(oldHue)];
+        const next: StoredPalette = {
+          ...palette,
+          hiddenPresetHues: [...hidden],
+          presetLabels: pl,
+          custom: [...palette.custom, { id: newCustomColorId(), label: row.label, hue: h }]
+        };
+        setEditingRowId(null);
+        await persist(next, "To actualitzat (color base convertit a personalitzat).").catch(() => undefined);
+        return;
+      }
+
+      if (row.kind === "in_use") {
+        if (palette.custom.some((c) => normalizeHue(c.hue) === h)) {
+          setError("Ja hi ha un color amb aquest to a la paleta.");
+          return;
+        }
+        const next: StoredPalette = {
+          ...palette,
+          custom: [...palette.custom, { id: newCustomColorId(), label: row.label, hue: h }]
+        };
+        setEditingRowId(null);
+        await persist(next, "Color afegit a la paleta amb el to triat.").catch(() => undefined);
+      }
+    },
+    [palette, persist, onMigratePhotosHue]
+  );
+
+  const onSwatchPickerChange = useCallback(
+    (hex: string) => {
+      const row = swatchPickerTargetRef.current;
+      swatchPickerTargetRef.current = null;
+      if (!row) return;
+      const rawHue = hexToHue(hex);
+      if (rawHue === null) {
+        setError("Color no vàlid.");
+        return;
+      }
+      void applyHueFromPicker(row, rawHue);
+    },
+    [applyHueFromPicker]
+  );
+
   const renderRow = (row: PaletteRow) => (
     <tr key={row.rowId}>
       <td className="admin-colors-swatch-cell">
-        {editingRowId === row.rowId && row.kind === "custom" ? (
-          <input
-            type="color"
-            value={editingHueHex}
-            disabled={busy}
-            onChange={(e) => setEditingHueHex(e.target.value)}
-            aria-label="Canvia el to"
-            className="admin-colors-edit-swatch"
-          />
-        ) : (
-          <span className="admin-assets-color-chip" style={{ backgroundColor: `hsl(${row.hue} 72% 46%)` }} aria-hidden />
-        )}
+        <button
+          type="button"
+          className="admin-colors-swatch-btn"
+          style={{ backgroundColor: `hsl(${row.hue} 72% 46%)` }}
+          aria-label={`Obrir selector de color: ${row.label}`}
+          title="Canviar color"
+          disabled={busy}
+          onClick={() => openSwatchPicker(row)}
+        />
       </td>
       <td>
         {editingRowId === row.rowId ? (
@@ -266,8 +370,22 @@ export function AdminColorsPanel({ assets, palette, onPaletteChange, onClearPhot
       <p className="modal-muted admin-colors-intro">
         Gestiona els 20 colors base (pots eliminar els que no vulguis) i afegeix personalitzats. El mateix llistat apareix als
         desplegables de Configuració → Fotos i a l&apos;editor de dades de cada foto. En eliminar un color, les fotos que el tenien
-        passen a «Sense color».
+        passen a «Sense color». Clica el quadrat de la columna <strong>Mostra</strong> per obrir el selector i canviar el to.
       </p>
+
+      <input
+        ref={swatchPickerInputRef}
+        type="color"
+        className="admin-colors-picker-hidden"
+        aria-hidden
+        tabIndex={-1}
+        value={pickerHex}
+        onChange={(e) => {
+          const v = e.target.value;
+          setPickerHex(v);
+          onSwatchPickerChange(v);
+        }}
+      />
 
       <div className="admin-assets-custom-color">
         <input

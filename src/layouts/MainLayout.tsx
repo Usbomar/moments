@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, type ReactNode, type RefObject } from "react";
 import { LeftNav, type MainNavTab } from "@/components/LeftNav";
+import { RetractableTopBarZone } from "@/components/RetractableTopBarZone";
 import { TopBar } from "@/components/TopBar";
 import type { GalleryView } from "@/components/ViewSelector";
 
@@ -19,6 +20,8 @@ type Props = {
   libraryUploadSlot?: ReactNode;
   /** Opcions de graella (només Quadrícula) */
   libraryGridOptionsSlot?: ReactNode;
+  /** Presentació amb música: la barra superior es mostra només en passar el ratolí pel vora superior. */
+  topBarRetractable?: boolean;
 };
 
 export function MainLayout({
@@ -30,7 +33,8 @@ export function MainLayout({
   searchInputRef,
   libraryUploadSlot,
   libraryGridOptionsSlot,
-  onAdminClick
+  onAdminClick,
+  topBarRetractable = false
 }: Props) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
@@ -68,9 +72,8 @@ export function MainLayout({
     setMobileDrawerOpen(true);
   }, []);
 
-  return (
-    <div className="moments-app">
-      <TopBar
+  const topBar = (
+    <TopBar
         searchInputRef={searchInputRef}
         libraryView={libraryView}
         onLibraryViewChange={onLibraryViewChange}
@@ -79,7 +82,12 @@ export function MainLayout({
         libraryUploadSlot={activeNav === "library" ? libraryUploadSlot : null}
         onMenuClick={openMobileDrawer}
         onAdminClick={onAdminClick}
-      />
+    />
+  );
+
+  return (
+    <div className={`moments-app${topBarRetractable ? " moments-app--immersive-topbar" : ""}`}>
+      {topBarRetractable ? <RetractableTopBarZone>{topBar}</RetractableTopBarZone> : topBar}
       <div className="moments-body">
         <LeftNav
           active={activeNav}

@@ -2147,6 +2147,44 @@ button.danger {
   box-shadow: var(--shadow-sm);
 }
 
+/* Presentació amb música: barra superior amagada fins que el ratolí entra al marge superior */
+.moments-topbar-zone--auto-hide {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 130;
+  pointer-events: none;
+}
+
+.moments-topbar-zone--auto-hide .moments-topbar-reveal-hit {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 20px;
+  pointer-events: auto;
+  z-index: 2;
+}
+
+.moments-topbar-zone--auto-hide .moments-topbar {
+  position: relative;
+  z-index: 1;
+  transform: translateY(calc(-100% - 1px));
+  transition: transform 0.28s ease;
+  pointer-events: auto;
+  box-shadow: var(--shadow-md);
+}
+
+.moments-topbar-zone--auto-hide.is-revealed .moments-topbar {
+  transform: translateY(0);
+}
+
+.moments-app--immersive-topbar .moments-body {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
 .moments-topbar-left,
 .moments-topbar-right {
   display: flex;

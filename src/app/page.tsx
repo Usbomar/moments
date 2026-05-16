@@ -569,6 +569,9 @@ function HomeContent() {
         libraryView={view}
         onLibraryViewChange={setView}
         searchInputRef={searchRef}
+        topBarRetractable={
+          !!(collectionSlideshow?.assets.length && collectionSlideshow.musicTrack?.url)
+        }
         onAdminClick={() => {
           // Deixa que el clic acabi i el navegador pugui pintar abans de muntar el modal (millora INP).
           window.requestAnimationFrame(() => {

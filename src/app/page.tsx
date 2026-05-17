@@ -571,21 +571,6 @@ function HomeContent() {
         searchInputRef={searchRef}
         topBarRetractable={topBarRetractable}
         onAdminClick={() => {
-          // #region agent log
-          fetch("http://127.0.0.1:7438/ingest/7331e6b2-572e-4d6a-9e78-f59c870b6fb3", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "213d72" },
-            body: JSON.stringify({
-              sessionId: "213d72",
-              runId: "collections-ui",
-              hypothesisId: "C",
-              location: "page.tsx:onAdminClick",
-              message: "opening admin config modal",
-              data: { adminBundle: "inline-20260516b" },
-              timestamp: Date.now()
-            })
-          }).catch(() => {});
-          // #endregion
           window.requestAnimationFrame(() => {
             startTransition(() => setAdminOpen(true));
             void refreshAdminCollections();

@@ -75,7 +75,7 @@ function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): nu
   return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function hasCoords(asset: Asset): asset is Asset & { location: { lat: number; lng: number } } {
+export function hasCoords(asset: Asset): asset is Asset & { location: { lat: number; lng: number } } {
   const loc = asset.location;
   return Boolean(loc && Number.isFinite(loc.lat) && Number.isFinite(loc.lng));
 }

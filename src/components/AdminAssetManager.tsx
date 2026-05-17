@@ -277,44 +277,6 @@ export function AdminAssetManager({
 
   useEffect(() => () => stopMusicPreview(), [stopMusicPreview]);
 
-  useEffect(() => {
-    if (!open) return;
-    // #region agent log
-    fetch("http://127.0.0.1:7438/ingest/7331e6b2-572e-4d6a-9e78-f59c870b6fb3", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "213d72" },
-      body: JSON.stringify({
-        sessionId: "213d72",
-        runId: "collections-ui",
-        hypothesisId: "B",
-        location: "AdminAssetManager.tsx:admin-open",
-        message: "admin modal state",
-        data: { open, activeTab, collectionsSubTab, build: ADMIN_UI_BUILD },
-        timestamp: Date.now()
-      })
-    }).catch(() => {});
-    // #endregion
-  }, [open, activeTab, collectionsSubTab]);
-
-  useEffect(() => {
-    if (!open || activeTab !== "collections") return;
-    // #region agent log
-    fetch("http://127.0.0.1:7438/ingest/7331e6b2-572e-4d6a-9e78-f59c870b6fb3", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "213d72" },
-      body: JSON.stringify({
-        sessionId: "213d72",
-        runId: "collections-ui",
-        hypothesisId: "D",
-        location: "AdminAssetManager.tsx:collections-tab",
-        message: "collections tab rendered",
-        data: { build: ADMIN_UI_BUILD, collectionsSubTab },
-        timestamp: Date.now()
-      })
-    }).catch(() => {});
-    // #endregion
-  }, [open, activeTab, collectionsSubTab]);
-
   const pickerAvailableAssets = useMemo(() => {
     if (!assetPickerTarget) return [];
     if (assetPickerTarget.kind === "collection") {

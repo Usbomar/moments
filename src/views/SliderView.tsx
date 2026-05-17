@@ -4,6 +4,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Asset } from "@/lib/types";
 import type { SliderTransition } from "@/lib/grid-library";
 import { BreadcrumbTemporal } from "@/components/BreadcrumbTemporal";
+import { SliderFilmstrip } from "@/components/SliderFilmstrip";
+import { SliderKeyboardHelp } from "@/components/SliderKeyboardHelp";
+import { SliderMetadataStrip } from "@/components/SliderMetadataStrip";
+import { SliderMiniMap } from "@/components/SliderMiniMap";
+import { SliderNavChips } from "@/components/SliderNavChips";
+import { SliderTimeline } from "@/components/SliderTimeline";
 import { ViewerFavoriteButton } from "@/components/ViewerFavoriteButton";
 import {
   getAssetDate,
@@ -41,6 +47,7 @@ export function SliderView({ items, transition, onEditPhoto, onOpenViewer, onFav
   const [favBusy, setFavBusy] = useState(false);
   const [subsetIndices, setSubsetIndices] = useState<number[] | null>(null);
   const [dismissedSuggestions, setDismissedSuggestions] = useState<Set<string>>(() => new Set());
+  const [keyboardHelpOpen, setKeyboardHelpOpen] = useState(false);
   const itemsKeyRef = useRef<string>("");
   const busyRef = useRef(false);
   const sectionRef = useRef<HTMLElement>(null);
@@ -49,6 +56,18 @@ export function SliderView({ items, transition, onEditPhoto, onOpenViewer, onFav
 
   const current = useMemo(() => items[index] ?? null, [items, index]);
   const previous = previousIndex != null ? items[previousIndex] ?? null : null;
+
+  const navigableIndices = useMemo(
+    () => (subsetIndices?.length ? subsetIndices : items.map((_, i) => i)),
+    [items, subsetIndices]
+  );
+
+  const positionLabel = useMemo(() => {
+    const pos = navigableIndices.indexOf(index);
+    const n = navigableIndices.length;
+    if (pos < 0 || n < 1) return "";
+    return `${pos + 1} / ${n}`;
+  }, [index, navigableIndices]);
 
   useEffect(() => {
     if (itemsKeyRef.current === itemsKey) return;
@@ -223,12 +242,25 @@ export function SliderView({ items, transition, onEditPhoto, onOpenViewer, onFav
       } else if (event.key === "ArrowLeft") {
         goPrev();
       } else if (event.key === "Escape") {
-        setFullscreen(false);
+        if (keyboardHelpOpen) {
+          setKeyboardHelpOpen(false);
+        } else {
+          setFullscreen(false);
+        }
+      } else if (event.key === "?" || (event.key === "/" && event.shiftKey)) {
+        event.preventDefault();
+        setKeyboardHelpOpen((v) => !v);
+      } else if (event.key === "Home") {
+        event.preventDefault();
+        if (navigableIndices.length) goToIndex(navigableIndices[0]!);
+      } else if (event.key === "End") {
+        event.preventDefault();
+        if (navigableIndices.length) goToIndex(navigableIndices[navigableIndices.length - 1]!);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [fullscreen, goNext, goPrev]);
+  }, [fullscreen, goNext, goPrev, goToIndex, keyboardHelpOpen, navigableIndices]);
 
   const toggleBrowserFullscreen = useCallback(() => {
     setFullscreen(true);
@@ -297,6 +329,7 @@ export function SliderView({ items, transition, onEditPhoto, onOpenViewer, onFav
             fetchPriority="high"
             onClick={() => onEditPhoto(current)}
           />
+          <SliderMetadataStrip asset={current} positionLabel={positionLabel} />
           {visibleSuggestion ? (
             <div className="slider-smart-nav" role="status" aria-live="polite">
               <button
@@ -325,6 +358,13 @@ export function SliderView({ items, transition, onEditPhoto, onOpenViewer, onFav
             </div>
           ) : null}
         </div>
+        <SliderTimeline
+          items={items}
+          orderedIndices={navigableIndices}
+          currentIndex={index}
+          onJumpToIndex={goToIndex}
+        />
+        <SliderFilmstrip items={items} orderedIndices={navigableIndices} currentIndex={index} onJumpToIndex={goToIndex} />
         {subsetActive ? (
           <p className="slider-view-subset-hint">
             Navegant una subsecció ({subsetIndices!.length} fotos).{" "}

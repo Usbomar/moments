@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { Asset } from "@/lib/types";
 import type { SliderTransition } from "@/lib/grid-library";
-import { BreadcrumbTemporal } from "@/components/BreadcrumbTemporal";
 import { SliderFilmstrip } from "@/components/SliderFilmstrip";
 import { SliderKeyboardHelp } from "@/components/SliderKeyboardHelp";
 import { SliderMetadataStrip } from "@/components/SliderMetadataStrip";
@@ -227,21 +226,6 @@ export function SliderView({ items, transition, onEditPhoto, onOpenViewer, onFav
     [applySubset, dismissSuggestion, index, items]
   );
 
-  const handleBreadcrumbJump = useCallback(
-    (targetIndex: number) => {
-      clearSubset();
-      goToIndex(targetIndex);
-    },
-    [clearSubset, goToIndex]
-  );
-
-  const handleBreadcrumbSubset = useCallback(
-    (indices: number[]) => {
-      applySubset(indices);
-    },
-    [applySubset]
-  );
-
   useEffect(() => {
     if (!playing || !items.length) return;
     const timer = window.setInterval(() => {
@@ -332,20 +316,13 @@ export function SliderView({ items, transition, onEditPhoto, onOpenViewer, onFav
             style={{ "--slider-accent-color": accentColor ?? "transparent" } as CSSProperties}
             aria-hidden
           />
-          <BreadcrumbTemporal
-            asset={current}
-            items={items}
-            currentIndex={index}
-            onJumpToIndex={handleBreadcrumbJump}
-            onNavigateToIndices={handleBreadcrumbSubset}
-          />
           <SliderKeyboardHelp open={keyboardHelpOpen} onToggle={() => setKeyboardHelpOpen((v) => !v)} />
           <SliderMiniMap items={items} highlightIndices={navigableIndices} currentIndex={index} />
           <SliderNavChips
             asset={current}
             items={items}
             subsetActive={subsetActive}
-            onNavigateToIndices={handleBreadcrumbSubset}
+            onNavigateToIndices={applySubset}
             onClearSubset={clearSubset}
           />
           {previous && previousSrc ? (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { Asset } from "@/lib/types";
 import type { SliderTransition } from "@/lib/grid-library";
 import { BreadcrumbTemporal } from "@/components/BreadcrumbTemporal";
@@ -11,6 +11,7 @@ import { SliderMiniMap } from "@/components/SliderMiniMap";
 import { SliderNavChips } from "@/components/SliderNavChips";
 import { SliderTimeline } from "@/components/SliderTimeline";
 import { ViewerFavoriteButton } from "@/components/ViewerFavoriteButton";
+import { resolveAssetColorHex } from "@/lib/color-utils";
 import {
   getAssetDate,
   getConsecutiveNearbyRun,
@@ -68,6 +69,16 @@ export function SliderView({ items, transition, onEditPhoto, onOpenViewer, onFav
     if (pos < 0 || n < 1) return "";
     return `${pos + 1} / ${n}`;
   }, [index, navigableIndices]);
+
+  const accentColor = useMemo(() => (current ? resolveAssetColorHex(current) : null), [current]);
+
+  /** Parallax per capes (fons desenfocat + primer pla) en mode immersiu amb proporció «normal». */
+  const useKenBurnsParallax = useMemo(() => {
+    if (!fullscreen || !current) return false;
+    if (!current.width || !current.height) return true;
+    const ratio = current.height / current.width;
+    return ratio > 0.45 && ratio < 2.2;
+  }, [current, fullscreen]);
 
   useEffect(() => {
     if (itemsKeyRef.current === itemsKey) return;
@@ -285,25 +296,49 @@ export function SliderView({ items, transition, onEditPhoto, onOpenViewer, onFav
   const previousSrc = previous ? (previous.files.mediumUrl || previous.files.previewUrl || previous.files.originalUrl).trim() : "";
 
   const subsetActive = subsetIndices != null && subsetIndices.length > 0;
+  const immersive = fullscreen;
+  const mediaBoxClass = [
+    `slider-view-media-box slider-view-media-box--transition-${transition}`,
+    immersive ? "slider-view-media-box--immersive" : ""
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const kenBurnsClass = ["slider-ken-burns", useKenBurnsParallax ? "slider-ken-burns--parallax" : ""].filter(Boolean).join(" ");
 
   return (
     <section
       ref={sectionRef}
-      className={fullscreen ? "viewer" : "view-panel"}
+      className={immersive ? "viewer slider-view--immersive" : "view-panel"}
       onClick={() => setFullscreen(false)}
     >
       <div
-        className={`slider-view-stack ${fullscreen ? "viewer-inner" : ""}`}
+        className={`slider-view-stack ${immersive ? "viewer-inner slider-view-stack--immersive" : ""}`}
         onClick={(e) => e.stopPropagation()}
         style={{ transition: "opacity 260ms ease, transform 260ms ease" }}
       >
-        <div className={`slider-view-media-box slider-view-media-box--transition-${transition}`}>
+        {immersive ? <div className="slider-fullscreen-hover-zone" aria-hidden /> : null}
+        <div className={mediaBoxClass}>
+          <div
+            key={`accent-${current.id}`}
+            className={`slider-color-bar${accentColor ? "" : " slider-color-bar--empty"}`}
+            style={{ "--slider-accent-color": accentColor ?? "transparent" } as CSSProperties}
+            aria-hidden
+          />
           <BreadcrumbTemporal
             asset={current}
             items={items}
             currentIndex={index}
             onJumpToIndex={handleBreadcrumbJump}
             onNavigateToIndices={handleBreadcrumbSubset}
+          />
+          <SliderKeyboardHelp open={keyboardHelpOpen} onToggle={() => setKeyboardHelpOpen((v) => !v)} />
+          <SliderMiniMap items={items} highlightIndices={navigableIndices} currentIndex={index} />
+          <SliderNavChips
+            asset={current}
+            items={items}
+            subsetActive={subsetActive}
+            onNavigateToIndices={handleBreadcrumbSubset}
+            onClearSubset={clearSubset}
           />
           {previous && previousSrc ? (
             // eslint-disable-next-line @next/next/no-img-element -- URL signades / emmagatzematge
@@ -317,18 +352,26 @@ export function SliderView({ items, transition, onEditPhoto, onOpenViewer, onFav
               decoding="async"
             />
           ) : null}
-          {/* eslint-disable-next-line @next/next/no-img-element -- URL signades / emmagatzematge */}
-          <img
-            key={`current-${current.id}`}
-            className={`viewer-media slider-view-media slider-view-media--current slider-view-media--current-${transition}`}
-            src={currentSrc}
-            alt={current.title}
-            referrerPolicy="no-referrer"
-            loading="eager"
-            decoding="async"
-            fetchPriority="high"
-            onClick={() => onEditPhoto(current)}
-          />
+          <div key={`kenburns-${current.id}`} className={kenBurnsClass}>
+            {useKenBurnsParallax && currentSrc ? (
+              <div
+                className="slider-ken-burns__bg"
+                style={{ backgroundImage: `url("${currentSrc}")` }}
+                aria-hidden
+              />
+            ) : null}
+            {/* eslint-disable-next-line @next/next/no-img-element -- URL signades / emmagatzematge */}
+            <img
+              className={`viewer-media slider-view-media slider-view-media--current slider-ken-burns__fg slider-view-media--current-${transition}`}
+              src={currentSrc}
+              alt={current.title}
+              referrerPolicy="no-referrer"
+              loading="eager"
+              decoding="async"
+              fetchPriority="high"
+              onClick={() => onEditPhoto(current)}
+            />
+          </div>
           <SliderMetadataStrip asset={current} positionLabel={positionLabel} />
           {visibleSuggestion ? (
             <div className="slider-smart-nav" role="status" aria-live="polite">
@@ -373,7 +416,11 @@ export function SliderView({ items, transition, onEditPhoto, onOpenViewer, onFav
             </button>
           </p>
         ) : null}
-        <div className={toolbarClass} role="toolbar" aria-label="Controls del slider">
+        <div
+          className={`slider-view-toolbar-slot${immersive ? " slider-fullscreen-toolbar-hide" : ""} ${toolbarClass}`}
+          role="toolbar"
+          aria-label="Controls del slider"
+        >
           <button type="button" className={btnClass} onClick={goPrev}>
             Anterior
           </button>

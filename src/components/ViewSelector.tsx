@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-export type GalleryView = "masonry" | "timeline" | "colors" | "collections" | "slider";
+export type GalleryView = "masonry" | "colors" | "collections" | "slider";
 
 interface Props {
   value: GalleryView;
@@ -13,9 +13,10 @@ interface Props {
 
 const STORAGE_KEY = "moments-view-preference";
 
+const VALID_VIEWS: GalleryView[] = ["masonry", "colors", "collections", "slider"];
+
 const OPTIONS: Array<{ id: GalleryView; label: string; icon: string }> = [
   { id: "masonry", label: "Quadrícula", icon: "▦" },
-  { id: "timeline", label: "Data", icon: "🗓" },
   { id: "collections", label: "Col·leccions", icon: "▤" },
   { id: "colors", label: "Colors", icon: "⬤" },
   { id: "slider", label: "Presentació", icon: "▶" }
@@ -28,9 +29,13 @@ export function ViewSelector({ value, onChange, variant = "default" }: Props) {
   useEffect(() => {
     if (hydratedRef.current) return;
     hydratedRef.current = true;
-    const stored = window.localStorage.getItem(STORAGE_KEY) as GalleryView | null;
-    if (stored && OPTIONS.some((item) => item.id === stored) && stored !== value) {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const stored = raw === "timeline" ? "masonry" : (raw as GalleryView | null);
+    if (stored && VALID_VIEWS.includes(stored) && stored !== value) {
       onChange(stored);
+    }
+    if (raw === "timeline") {
+      window.localStorage.setItem(STORAGE_KEY, "masonry");
     }
   }, [onChange, value]);
 

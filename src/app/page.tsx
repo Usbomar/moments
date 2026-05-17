@@ -70,10 +70,6 @@ const Analytics = dynamic(() => import("@/components/Analytics").then((mod) => m
   loading: () => <TabLoadingHint label="analítiques" />
 });
 
-const TimelineView = dynamic(() => import("@/components/timeline-view").then((mod) => mod.TimelineView), {
-  loading: () => <TabLoadingHint label="cronologia" />
-});
-
 const PhotoModal = dynamic(() => import("@/components/PhotoModal").then((mod) => mod.PhotoModal), {
   loading: () => <TabLoadingHint label="editor de foto" />
 });
@@ -646,19 +642,6 @@ function HomeContent() {
               ) : null}
               <ViewErrorBoundary label="Biblioteca">
                 <div style={{ marginTop: 16 }}>
-                  {view === "timeline" ? (
-                    <TimelineView
-                      items={viewItems}
-                      distribution={gridDistribution}
-                      tileMinPx={tileMinPx}
-                      imageHoverPercent={tileImageHoverPercent}
-                      tileHoverFrameScalePercent={tileHoverFrameScalePercent}
-                      tileHoverLiftPx={tileHoverLiftPx}
-                      tileHoverShadowPct={tileHoverShadowPct}
-                      onOpenModal={(asset) => setSelectedAsset(asset)}
-                      onOpenViewer={openViewer}
-                    />
-                  ) : null}
                   {view === "masonry" ? (
                     <LibraryGrid
                       items={gridCatalogItems}

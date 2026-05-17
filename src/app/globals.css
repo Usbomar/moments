@@ -1616,10 +1616,6 @@ button.active {
   max-width: 520px;
 }
 
-.timeline-group {
-  margin-bottom: 22px;
-}
-
 .dropzone {
   border: 1px dashed var(--border-dark);
   border-radius: 0;

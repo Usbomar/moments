@@ -16,6 +16,7 @@ import { ColorSelect } from "@/components/admin/ColorSelect";
 import { buildColorOptionsFromPalette, type StoredPalette } from "@/lib/admin-color-palette";
 import { hexEquals, normalizeHex, resolveAssetColorHex } from "@/lib/color-utils";
 import {
+  ADMIN_ANALYTICS_TAB,
   DEFAULT_PHOTO_COLUMNS,
   DEFAULT_TAB_ORDER,
   normalizePhotoColumnOrder,
@@ -26,11 +27,15 @@ import {
   STORAGE_PHOTO_COLS,
   STORAGE_TAB_ORDER,
   loadStoredTabOrder,
+  type AdminPanelTab,
   type AdminTabId,
   type PhotoColumnKey
 } from "@/components/admin/adminDnD";
+import { Analytics } from "@/components/Analytics";
 
 export const ADMIN_UI_BUILD = "20260516b";
+
+const ADMIN_ANALYTICS_ICON = "📊";
 
 const TAB_LABELS: Record<AdminTabId, string> = {
   photos: "Fotos",
@@ -136,7 +141,7 @@ export function AdminAssetManager({
   colorPalette,
   onColorPaletteChange
 }: Props) {
-  const [activeTab, setActiveTab] = useState<AdminTabId>("photos");
+  const [activeTab, setActiveTab] = useState<AdminPanelTab>("photos");
   const [sort, setSort] = useState<SortState[]>([{ key: "takenAt", dir: "desc" }]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(100);
@@ -1027,9 +1032,16 @@ export function AdminAssetManager({
     <div className="modal-overlay modal-overlay--front admin-assets-overlay" role="dialog" aria-modal="true" aria-label="Configuració de la biblioteca" data-admin-ui-build={ADMIN_UI_BUILD} onClick={onClose}>
       <div className="modal-content admin-assets-modal admin-assets-modal--fullscreen" onClick={(e) => e.stopPropagation()}>
         <header className="admin-assets-head">
-          <h2>{activeTab === "collections" ? "Col·leccions — Apartats / Cançons" : "Configuració"}</h2>
+          <h2>
+            {activeTab === ADMIN_ANALYTICS_TAB
+              ? "Analítiques"
+              : activeTab === "collections"
+                ? "Col·leccions — Apartats / Cançons"
+                : "Configuració"}
+          </h2>
           <div className="admin-assets-head-actions">
             <div className="admin-tabs" role="tablist" aria-label="Pestanyes de configuració">
+              <div className="admin-tabs__reorderable">
               {tabOrder.map((tabId) => (
                 <div key={tabId} className="admin-tab-item" onDragOver={onTabDragOver} onDrop={onTabDrop(tabId)}>
                   <span
@@ -1046,6 +1058,20 @@ export function AdminAssetManager({
                   </button>
                 </div>
               ))}
+              </div>
+              <div className="admin-tab-item admin-tab-item--pinned">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === ADMIN_ANALYTICS_TAB}
+                  className={`admin-tab-btn--icon${activeTab === ADMIN_ANALYTICS_TAB ? " is-active" : ""}`}
+                  aria-label="Analítiques"
+                  title="Analítiques"
+                  onClick={() => setActiveTab(ADMIN_ANALYTICS_TAB)}
+                >
+                  <span aria-hidden>{ADMIN_ANALYTICS_ICON}</span>
+                </button>
+              </div>
             </div>
           </div>
           <button type="button" className="btn btn-ghost btn-sm" onClick={onClose} aria-label="Tancar">
@@ -1747,6 +1773,12 @@ export function AdminAssetManager({
               onClearPhotosWithHex={clearPhotosWithHex}
               onMigratePhotosHex={migratePhotosHex}
             />
+          </div>
+        ) : null}
+
+        {activeTab === ADMIN_ANALYTICS_TAB ? (
+          <div className="admin-tab-panel admin-tab-panel--analytics">
+            <Analytics items={assets} />
           </div>
         ) : null}
       </div>

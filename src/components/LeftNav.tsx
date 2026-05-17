@@ -3,14 +3,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 
-export type MainNavTab = "library" | "map" | "collections" | "memories" | "analytics";
+export type MainNavTab = "library" | "map" | "collections" | "memories";
 
 const ITEMS: Array<{ id: MainNavTab; label: string; icon: string }> = [
   { id: "library", label: "Biblioteca", icon: "📸" },
   { id: "map", label: "Mapa", icon: "🗺" },
   { id: "collections", label: "Col·leccions", icon: "📁" },
-  { id: "memories", label: "Records", icon: "💭" },
-  { id: "analytics", label: "Analítiques", icon: "📊" }
+  { id: "memories", label: "Records", icon: "💭" }
 ];
 
 type Props = {

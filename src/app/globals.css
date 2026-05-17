@@ -3361,8 +3361,19 @@ button.danger {
 
 .admin-tabs {
   display: flex;
+  align-items: stretch;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-tabs__reorderable {
+  display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   align-items: stretch;
+  flex: 1;
+  min-width: 0;
 }
 
 .admin-tab-item {
@@ -3370,6 +3381,11 @@ button.danger {
   align-items: stretch;
   border: 1px solid var(--border);
   background: var(--bg-primary);
+}
+
+.admin-tab-item--pinned {
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .admin-tab-grip {
@@ -3396,13 +3412,33 @@ button.danger {
   letter-spacing: 0.02em;
 }
 
-.admin-tabs .admin-tab-item button.is-active {
+.admin-tabs .admin-tab-item button.is-active,
+.admin-tabs .admin-tab-item .admin-tab-btn--icon.is-active {
   background: color-mix(in srgb, var(--accent-light) 65%, var(--bg-primary));
   color: var(--accent);
 }
 
-.admin-tabs .admin-tab-item:has(button.is-active) {
+.admin-tabs .admin-tab-item:has(button.is-active),
+.admin-tabs .admin-tab-item--pinned:has(.admin-tab-btn--icon.is-active) {
   border-color: var(--accent);
+}
+
+.admin-tab-item--pinned .admin-tab-btn--icon {
+  border: none;
+  background: transparent;
+  padding: 8px 12px;
+  min-width: 44px;
+  font-size: 18px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.admin-tab-panel--analytics {
+  padding: 4px 2px 16px;
+  overflow: auto;
 }
 
 .admin-assets-subhead {

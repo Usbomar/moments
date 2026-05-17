@@ -61,7 +61,12 @@ export function reorderPhotoColumns(order: PhotoColumnKey[], dragKey: PhotoColum
   return next;
 }
 
+/** Pestanyes reordenables (drag) dins Configuració. «analytics» és fixa al final del menú. */
 export type AdminTabId = "photos" | "libraryGrid" | "guest" | "collections" | "tags" | "locations" | "colors";
+
+export type AdminPanelTab = AdminTabId | "analytics";
+
+export const ADMIN_ANALYTICS_TAB: AdminPanelTab = "analytics";
 
 /** Ordre antic (v1 localStorage): es substitueix pel nou per defecte si l’usuari no havia reordenat pestanyes. */
 export const LEGACY_DEFAULT_TAB_ORDER: AdminTabId[] = [

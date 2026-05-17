@@ -66,10 +66,6 @@ const Memories = dynamic(() => import("@/components/Memories").then((mod) => mod
   loading: () => <TabLoadingHint label="records" />
 });
 
-const Analytics = dynamic(() => import("@/components/Analytics").then((mod) => mod.Analytics), {
-  loading: () => <TabLoadingHint label="analítiques" />
-});
-
 const PhotoModal = dynamic(() => import("@/components/PhotoModal").then((mod) => mod.PhotoModal), {
   loading: () => <TabLoadingHint label="editor de foto" />
 });
@@ -725,11 +721,6 @@ function HomeContent() {
           {mainTab === "memories" ? (
             <ViewErrorBoundary label="Records">
               <Memories items={library} onView={onMemoryView} />
-            </ViewErrorBoundary>
-          ) : null}
-          {mainTab === "analytics" ? (
-            <ViewErrorBoundary label="Analítiques">
-              <Analytics items={library} />
             </ViewErrorBoundary>
           ) : null}
         </div>

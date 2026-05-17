@@ -305,10 +305,15 @@ export function SliderView({ items, transition, onEditPhoto, onOpenViewer, onFav
       onClick={overlayMode ? () => setOverlayMode(false) : undefined}
     >
       <div
-        className={`slider-view-stack ${overlayMode ? "viewer-inner" : ""} slider-view-stack--immersive`}
+        className={`slider-view-stack${overlayMode ? " viewer-inner slider-view-stack--immersive" : ""}`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="slider-fullscreen-hover-zone" aria-hidden />
+        {overlayMode ? (
+          <>
+            <div className="slider-fullscreen-hover-zone slider-fullscreen-hover-zone--top" aria-hidden />
+            <div className="slider-fullscreen-hover-zone slider-fullscreen-hover-zone--bottom" aria-hidden />
+          </>
+        ) : null}
         <div className={mediaBoxClass}>
           <div
             key={`accent-${current.id}`}
@@ -404,7 +409,7 @@ export function SliderView({ items, transition, onEditPhoto, onOpenViewer, onFav
         />
         <SliderFilmstrip items={items} orderedIndices={navigableIndices} currentIndex={index} onJumpToIndex={goToIndex} />
         <div
-          className={`slider-view-toolbar-slot slider-fullscreen-toolbar-hide ${toolbarClass}`}
+          className={`slider-view-toolbar-slot${overlayMode ? " slider-fullscreen-toolbar-hide" : ""} ${toolbarClass}`}
           role="toolbar"
           aria-label="Controls del slider"
         >

@@ -293,6 +293,27 @@ button.active {
   background: color-mix(in srgb, var(--bg-secondary) 35%, var(--bg-primary));
 }
 
+.slider-view-toolbar--embedded .viewer-toolbar-btn {
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.slider-view-toolbar--embedded .viewer-toolbar-btn:hover:not(:disabled) {
+  background: var(--bg-secondary);
+  border-color: var(--border-dark);
+}
+
+.slider-view-toolbar--embedded .slider-view-speed--fs {
+  color: var(--text-secondary);
+}
+
+.slider-view-toolbar--embedded .slider-view-speed--fs select {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border-color: var(--border);
+}
+
 .slider-view-media-box {
   width: 100%;
   flex: 0 0 auto;
@@ -311,24 +332,32 @@ button.active {
 
 .slider-fullscreen-hover-zone {
   position: absolute;
-  top: 0;
   left: 0;
   right: 0;
-  height: 10px;
   z-index: 25;
+  pointer-events: auto;
+}
+
+.slider-fullscreen-hover-zone--top {
+  top: 0;
+  height: 12px;
+}
+
+.slider-fullscreen-hover-zone--bottom {
+  bottom: 0;
+  height: 72px;
 }
 
 .slider-fullscreen-toolbar-hide {
   opacity: 0;
-  pointer-events: none;
   transition: opacity 0.3s ease 2s;
 }
 
-.slider-view-stack--immersive:has(.slider-fullscreen-hover-zone:hover) .slider-fullscreen-toolbar-hide,
+.slider-view-stack--immersive:has(.slider-fullscreen-hover-zone--top:hover) .slider-fullscreen-toolbar-hide,
+.slider-view-stack--immersive:has(.slider-fullscreen-hover-zone--bottom:hover) .slider-fullscreen-toolbar-hide,
 .slider-view-stack--immersive:has(.slider-view-toolbar-slot:hover) .slider-fullscreen-toolbar-hide,
 .slider-view-stack--immersive:has(.slider-view-toolbar-slot:focus-within) .slider-fullscreen-toolbar-hide {
   opacity: 1;
-  pointer-events: auto;
   transition: opacity 0.3s ease 0s;
 }
 

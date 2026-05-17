@@ -8,7 +8,7 @@ import { FadingSlideshow } from "@/components/FadingSlideshow";
 import type { MainNavTab } from "@/components/LeftNav";
 import type { Asset } from "@/lib/types";
 import { UploadDropzone } from "@/components/upload-dropzone";
-import { type GalleryView } from "@/components/ViewSelector";
+import { GALLERY_VIEW_STORAGE_KEY, readGalleryViewPreference, type GalleryView } from "@/components/ViewSelector";
 import { FilterProvider, useFilters } from "@/context/FilterContext";
 import { ViewErrorBoundary } from "@/components/ViewErrorBoundary";
 import { clearCache } from "@/lib/cache";
@@ -103,6 +103,20 @@ function HomeContent() {
   const { filters } = useFilters();
   const searchRef = useRef<HTMLInputElement>(null);
   const [view, setView] = useState<GalleryView>("masonry");
+  const viewPreferenceHydratedRef = useRef(false);
+
+  useEffect(() => {
+    if (!viewPreferenceHydratedRef.current) {
+      viewPreferenceHydratedRef.current = true;
+      setView(readGalleryViewPreference());
+      return;
+    }
+    try {
+      window.localStorage.setItem(GALLERY_VIEW_STORAGE_KEY, view);
+    } catch {
+      /* ignore */
+    }
+  }, [view]);
   const [gridDistribution, setGridDistribution] = useState<GridDistribution>("uniform");
   const [tileMinPx, setTileMinPx] = useState(() => GRID_DENSITY_PRESET_TILE_MIN.balanced);
   const [tileImageHoverPercent, setTileImageHoverPercent] = useState(100);
@@ -658,6 +672,7 @@ function HomeContent() {
                       maxOpen={5}
                       onOpenModal={(asset) => setSelectedAsset(asset)}
                       onOpenViewer={openViewer}
+                      onPlaySlideshow={onCollectionSlideshow}
                     />
                   ) : null}
                   {view === "slider" ? (

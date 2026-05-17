@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { Asset } from "@/lib/types";
 import type { AppCollection } from "@/lib/collections";
+import type { CollectionMusicTrack } from "@/lib/collection-music";
 import { LazyImage } from "@/components/LazyImage";
 
 type Props = {
@@ -11,9 +12,10 @@ type Props = {
   maxOpen: number;
   onOpenModal: (asset: Asset) => void;
   onOpenViewer: (asset: Asset, contextItems: Asset[]) => void;
+  onPlaySlideshow?: (assets: Asset[], musicTrack: CollectionMusicTrack | null) => void;
 };
 
-export function CollectionMosaicView({ items, collections, maxOpen, onOpenModal, onOpenViewer }: Props) {
+export function CollectionMosaicView({ items, collections, maxOpen, onOpenModal, onOpenViewer, onPlaySlideshow }: Props) {
   const [openIds, setOpenIds] = useState<string[]>([]);
   const byId = useMemo(() => {
     const map = new Map<string, Asset>();
@@ -38,10 +40,23 @@ export function CollectionMosaicView({ items, collections, maxOpen, onOpenModal,
         const coverUrl = (cover?.files.previewUrl || cover?.files.thumbUrl || cover?.files.originalUrl || "").trim();
         return (
           <section key={collection.id} className="collection-mosaic-section">
-            <button type="button" className="collection-mosaic-header" onClick={() => toggleOpen(collection.id)}>
-              <span>{collection.name}</span>
-              <small>{collection.musicTrack ? `♪ ${collection.musicTrack.title}` : `${assets.length} fotos`}</small>
-            </button>
+            <div className="collection-mosaic-section-head">
+              <button type="button" className="collection-mosaic-header" onClick={() => toggleOpen(collection.id)}>
+                <span>{collection.name}</span>
+                <small>{collection.musicTrack ? `♪ ${collection.musicTrack.title}` : `${assets.length} fotos`}</small>
+              </button>
+              {onPlaySlideshow ? (
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm collection-mosaic-present-btn"
+                  aria-label={`Presentació: ${collection.name}`}
+                  disabled={assets.length === 0}
+                  onClick={() => onPlaySlideshow(assets, collection.musicTrack ?? null)}
+                >
+                  <span aria-hidden>▶</span> Presentació
+                </button>
+              ) : null}
+            </div>
             {open ? (
               <div className="collection-mosaic-grid">
                 {assets.map((asset, index) => {
@@ -74,4 +89,3 @@ export function CollectionMosaicView({ items, collections, maxOpen, onOpenModal,
     </div>
   );
 }
-

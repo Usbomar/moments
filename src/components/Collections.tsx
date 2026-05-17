@@ -101,6 +101,16 @@ export function Collections({ items, onPlaySlideshow }: Props) {
     setDeleteId(id);
   }, []);
 
+  const playSlideshow = useCallback(
+    (e: MouseEvent, assets: Asset[], musicTrack: CollectionMusicTrack | null) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!assets.length) return;
+      onPlaySlideshow?.(assets, musicTrack);
+    },
+    [onPlaySlideshow]
+  );
+
   return (
     <div className="collections-root">
       <div className="collections-toolbar">
@@ -128,16 +138,16 @@ export function Collections({ items, onPlaySlideshow }: Props) {
               <p className="modal-muted">{visibleAssets.length} foto(s)</p>
               {activeCollection.musicTrack ? <p className="collection-music-label">♪ {activeCollection.musicTrack.title}</p> : null}
             </div>
-            <button
-              type="button"
-              className="btn btn-icon btn-sm"
-              aria-label="Presentació només d’aquesta col·lecció"
-              title="Presentació"
-              disabled={!visibleAssets.length}
-              onClick={() => onPlaySlideshow?.(visibleAssets, activeCollection.musicTrack)}
-            >
-              <span aria-hidden>▶</span>
-            </button>
+            {onPlaySlideshow ? (
+              <button
+                type="button"
+                className="btn btn-primary btn-sm collections-present-btn"
+                disabled={!visibleAssets.length}
+                onClick={(e) => playSlideshow(e, visibleAssets, activeCollection.musicTrack)}
+              >
+                <span aria-hidden>▶</span> Presentació
+              </button>
+            ) : null}
           </div>
           {visibleAssets.length ? (
             <div className="collections-grid">
@@ -245,17 +255,12 @@ export function Collections({ items, onPlaySlideshow }: Props) {
                       {onPlaySlideshow ? (
                         <button
                           type="button"
-                          className="btn btn-icon btn-sm"
+                          className="btn btn-primary btn-sm collections-present-btn"
                           aria-label={`Presentació: ${c.name}`}
-                          title="Presentació d’aquesta col·lecció"
                           disabled={slideAssets.length === 0}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            onPlaySlideshow(slideAssets, c.musicTrack);
-                          }}
+                          onClick={(e) => playSlideshow(e, slideAssets, c.musicTrack)}
                         >
-                          <span aria-hidden>▶</span>
+                          <span aria-hidden>▶</span> Presentació
                         </button>
                       ) : null}
                       <span className="collection-card-bar-fill" aria-hidden />

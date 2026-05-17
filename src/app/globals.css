@@ -4686,16 +4686,35 @@ button.danger {
   background: var(--bg-primary);
 }
 
+.collection-mosaic-section-head {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+}
+
 .collection-mosaic-header {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
   border: none;
-  border-bottom: 1px solid var(--border);
+  border-bottom: none;
   background: color-mix(in srgb, var(--bg-secondary) 90%, var(--bg-primary));
   padding: 10px 12px;
   cursor: pointer;
+}
+
+.collection-mosaic-present-btn {
+  flex-shrink: 0;
+  align-self: center;
+  margin: 6px 10px 6px 0;
+  white-space: nowrap;
+}
+
+.collections-present-btn {
+  white-space: nowrap;
 }
 
 .collection-mosaic-grid {

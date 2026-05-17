@@ -316,15 +316,20 @@ export function SliderView({ items, transition, onEditPhoto, onOpenViewer, onFav
             style={{ "--slider-accent-color": accentColor ?? "transparent" } as CSSProperties}
             aria-hidden
           />
-          <SliderKeyboardHelp open={keyboardHelpOpen} onToggle={() => setKeyboardHelpOpen((v) => !v)} />
+          <div className="slider-view-top-bar">
+            <SliderNavChips
+              asset={current}
+              items={items}
+              subsetActive={subsetActive}
+              onNavigateToIndices={applySubset}
+              onClearSubset={clearSubset}
+              positionLabel={positionLabel}
+            />
+            <div className="slider-view-top-bar__actions">
+              <SliderKeyboardHelp open={keyboardHelpOpen} onToggle={() => setKeyboardHelpOpen((v) => !v)} />
+            </div>
+          </div>
           <SliderMiniMap items={items} highlightIndices={navigableIndices} currentIndex={index} />
-          <SliderNavChips
-            asset={current}
-            items={items}
-            subsetActive={subsetActive}
-            onNavigateToIndices={applySubset}
-            onClearSubset={clearSubset}
-          />
           {previous && previousSrc ? (
             // eslint-disable-next-line @next/next/no-img-element -- URL signades / emmagatzematge
             <img

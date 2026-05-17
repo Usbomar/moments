@@ -703,58 +703,103 @@ button.active {
   color: #e8ecf2;
 }
 
-.slider-nav-chips {
+.slider-view-top-bar {
   position: absolute;
-  top: 48px;
+  top: 10px;
   left: 12px;
-  z-index: 4;
+  right: 12px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 44px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, #fff 22%, transparent);
+  background: color-mix(in srgb, var(--panel, #12151c) 88%, transparent);
+  backdrop-filter: blur(10px);
+  box-shadow:
+    0 2px 14px color-mix(in srgb, #000 38%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent);
+  pointer-events: none;
+}
+
+.slider-view-top-bar__actions {
+  position: relative;
+  flex-shrink: 0;
+  pointer-events: auto;
+}
+
+.slider-nav-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  max-width: min(70%, 360px);
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  pointer-events: auto;
+}
+
+.slider-nav-chips__pos {
+  flex-shrink: 0;
+  padding: 2px 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0.02em;
+  text-shadow: 0 1px 3px color-mix(in srgb, #000 55%, transparent);
 }
 
 .slider-nav-chips__btn {
-  border: 1px solid color-mix(in srgb, #fff 28%, transparent);
+  border: 1px solid color-mix(in srgb, #fff 38%, transparent);
   border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 11px;
-  font-weight: 600;
-  background: color-mix(in srgb, var(--panel, #1a1d24) 78%, transparent);
-  color: #f0f3f8;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 650;
+  background: color-mix(in srgb, #000 32%, var(--panel, #1a1d24));
+  color: #f5f7fa;
   cursor: pointer;
-  backdrop-filter: blur(4px);
+  box-shadow: 0 1px 4px color-mix(in srgb, #000 25%, transparent);
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    color 140ms ease;
 }
 
 .slider-nav-chips__btn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent, #6b9fff) 75%, #fff);
+  background: color-mix(in srgb, var(--accent, #6b9fff) 22%, #1a1d24);
+  color: #fff;
 }
 
 .slider-nav-chips__btn--clear {
   border-style: dashed;
+  color: color-mix(in srgb, #f0f3f8 92%, var(--accent, #6b9fff));
 }
 
 .slider-keyboard-help__toggle {
-  position: absolute;
-  top: 10px;
-  right: 12px;
-  z-index: 5;
-  width: 28px;
-  height: 28px;
-  border: 1px solid color-mix(in srgb, #fff 30%, transparent);
+  width: 32px;
+  height: 32px;
+  border: 1px solid color-mix(in srgb, #fff 38%, transparent);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--panel, #1a1d24) 75%, transparent);
-  color: #f0f3f8;
-  font-size: 14px;
+  background: color-mix(in srgb, #000 28%, var(--panel, #1a1d24));
+  color: #fff;
+  font-size: 15px;
   font-weight: 700;
   cursor: pointer;
+  box-shadow: 0 1px 4px color-mix(in srgb, #000 25%, transparent);
+}
+
+.slider-keyboard-help__toggle:hover {
+  border-color: var(--accent, #6b9fff);
+  background: color-mix(in srgb, var(--accent, #6b9fff) 25%, #1a1d24);
 }
 
 .slider-keyboard-help__panel {
   position: absolute;
-  top: 44px;
-  right: 12px;
+  top: calc(100% + 8px);
+  right: 0;
   z-index: 6;
   min-width: 220px;
   padding: 10px 12px;
@@ -809,11 +854,16 @@ button.active {
     height: 72px;
   }
 
-  .slider-nav-chips {
-    top: auto;
-    bottom: 56px;
+  .slider-view-top-bar {
     left: 8px;
-    max-width: calc(100% - 16px);
+    right: 8px;
+    padding: 6px 8px;
+    min-height: 40px;
+  }
+
+  .slider-nav-chips__btn {
+    padding: 5px 10px;
+    font-size: 11px;
   }
 
   .slider-filmstrip__item {

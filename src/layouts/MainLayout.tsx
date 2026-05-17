@@ -22,6 +22,7 @@ type Props = {
   libraryGridOptionsSlot?: ReactNode;
   /** Mode presentació: la barra superior s’amaga i es mostra amb mouseover al marge superior. */
   topBarRetractable?: boolean;
+  presentationMode?: boolean;
 };
 
 export function MainLayout({
@@ -34,7 +35,8 @@ export function MainLayout({
   libraryUploadSlot,
   libraryGridOptionsSlot,
   onAdminClick,
-  topBarRetractable = false
+  topBarRetractable = false,
+  presentationMode = false
 }: Props) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
@@ -82,6 +84,7 @@ export function MainLayout({
         libraryUploadSlot={activeNav === "library" ? libraryUploadSlot : null}
         onMenuClick={openMobileDrawer}
         onAdminClick={onAdminClick}
+        presentationMode={presentationMode}
     />
   );
 

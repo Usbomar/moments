@@ -9,9 +9,9 @@ type Props = {
   libraryView: GalleryView;
   onLibraryViewChange: (view: GalleryView) => void;
   showLibraryViewSelector: boolean;
-  /** Només vista Quadrícula: popover minimalista d’opcions de graella. */
   libraryGridOptionsSlot?: ReactNode;
   libraryUploadSlot?: ReactNode;
+  presentationMode?: boolean;
   onMenuClick: () => void;
   onAdminClick: () => void;
 };
@@ -23,6 +23,7 @@ export function TopBar({
   showLibraryViewSelector,
   libraryGridOptionsSlot,
   libraryUploadSlot,
+  presentationMode = false,
   onMenuClick,
   onAdminClick
 }: Props) {
@@ -36,13 +37,14 @@ export function TopBar({
   );
 
   useEffect(() => {
+    if (presentationMode) return;
     const el = searchInputRef.current;
     if (!el) return;
     el.value = filters.searchQuery;
-  }, [filters.searchQuery, searchInputRef]);
+  }, [filters.searchQuery, presentationMode, searchInputRef]);
 
   return (
-    <header className="moments-topbar">
+    <header className={`moments-topbar${presentationMode ? " moments-topbar--presentation" : ""}`}>
       <div className="moments-topbar-left">
         <button type="button" className="btn btn-ghost moments-menu-btn" aria-label="Obrir menú" onClick={onMenuClick}>
           ☰
@@ -56,49 +58,55 @@ export function TopBar({
         {showLibraryViewSelector ? (
           <div className="moments-view-toolbar">
             <ViewSelector variant="compact" value={libraryView} onChange={onLibraryViewChange} />
-            {libraryGridOptionsSlot}
+            {!presentationMode ? libraryGridOptionsSlot : null}
           </div>
         ) : null}
-        <label className="moments-search-label" htmlFor="global-search">
-          <span className="sr-only">Cerca</span>
-          <span aria-hidden className="moments-search-icon">
-            ⌕
-          </span>
-          <input
-            ref={searchInputRef}
-            id="global-search"
-            type="search"
-            className="moments-search-input"
-            placeholder="Cerca per títol, tags, descripció o ciutat…"
-            defaultValue={filters.searchQuery}
-            onChange={onSearchChange}
-            autoComplete="off"
-          />
-        </label>
-        <div className="moments-year-mini" aria-label="Filtre per anys">
-          <input
-            type="number"
-            min={2010}
-            max={filters.year[1]}
-            value={filters.year[0]}
-            onChange={(e) => setYear([Math.min(Number(e.target.value || 2010), filters.year[1]), filters.year[1]])}
-            aria-label="Any des de"
-          />
-          <span>—</span>
-          <input
-            type="number"
-            min={filters.year[0]}
-            max={new Date().getFullYear()}
-            value={filters.year[1]}
-            onChange={(e) =>
-              setYear([filters.year[0], Math.max(filters.year[0], Number(e.target.value || new Date().getFullYear()))])
-            }
-            aria-label="Any fins"
-          />
-        </div>
+        {!presentationMode ? (
+          <>
+            <label className="moments-search-label" htmlFor="global-search">
+              <span className="sr-only">Cerca</span>
+              <span aria-hidden className="moments-search-icon">
+                ⌕
+              </span>
+              <input
+                ref={searchInputRef}
+                id="global-search"
+                type="search"
+                className="moments-search-input"
+                placeholder="Cerca per títol, tags, descripció o ciutat…"
+                defaultValue={filters.searchQuery}
+                onChange={onSearchChange}
+                autoComplete="off"
+              />
+            </label>
+            <div className="moments-year-mini" aria-label="Filtre per anys">
+              <input
+                type="number"
+                min={2010}
+                max={filters.year[1]}
+                value={filters.year[0]}
+                onChange={(e) => setYear([Math.min(Number(e.target.value || 2010), filters.year[1]), filters.year[1]])}
+                aria-label="Any des de"
+              />
+              <span>—</span>
+              <input
+                type="number"
+                min={filters.year[0]}
+                max={new Date().getFullYear()}
+                value={filters.year[1]}
+                onChange={(e) =>
+                  setYear([filters.year[0], Math.max(filters.year[0], Number(e.target.value || new Date().getFullYear()))])
+                }
+                aria-label="Any fins"
+              />
+            </div>
+          </>
+        ) : null}
       </div>
       <div className="moments-topbar-right">
-        {libraryUploadSlot ? <div className="moments-topbar-toolbar moments-topbar-toolbar--actions">{libraryUploadSlot}</div> : null}
+        {!presentationMode && libraryUploadSlot ? (
+          <div className="moments-topbar-toolbar moments-topbar-toolbar--actions">{libraryUploadSlot}</div>
+        ) : null}
         <button type="button" className="btn btn-ghost moments-settings-btn" aria-label="Configuració" title="Configuració" onClick={onAdminClick}>
           <span className="moments-settings-btn-icon" aria-hidden>
             ⚙

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const DEFAULT_ROOT_MARGIN = "180px 0px";
 
@@ -16,36 +16,55 @@ export type UseLazyLoadOptions = {
  * Útil per diferir `src` d’imatges fins que calgui.
  */
 export function useLazyLoad<T extends Element>(options?: UseLazyLoadOptions): {
-  ref: RefObject<T | null>;
+  ref: (node: T | null) => void;
   isVisible: boolean;
 } {
-  const ref = useRef<T | null>(null);
+  const rootMargin = options?.rootMargin ?? DEFAULT_ROOT_MARGIN;
+  const threshold = options?.threshold ?? 0.01;
   const skip = !!options?.skip;
-  const [revealed, setRevealed] = useState(false);
+
+  const revealedRef = useRef(skip);
+  const [revealed, setRevealed] = useState(skip);
+  const observerRef = useRef<IntersectionObserver | null>(null);
+
+  const reveal = useCallback(() => {
+    if (revealedRef.current) return;
+    revealedRef.current = true;
+    setRevealed(true);
+  }, []);
 
   useEffect(() => {
-    if (skip) return;
-    const el = ref.current;
-    if (!el) return;
+    if (skip) reveal();
+  }, [skip, reveal]);
 
-    if (typeof IntersectionObserver === "undefined") {
-      queueMicrotask(() => setRevealed(true));
-      return;
-    }
+  const ref = useCallback(
+    (node: T | null) => {
+      observerRef.current?.disconnect();
+      observerRef.current = null;
 
-    const obs = new IntersectionObserver(
-      ([entry]) => {
-        if (entry?.isIntersecting) {
-          setRevealed(true);
+      if (!node || skip || revealedRef.current) return;
+
+      if (typeof IntersectionObserver === "undefined") {
+        reveal();
+        return;
+      }
+
+      const obs = new IntersectionObserver(
+        ([entry]) => {
+          if (!entry?.isIntersecting) return;
+          reveal();
           obs.disconnect();
-        }
-      },
-      { root: null, rootMargin: options?.rootMargin ?? DEFAULT_ROOT_MARGIN, threshold: options?.threshold ?? 0.01 }
-    );
+          if (observerRef.current === obs) observerRef.current = null;
+        },
+        { root: null, rootMargin, threshold }
+      );
+      observerRef.current = obs;
+      obs.observe(node);
+    },
+    [skip, rootMargin, threshold, reveal]
+  );
 
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [skip, options?.rootMargin, options?.threshold]);
+  useEffect(() => () => observerRef.current?.disconnect(), []);
 
-  return { ref, isVisible: skip || revealed };
+  return { ref, isVisible: revealed };
 }

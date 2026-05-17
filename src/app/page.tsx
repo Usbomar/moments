@@ -535,23 +535,9 @@ function HomeContent() {
   const gridCatalogItems = useMemo(() => sortAssetsForGrid(library, gridSortOrder), [library, gridSortOrder]);
   const viewerItems = useMemo(() => slideshowItems ?? viewerQueue ?? viewItems, [slideshowItems, viewerQueue, viewItems]);
 
-  /** Presentació: barra retràctil (activada un frame després per evitar salt de layout). */
-  const topBarRetractableWanted =
-    !!(collectionSlideshow?.assets.length) || (mainTab === "library" && view === "slider");
-  const [topBarRetractable, setTopBarRetractable] = useState(false);
-
-  useEffect(() => {
-    if (!topBarRetractableWanted) {
-      setTopBarRetractable(false);
-      return;
-    }
-    const id = requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        setTopBarRetractable(true);
-      });
-    });
-    return () => cancelAnimationFrame(id);
-  }, [topBarRetractableWanted, view, mainTab]);
+  const presentationMode = mainTab === "library" && view === "slider";
+  const topBarRetractable =
+    !!(collectionSlideshow?.assets.length) || presentationMode;
 
   const libraryTagSuggestions = useMemo(() => {
     const s = new Set<string>();
@@ -573,6 +559,7 @@ function HomeContent() {
         onLibraryViewChange={setView}
         searchInputRef={searchRef}
         topBarRetractable={topBarRetractable}
+        presentationMode={presentationMode}
         onAdminClick={() => {
           window.requestAnimationFrame(() => {
             startTransition(() => setAdminOpen(true));
@@ -580,7 +567,7 @@ function HomeContent() {
           });
         }}
         libraryUploadSlot={
-          mainTab === "library" ? (
+          mainTab === "library" && view !== "slider" ? (
             <UploadDropzone
               onUploaded={handleLibraryUploaded}
               supabaseConfigured={supabaseConfigured}

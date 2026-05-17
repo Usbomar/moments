@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
-const HIDE_DELAY_MS = 350;
+const HIDE_DELAY_MS = 600;
 
 type Props = {
   children: ReactNode;

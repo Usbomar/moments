@@ -375,37 +375,38 @@ button.active {
   will-change: transform;
 }
 
-.slider-view-media-box--immersive .slider-ken-burns__fg {
+/* Ken Burns només en mode superposició (cinema), no a la vista incrustada */
+.slider-view-media-box--ken-burns .slider-ken-burns__fg {
   animation: kenBurns 6s ease-out 0.45s forwards;
 }
 
-.slider-view-media-box--immersive .slider-ken-burns--parallax .slider-ken-burns__bg {
+.slider-view-media-box--ken-burns .slider-ken-burns--parallax .slider-ken-burns__bg {
   animation: kenBurnsParallaxBg 6s ease-out 0.45s forwards;
 }
 
-.slider-view-media-box--immersive .slider-ken-burns--parallax .slider-ken-burns__fg {
+.slider-view-media-box--ken-burns .slider-ken-burns--parallax .slider-ken-burns__fg {
   animation: kenBurnsParallaxFg 6s ease-out 0.45s forwards;
 }
 
-.slider-view-media-box--immersive .slider-ken-burns__fg.slider-view-media--current-crossfade,
-.slider-view-media-box--immersive .slider-ken-burns__fg.slider-view-media--current-fade,
-.slider-view-media-box--immersive .slider-ken-burns__fg.slider-view-media--current-slide,
-.slider-view-media-box--immersive .slider-ken-burns__fg.slider-view-media--current-zoom,
-.slider-view-media-box--immersive .slider-ken-burns__fg.slider-view-media--current-wipe {
+.slider-view-media-box--ken-burns .slider-ken-burns__fg.slider-view-media--current-crossfade,
+.slider-view-media-box--ken-burns .slider-ken-burns__fg.slider-view-media--current-fade,
+.slider-view-media-box--ken-burns .slider-ken-burns__fg.slider-view-media--current-slide,
+.slider-view-media-box--ken-burns .slider-ken-burns__fg.slider-view-media--current-zoom,
+.slider-view-media-box--ken-burns .slider-ken-burns__fg.slider-view-media--current-wipe {
   animation: kenBurns 6s ease-out 0.45s forwards;
 }
 
 /* Evita doble animació de transform (transició + Ken Burns) en el primer fotograma */
-.slider-view-media-box--immersive .slider-ken-burns__fg.slider-view-media--previous-zoom,
-.slider-view-media-box--immersive .slider-ken-burns__fg.slider-view-media--previous-slide {
+.slider-view-media-box--ken-burns .slider-ken-burns__fg.slider-view-media--previous-zoom,
+.slider-view-media-box--ken-burns .slider-ken-burns__fg.slider-view-media--previous-slide {
   animation: none;
 }
 
-.slider-view-media-box--immersive .slider-ken-burns--parallax .slider-ken-burns__fg.slider-view-media--current-crossfade,
-.slider-view-media-box--immersive .slider-ken-burns--parallax .slider-ken-burns__fg.slider-view-media--current-fade,
-.slider-view-media-box--immersive .slider-ken-burns--parallax .slider-ken-burns__fg.slider-view-media--current-slide,
-.slider-view-media-box--immersive .slider-ken-burns--parallax .slider-ken-burns__fg.slider-view-media--current-zoom,
-.slider-view-media-box--immersive .slider-ken-burns--parallax .slider-ken-burns__fg.slider-view-media--current-wipe {
+.slider-view-media-box--ken-burns .slider-ken-burns--parallax .slider-ken-burns__fg.slider-view-media--current-crossfade,
+.slider-view-media-box--ken-burns .slider-ken-burns--parallax .slider-ken-burns__fg.slider-view-media--current-fade,
+.slider-view-media-box--ken-burns .slider-ken-burns--parallax .slider-ken-burns__fg.slider-view-media--current-slide,
+.slider-view-media-box--ken-burns .slider-ken-burns--parallax .slider-ken-burns__fg.slider-view-media--current-zoom,
+.slider-view-media-box--ken-burns .slider-ken-burns--parallax .slider-ken-burns__fg.slider-view-media--current-wipe {
   animation: kenBurnsParallaxFg 6s ease-out 0.45s forwards;
 }
 

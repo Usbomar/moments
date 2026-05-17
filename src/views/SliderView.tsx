@@ -53,6 +53,8 @@ export function SliderView({ items, transition, onEditPhoto, onOpenViewer, onFav
   const itemsKeyRef = useRef<string>("");
   const busyRef = useRef(false);
   const sectionRef = useRef<HTMLElement>(null);
+  /** Sense animació d'entrada crossfade/zoom al primer fotograma (evita parpelleig). */
+  const skipEnterTransitionRef = useRef(true);
 
   const itemsKey = useMemo(() => items.map((item) => item.id).join("|"), [items]);
 
@@ -82,22 +84,27 @@ export function SliderView({ items, transition, onEditPhoto, onOpenViewer, onFav
   }, [current, overlayMode]);
 
   useEffect(() => {
-    if (itemsKeyRef.current === itemsKey) return;
+    const prevKey = itemsKeyRef.current;
+    if (prevKey === itemsKey) return;
+    const isInitialBind = prevKey === "" && itemsKey !== "";
     itemsKeyRef.current = itemsKey;
+    if (isInitialBind) return;
     queueMicrotask(() => {
+      skipEnterTransitionRef.current = true;
       setPreviousIndex(null);
       busyRef.current = false;
       setSubsetIndices(null);
       setDismissedSuggestions(new Set());
       setIndex(0);
     });
-  }, [itemsKey]);
+  }, [itemsKey, items.length]);
 
   const goToIndex = useCallback(
     (nextRaw: number) => {
       if (busyRef.current || items.length < 1) return;
       const next = ((nextRaw % items.length) + items.length) % items.length;
       if (next === index) return;
+      skipEnterTransitionRef.current = false;
       busyRef.current = true;
       setPreviousIndex(index);
       setIndex(next);
@@ -297,8 +304,15 @@ export function SliderView({ items, transition, onEditPhoto, onOpenViewer, onFav
   const previousSrc = previous ? (previous.files.mediumUrl || previous.files.previewUrl || previous.files.originalUrl).trim() : "";
 
   const subsetActive = subsetIndices != null && subsetIndices.length > 0;
-  const mediaBoxClass = `slider-view-media-box slider-view-media-box--transition-${transition} slider-view-media-box--immersive`;
+  const mediaBoxClass = [
+    "slider-view-media-box",
+    `slider-view-media-box--transition-${transition}`,
+    overlayMode ? "slider-view-media-box--ken-burns" : ""
+  ]
+    .filter(Boolean)
+    .join(" ");
   const kenBurnsClass = ["slider-ken-burns", useKenBurnsParallax ? "slider-ken-burns--parallax" : ""].filter(Boolean).join(" ");
+  const currentTransitionClass = skipEnterTransitionRef.current ? "" : `slider-view-media--current-${transition}`;
 
   return (
     <section
@@ -356,7 +370,12 @@ export function SliderView({ items, transition, onEditPhoto, onOpenViewer, onFav
             ) : null}
             {/* eslint-disable-next-line @next/next/no-img-element -- URL signades / emmagatzematge */}
             <img
-              className={`viewer-media slider-view-media slider-view-media--current slider-ken-burns__fg slider-view-media--current-${transition}`}
+              className={[
+                "viewer-media slider-view-media slider-view-media--current slider-ken-burns__fg",
+                currentTransitionClass
+              ]
+                .filter(Boolean)
+                .join(" ")}
               src={currentSrc}
               alt={current.title}
               referrerPolicy="no-referrer"

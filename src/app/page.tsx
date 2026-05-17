@@ -14,6 +14,7 @@ import { ViewErrorBoundary } from "@/components/ViewErrorBoundary";
 import { clearCache } from "@/lib/cache";
 import type { EditOperation, ExportOptions } from "@/lib/image-edit-ops";
 import { MainLayout } from "@/layouts/MainLayout";
+import { SliderView } from "@/views/SliderView";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { loadCollections } from "@/lib/collections-storage";
 import type { AppCollection } from "@/lib/collections";
@@ -52,10 +53,6 @@ const MapView = dynamic(() => import("@/views/MapView").then((mod) => mod.MapVie
 
 const ColorView = dynamic(() => import("@/views/ColorView").then((mod) => mod.ColorView), {
   loading: () => <TabLoadingHint label="vista per colors" />
-});
-
-const SliderView = dynamic(() => import("@/views/SliderView").then((mod) => mod.SliderView), {
-  loading: () => <TabLoadingHint label="presentació" />
 });
 
 const Collections = dynamic(() => import("@/components/Collections").then((mod) => mod.Collections), {
@@ -546,9 +543,23 @@ function HomeContent() {
   const gridCatalogItems = useMemo(() => sortAssetsForGrid(library, gridSortOrder), [library, gridSortOrder]);
   const viewerItems = useMemo(() => slideshowItems ?? viewerQueue ?? viewItems, [slideshowItems, viewerQueue, viewItems]);
 
-  /** Presentació (biblioteca o col·lecció): barra superior amagada fins mouseover al marge superior. */
-  const topBarRetractable =
+  /** Presentació: barra retràctil (activada un frame després per evitar salt de layout). */
+  const topBarRetractableWanted =
     !!(collectionSlideshow?.assets.length) || (mainTab === "library" && view === "slider");
+  const [topBarRetractable, setTopBarRetractable] = useState(false);
+
+  useEffect(() => {
+    if (!topBarRetractableWanted) {
+      setTopBarRetractable(false);
+      return;
+    }
+    const id = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setTopBarRetractable(true);
+      });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [topBarRetractableWanted, view, mainTab]);
 
   const libraryTagSuggestions = useMemo(() => {
     const s = new Set<string>();

@@ -18,7 +18,7 @@ export function SliderKeyboardHelp({ open, onToggle }: SliderKeyboardHelpProps) 
     <>
       <button
         type="button"
-        className="slider-keyboard-help__toggle"
+        className="btn btn-sm btn-ghost slider-keyboard-help__toggle"
         aria-label={open ? "Amagar dreceres de teclat" : "Mostrar dreceres de teclat"}
         aria-expanded={open}
         title="Dreceres (?)"

@@ -50,14 +50,19 @@ export function SliderNavChips({
 
   return (
     <div className="slider-nav-chips" role="toolbar" aria-label="Filtres ràpids">
-      {positionLabel ? <span className="slider-nav-chips__pos">{positionLabel}</span> : null}
+      {positionLabel ? <span className="slider-view-controls__pos">{positionLabel}</span> : null}
       {chips.map((chip) => (
-        <button key={chip.id} type="button" className="slider-nav-chips__btn" onClick={() => onNavigateToIndices(chip.indices)}>
+        <button
+          key={chip.id}
+          type="button"
+          className="btn btn-sm"
+          onClick={() => onNavigateToIndices(chip.indices)}
+        >
           {chip.label}
         </button>
       ))}
       {subsetActive ? (
-        <button type="button" className="slider-nav-chips__btn slider-nav-chips__btn--clear" onClick={onClearSubset}>
+        <button type="button" className="btn btn-sm btn-primary" onClick={onClearSubset}>
           Totes les fotos
         </button>
       ) : null}

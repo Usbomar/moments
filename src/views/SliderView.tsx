@@ -316,19 +316,6 @@ export function SliderView({ items, transition, onEditPhoto, onOpenViewer, onFav
             style={{ "--slider-accent-color": accentColor ?? "transparent" } as CSSProperties}
             aria-hidden
           />
-          <div className="slider-view-top-bar">
-            <SliderNavChips
-              asset={current}
-              items={items}
-              subsetActive={subsetActive}
-              onNavigateToIndices={applySubset}
-              onClearSubset={clearSubset}
-              positionLabel={positionLabel}
-            />
-            <div className="slider-view-top-bar__actions">
-              <SliderKeyboardHelp open={keyboardHelpOpen} onToggle={() => setKeyboardHelpOpen((v) => !v)} />
-            </div>
-          </div>
           <SliderMiniMap items={items} highlightIndices={navigableIndices} currentIndex={index} />
           {previous && previousSrc ? (
             // eslint-disable-next-line @next/next/no-img-element -- URL signades / emmagatzematge
@@ -367,7 +354,7 @@ export function SliderView({ items, transition, onEditPhoto, onOpenViewer, onFav
               onClick={() => onEditPhoto(current)}
             />
           </div>
-          <SliderMetadataStrip asset={current} positionLabel={positionLabel} />
+          <SliderMetadataStrip asset={current} />
           {visibleSuggestion ? (
             <div className="slider-smart-nav" role="status" aria-live="polite">
               <button
@@ -396,6 +383,19 @@ export function SliderView({ items, transition, onEditPhoto, onOpenViewer, onFav
             </div>
           ) : null}
         </div>
+        <div className="slider-view-controls">
+          <SliderNavChips
+            asset={current}
+            items={items}
+            subsetActive={subsetActive}
+            onNavigateToIndices={applySubset}
+            onClearSubset={clearSubset}
+            positionLabel={positionLabel}
+          />
+          <div className="slider-view-controls__end">
+            <SliderKeyboardHelp open={keyboardHelpOpen} onToggle={() => setKeyboardHelpOpen((v) => !v)} />
+          </div>
+        </div>
         <SliderTimeline
           items={items}
           orderedIndices={navigableIndices}
@@ -403,14 +403,6 @@ export function SliderView({ items, transition, onEditPhoto, onOpenViewer, onFav
           onJumpToIndex={goToIndex}
         />
         <SliderFilmstrip items={items} orderedIndices={navigableIndices} currentIndex={index} onJumpToIndex={goToIndex} />
-        {subsetActive ? (
-          <p className="slider-view-subset-hint">
-            Navegant una subsecció ({subsetIndices!.length} fotos).{" "}
-            <button type="button" className="slider-view-subset-hint__clear" onClick={clearSubset}>
-              Mostrar tota la biblioteca
-            </button>
-          </p>
-        ) : null}
         <div
           className={`slider-view-toolbar-slot slider-fullscreen-toolbar-hide ${toolbarClass}`}
           role="toolbar"

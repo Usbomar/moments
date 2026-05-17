@@ -5,10 +5,9 @@ import { formatMonthLabelCa, getAssetDate } from "@/lib/slider-temporal-nav";
 
 export type SliderMetadataStripProps = {
   asset: Asset | null;
-  positionLabel: string;
 };
 
-export function SliderMetadataStrip({ asset, positionLabel }: SliderMetadataStripProps) {
+export function SliderMetadataStrip({ asset }: SliderMetadataStripProps) {
   if (!asset) return null;
 
   const d = getAssetDate(asset);
@@ -28,7 +27,6 @@ export function SliderMetadataStrip({ asset, positionLabel }: SliderMetadataStri
         <span className="slider-metadata-strip__date">{dateText}</span>
         {locationText ? <span className="slider-metadata-strip__location">{locationText}</span> : null}
       </div>
-      <span className="slider-metadata-strip__pos">{positionLabel}</span>
     </div>
   );
 }

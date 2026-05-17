@@ -44,7 +44,8 @@ export function SliderView({ items, transition, onEditPhoto, onOpenViewer, onFav
   const [playing, setPlaying] = useState(false);
   const [shuffle, setShuffle] = useState(false);
   const [speedMs, setSpeedMs] = useState(2400);
-  const [fullscreen, setFullscreen] = useState(true);
+  /** Superposició fosca a pantalla completa (modal). Per defecte incrustat dins la biblioteca. */
+  const [overlayMode, setOverlayMode] = useState(false);
   const [favBusy, setFavBusy] = useState(false);
   const [subsetIndices, setSubsetIndices] = useState<number[] | null>(null);
   const [dismissedSuggestions, setDismissedSuggestions] = useState<Set<string>>(() => new Set());
@@ -72,13 +73,13 @@ export function SliderView({ items, transition, onEditPhoto, onOpenViewer, onFav
 
   const accentColor = useMemo(() => (current ? resolveAssetColorHex(current) : null), [current]);
 
-  /** Parallax per capes (fons desenfocat + primer pla) en mode immersiu amb proporció «normal». */
+  /** Parallax (doble capa) només en superposició fosca — evita parpelleigs a la vista incrustada. */
   const useKenBurnsParallax = useMemo(() => {
-    if (!fullscreen || !current) return false;
+    if (!overlayMode || !current) return false;
     if (!current.width || !current.height) return true;
     const ratio = current.height / current.width;
     return ratio > 0.45 && ratio < 2.2;
-  }, [current, fullscreen]);
+  }, [current, overlayMode]);
 
   useEffect(() => {
     if (itemsKeyRef.current === itemsKey) return;
@@ -244,7 +245,6 @@ export function SliderView({ items, transition, onEditPhoto, onOpenViewer, onFav
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (!fullscreen) return;
       if (event.key === " ") {
         event.preventDefault();
         setPlaying((prev) => !prev);
@@ -255,8 +255,8 @@ export function SliderView({ items, transition, onEditPhoto, onOpenViewer, onFav
       } else if (event.key === "Escape") {
         if (keyboardHelpOpen) {
           setKeyboardHelpOpen(false);
-        } else {
-          setFullscreen(false);
+        } else if (overlayMode) {
+          setOverlayMode(false);
         }
       } else if (event.key === "?" || (event.key === "/" && event.shiftKey)) {
         event.preventDefault();
@@ -271,10 +271,9 @@ export function SliderView({ items, transition, onEditPhoto, onOpenViewer, onFav
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [fullscreen, goNext, goPrev, goToIndex, keyboardHelpOpen, navigableIndices]);
+  }, [goNext, goPrev, goToIndex, keyboardHelpOpen, navigableIndices, overlayMode]);
 
   const toggleBrowserFullscreen = useCallback(() => {
-    setFullscreen(true);
     const el = sectionRef.current;
     if (!el) return;
     if (document.fullscreenElement) {
@@ -290,33 +289,28 @@ export function SliderView({ items, transition, onEditPhoto, onOpenViewer, onFav
 
   if (!current) return null;
 
-  const btnClass = fullscreen ? "viewer-toolbar-btn" : undefined;
-  const toolbarClass = fullscreen ? "viewer-toolbar slider-view-toolbar" : "controls slider-view-toolbar";
+  const btnClass = "viewer-toolbar-btn";
+  const toolbarClass = overlayMode
+    ? "viewer-toolbar slider-view-toolbar"
+    : "viewer-toolbar slider-view-toolbar slider-view-toolbar--embedded";
   const currentSrc = (current.files.mediumUrl || current.files.previewUrl || current.files.originalUrl).trim();
   const previousSrc = previous ? (previous.files.mediumUrl || previous.files.previewUrl || previous.files.originalUrl).trim() : "";
 
   const subsetActive = subsetIndices != null && subsetIndices.length > 0;
-  const immersive = fullscreen;
-  const mediaBoxClass = [
-    `slider-view-media-box slider-view-media-box--transition-${transition}`,
-    immersive ? "slider-view-media-box--immersive" : ""
-  ]
-    .filter(Boolean)
-    .join(" ");
+  const mediaBoxClass = `slider-view-media-box slider-view-media-box--transition-${transition} slider-view-media-box--immersive`;
   const kenBurnsClass = ["slider-ken-burns", useKenBurnsParallax ? "slider-ken-burns--parallax" : ""].filter(Boolean).join(" ");
 
   return (
     <section
       ref={sectionRef}
-      className={immersive ? "viewer slider-view--immersive" : "view-panel"}
-      onClick={() => setFullscreen(false)}
+      className={overlayMode ? "viewer slider-view--overlay" : "slider-view-embedded view-panel"}
+      onClick={overlayMode ? () => setOverlayMode(false) : undefined}
     >
       <div
-        className={`slider-view-stack ${immersive ? "viewer-inner slider-view-stack--immersive" : ""}`}
+        className={`slider-view-stack ${overlayMode ? "viewer-inner" : ""} slider-view-stack--immersive`}
         onClick={(e) => e.stopPropagation()}
-        style={{ transition: "opacity 260ms ease, transform 260ms ease" }}
       >
-        {immersive ? <div className="slider-fullscreen-hover-zone" aria-hidden /> : null}
+        <div className="slider-fullscreen-hover-zone" aria-hidden />
         <div className={mediaBoxClass}>
           <div
             key={`accent-${current.id}`}
@@ -417,7 +411,7 @@ export function SliderView({ items, transition, onEditPhoto, onOpenViewer, onFav
           </p>
         ) : null}
         <div
-          className={`slider-view-toolbar-slot${immersive ? " slider-fullscreen-toolbar-hide" : ""} ${toolbarClass}`}
+          className={`slider-view-toolbar-slot slider-fullscreen-toolbar-hide ${toolbarClass}`}
           role="toolbar"
           aria-label="Controls del slider"
         >
@@ -429,7 +423,7 @@ export function SliderView({ items, transition, onEditPhoto, onOpenViewer, onFav
           </button>
           <button
             type="button"
-            className={`${btnClass ?? "btn btn-sm"} viewer-toolbar-btn--icon viewer-toolbar-btn--shuffle${shuffle && fullscreen ? " viewer-toolbar-btn--active" : ""}`}
+            className={`${btnClass} viewer-toolbar-btn--icon viewer-toolbar-btn--shuffle${shuffle ? " viewer-toolbar-btn--active" : ""}`}
             aria-label={shuffle ? "Desactivar ordre aleatori" : "Activar ordre aleatori"}
             title={shuffle ? "Aleatori activat" : "Aleatori"}
             aria-pressed={shuffle}
@@ -439,7 +433,7 @@ export function SliderView({ items, transition, onEditPhoto, onOpenViewer, onFav
           </button>
           <button
             type="button"
-            className={`${btnClass ?? "btn btn-sm"} viewer-toolbar-btn--icon`}
+            className={`${btnClass} viewer-toolbar-btn--icon`}
             aria-label="Pantalla completa"
             title="Pantalla completa"
             onClick={toggleBrowserFullscreen}
@@ -465,7 +459,7 @@ export function SliderView({ items, transition, onEditPhoto, onOpenViewer, onFav
               Presentació
             </button>
           ) : null}
-          <label className={fullscreen ? "slider-view-speed slider-view-speed--fs" : "slider-view-speed"}>
+          <label className="slider-view-speed slider-view-speed--fs">
             <span>Interval</span>
             <select value={speedMs} onChange={(e) => setSpeedMs(Number(e.target.value))}>
               <option value={1500}>1,5 s</option>

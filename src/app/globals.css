@@ -273,6 +273,26 @@ button.active {
   width: min(95vw, 1100px);
 }
 
+.slider-view-embedded {
+  position: relative;
+  width: 100%;
+  margin: 0;
+}
+
+.slider-view-embedded.view-panel {
+  padding: var(--space-4) 0;
+}
+
+.slider-view-toolbar--embedded {
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px 8px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bg-secondary) 35%, var(--bg-primary));
+}
+
 .slider-view-media-box {
   width: 100%;
   flex: 0 0 auto;
@@ -373,6 +393,12 @@ button.active {
 .slider-view-media-box--immersive .slider-ken-burns__fg.slider-view-media--current-zoom,
 .slider-view-media-box--immersive .slider-ken-burns__fg.slider-view-media--current-wipe {
   animation: kenBurns 6s ease-out 0.45s forwards;
+}
+
+/* Evita doble animació de transform (transició + Ken Burns) en el primer fotograma */
+.slider-view-media-box--immersive .slider-ken-burns__fg.slider-view-media--previous-zoom,
+.slider-view-media-box--immersive .slider-ken-burns__fg.slider-view-media--previous-slide {
+  animation: none;
 }
 
 .slider-view-media-box--immersive .slider-ken-burns--parallax .slider-ken-burns__fg.slider-view-media--current-crossfade,

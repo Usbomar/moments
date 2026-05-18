@@ -7,6 +7,7 @@ import type { SliderTransition } from "@/lib/grid-library";
 import { ViewerFavoriteButton } from "@/components/ViewerFavoriteButton";
 
 const BASE_FADE_MS = 450;
+const CHROME_HIDE_DELAY_MS = 600;
 
 export const SLIDESHOW_SPEEDS = [0.5, 1, 1.25, 1.5, 1.75, 2] as const;
 export type SlideshowSpeed = (typeof SLIDESHOW_SPEEDS)[number];
@@ -21,7 +22,18 @@ type Props = {
   dwellMs?: number;
 };
 
-function urlFor(asset: Asset): string {
+/** Foto principal: proporció original; thumb només si no hi ha res millor. */
+function displayUrlFor(asset: Asset): string {
+  return (
+    asset.files.mediumUrl ||
+    asset.files.previewUrl ||
+    asset.files.originalUrl ||
+    asset.files.thumbUrl
+  ).trim();
+}
+
+/** Filmstrip: miniatures compactes. */
+function thumbUrlFor(asset: Asset): string {
   return (asset.files.thumbUrl || asset.files.mediumUrl || asset.files.previewUrl || asset.files.originalUrl).trim();
 }
 
@@ -31,6 +43,7 @@ export function FadingSlideshow({ items, onClose, onEditDetails, onFavoriteToggl
   const [playing, setPlaying] = useState(true);
   const [shuffle, setShuffle] = useState(false);
   const [speed, setSpeed] = useState<SlideshowSpeed>(1);
+  const [chromeRevealed, setChromeRevealed] = useState(false);
   const fadeMs = useMemo(() => Math.max(120, Math.round(BASE_FADE_MS / speed)), [speed]);
   const effectiveDwellMs = useMemo(() => Math.max(500, Math.round(dwellMs / speed)), [dwellMs, speed]);
   const transitionStyle = useMemo(
@@ -48,11 +61,35 @@ export function FadingSlideshow({ items, onClose, onEditDetails, onFavoriteToggl
   const audioRef = useRef<HTMLAudioElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const filmstripRef = useRef<HTMLDivElement>(null);
+  const hideChromeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const chromeHoverRef = useRef({ leftStrip: false, rightStrip: false, bottomStrip: false, leftRail: false, rightRail: false, bottom: false });
 
   const n = items.length;
   const current = n > 0 ? items[Math.min(index, n - 1)] : null;
   const previous = previousIndex != null && n > 0 ? items[Math.min(previousIndex, n - 1)] : null;
   const itemsKey = useMemo(() => items.map((i) => i.id).join("|"), [items]);
+  const clearChromeHideTimer = useCallback(() => {
+    if (hideChromeTimerRef.current !== null) {
+      clearTimeout(hideChromeTimerRef.current);
+      hideChromeTimerRef.current = null;
+    }
+  }, []);
+
+  const showChrome = useCallback(() => {
+    clearChromeHideTimer();
+    setChromeRevealed(true);
+  }, [clearChromeHideTimer]);
+
+  const tryHideChrome = useCallback(() => {
+    clearChromeHideTimer();
+    hideChromeTimerRef.current = setTimeout(() => {
+      const h = chromeHoverRef.current;
+      if (h.leftStrip || h.rightStrip || h.bottomStrip || h.leftRail || h.rightRail || h.bottom) return;
+      setChromeRevealed(false);
+    }, CHROME_HIDE_DELAY_MS);
+  }, [clearChromeHideTimer]);
+
+  useEffect(() => () => clearChromeHideTimer(), [clearChromeHideTimer]);
 
   useEffect(() => {
     indexRef.current = index;
@@ -99,7 +136,7 @@ export function FadingSlideshow({ items, onClose, onEditDetails, onFavoriteToggl
         busyRef.current = false;
       }, fadeMs);
     },
-    [n]
+    [n, fadeMs]
   );
 
   const goPrev = useCallback(() => goToIndex(indexRef.current - 1), [goToIndex]);
@@ -179,10 +216,15 @@ export function FadingSlideshow({ items, onClose, onEditDetails, onFavoriteToggl
 
   if (!current || n < 1) return null;
 
-  const src = urlFor(current);
-  const previousSrc = previous ? urlFor(previous) : "";
+  const src = displayUrlFor(current);
+  const previousSrc = previous ? displayUrlFor(previous) : "";
   const label = `${index + 1} / ${n}`;
   const effectiveVolume = musicMuted ? 0 : musicVolume;
+  const layoutClass = `fading-slideshow-layout${chromeRevealed ? " is-chrome-revealed" : ""}`;
+
+  const setChromeHover = (key: keyof typeof chromeHoverRef.current, value: boolean) => {
+    chromeHoverRef.current[key] = value;
+  };
 
   return (
     <div
@@ -193,8 +235,94 @@ export function FadingSlideshow({ items, onClose, onEditDetails, onFavoriteToggl
       aria-label="Presentació de la col·lecció"
       onClick={onClose}
     >
-      <div className="fading-slideshow-layout" style={transitionStyle} onClick={(e) => e.stopPropagation()}>
-        <aside className="fading-slideshow-rail fading-slideshow-rail--left" aria-label="Controls de diapositives i so">
+      <div className={layoutClass} style={transitionStyle} onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fading-slideshow-reveal-hit fading-slideshow-reveal-hit--left"
+          aria-hidden
+          onMouseEnter={() => {
+            setChromeHover("leftStrip", true);
+            showChrome();
+          }}
+          onMouseLeave={() => {
+            setChromeHover("leftStrip", false);
+            tryHideChrome();
+          }}
+        />
+        <div
+          className="fading-slideshow-reveal-hit fading-slideshow-reveal-hit--right"
+          aria-hidden
+          onMouseEnter={() => {
+            setChromeHover("rightStrip", true);
+            showChrome();
+          }}
+          onMouseLeave={() => {
+            setChromeHover("rightStrip", false);
+            tryHideChrome();
+          }}
+        />
+        <div
+          className="fading-slideshow-reveal-hit fading-slideshow-reveal-hit--bottom"
+          aria-hidden
+          onMouseEnter={() => {
+            setChromeHover("bottomStrip", true);
+            showChrome();
+          }}
+          onMouseLeave={() => {
+            setChromeHover("bottomStrip", false);
+            tryHideChrome();
+          }}
+        />
+
+        <main className="fading-slideshow-stage">
+          <span className="fading-slideshow-counter" aria-live="polite">
+            {label}
+          </span>
+          <div className="fading-slideshow-img-wrap" style={transitionStyle}>
+              {previous && previousSrc ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={`previous-${previous.id}`}
+                  className={`fading-slideshow-img fading-slideshow-img--previous fading-slideshow-img--previous-${transition}`}
+                  src={previousSrc}
+                  alt=""
+                  aria-hidden
+                  referrerPolicy="no-referrer"
+                  decoding="async"
+                />
+              ) : null}
+              {src ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={`current-${current.id}`}
+                  className={`fading-slideshow-img fading-slideshow-img--current fading-slideshow-img--current-${transition}`}
+                  src={src}
+                  alt={current.title}
+                  referrerPolicy="no-referrer"
+                  decoding="async"
+                  fetchPriority="high"
+                />
+              ) : (
+                <div className="fading-slideshow-placeholder">{current.title}</div>
+              )}
+          </div>
+        </main>
+
+        <aside
+          className="fading-slideshow-rail fading-slideshow-rail--left"
+          aria-label="Controls de diapositives i so"
+          onMouseEnter={() => {
+            setChromeHover("leftRail", true);
+            showChrome();
+          }}
+          onMouseLeave={() => {
+            setChromeHover("leftRail", false);
+            tryHideChrome();
+          }}
+          onFocusCapture={showChrome}
+          onBlurCapture={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) tryHideChrome();
+          }}
+        >
           <div className="fading-slideshow-rail-group" role="toolbar" aria-label="Diapositives">
             <button
               type="button"
@@ -287,78 +415,22 @@ export function FadingSlideshow({ items, onClose, onEditDetails, onFavoriteToggl
           ) : null}
         </aside>
 
-        <main className="fading-slideshow-main">
-          <div className="fading-slideshow-stage">
-            <span className="fading-slideshow-counter" aria-live="polite">
-              {label}
-            </span>
-            <div className="fading-slideshow-img-wrap" style={transitionStyle}>
-              {previous && previousSrc ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  key={`previous-${previous.id}`}
-                  className={`fading-slideshow-img fading-slideshow-img--previous fading-slideshow-img--previous-${transition}`}
-                  src={previousSrc}
-                  alt=""
-                  aria-hidden
-                  referrerPolicy="no-referrer"
-                  decoding="async"
-                />
-              ) : null}
-              {src ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  key={`current-${current.id}`}
-                  className={`fading-slideshow-img fading-slideshow-img--current fading-slideshow-img--current-${transition}`}
-                  src={src}
-                  alt={current.title}
-                  referrerPolicy="no-referrer"
-                  decoding="async"
-                  fetchPriority="high"
-                />
-              ) : (
-                <div className="fading-slideshow-placeholder">{current.title}</div>
-              )}
-            </div>
-          </div>
-
-          <div className="fading-slideshow-bottom">
-            <div ref={filmstripRef} className="fading-slideshow-filmstrip" role="tablist" aria-label="Fotos de la col·lecció">
-              {items.map((item, i) => {
-                const thumb = urlFor(item);
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={i === index}
-                    aria-label={`${item.title}, foto ${i + 1} de ${n}`}
-                    className={`fading-slideshow-filmstrip-item${i === index ? " is-active" : ""}`}
-                    onClick={() => goToIndex(i)}
-                  >
-                    {thumb ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={thumb} alt="" referrerPolicy="no-referrer" decoding="async" />
-                    ) : (
-                      <span className="fading-slideshow-filmstrip-fallback" aria-hidden />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-            {musicName ? (
-              <p className="fading-slideshow-track" title={musicName}>
-                ♪ {musicName}
-              </p>
-            ) : (
-              <p className="fading-slideshow-track fading-slideshow-track--empty" aria-hidden>
-                &nbsp;
-              </p>
-            )}
-          </div>
-        </main>
-
-        <aside className="fading-slideshow-rail fading-slideshow-rail--right" aria-label="Accions">
+        <aside
+          className="fading-slideshow-rail fading-slideshow-rail--right"
+          aria-label="Accions"
+          onMouseEnter={() => {
+            setChromeHover("rightRail", true);
+            showChrome();
+          }}
+          onMouseLeave={() => {
+            setChromeHover("rightRail", false);
+            tryHideChrome();
+          }}
+          onFocusCapture={showChrome}
+          onBlurCapture={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) tryHideChrome();
+          }}
+        >
           <ViewerFavoriteButton
             favorite={!!current.favorite}
             disabled={!onFavoriteToggle}
@@ -398,6 +470,55 @@ export function FadingSlideshow({ items, onClose, onEditDetails, onFavoriteToggl
             <span className="viewer-icon viewer-icon-close" aria-hidden />
           </button>
         </aside>
+
+        <div
+          className="fading-slideshow-bottom-dock"
+          onMouseEnter={() => {
+            setChromeHover("bottom", true);
+            showChrome();
+          }}
+          onMouseLeave={() => {
+            setChromeHover("bottom", false);
+            tryHideChrome();
+          }}
+          onFocusCapture={showChrome}
+          onBlurCapture={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) tryHideChrome();
+          }}
+        >
+          <div ref={filmstripRef} className="fading-slideshow-filmstrip" role="tablist" aria-label="Fotos de la col·lecció">
+            {items.map((item, i) => {
+              const thumb = thumbUrlFor(item);
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={i === index}
+                  aria-label={`${item.title}, foto ${i + 1} de ${n}`}
+                  className={`fading-slideshow-filmstrip-item${i === index ? " is-active" : ""}`}
+                  onClick={() => goToIndex(i)}
+                >
+                  {thumb ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={thumb} alt="" referrerPolicy="no-referrer" decoding="async" />
+                  ) : (
+                    <span className="fading-slideshow-filmstrip-fallback" aria-hidden />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          {musicName ? (
+            <p className="fading-slideshow-track" title={musicName}>
+              ♪ {musicName}
+            </p>
+          ) : (
+            <p className="fading-slideshow-track fading-slideshow-track--empty" aria-hidden>
+              &nbsp;
+            </p>
+          )}
+        </div>
       </div>
 
       {musicSrc ? <audio ref={audioRef} src={musicSrc} loop preload="auto" /> : null}

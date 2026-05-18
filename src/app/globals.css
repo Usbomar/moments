@@ -1072,31 +1072,82 @@ button.active {
 
 .fading-slideshow-layout {
   --slideshow-transition-ms: 450ms;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  position: relative;
   width: 100vw;
   height: 100vh;
   height: 100dvh;
-  align-items: stretch;
+  overflow: hidden;
+}
+
+.fading-slideshow-reveal-hit {
+  position: absolute;
+  z-index: 18;
+  pointer-events: auto;
+}
+
+.fading-slideshow-reveal-hit--left {
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 44px;
+}
+
+.fading-slideshow-reveal-hit--right {
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 44px;
+}
+
+.fading-slideshow-reveal-hit--bottom {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 52px;
+}
+
+.fading-slideshow-layout.is-chrome-revealed .fading-slideshow-reveal-hit {
+  pointer-events: none;
 }
 
 .fading-slideshow-rail {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 22;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   gap: 10px;
-  padding: 12px 10px;
-  flex-shrink: 0;
+  width: 58px;
+  padding: 14px 10px;
+  background: rgba(5, 8, 12, 0.78);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition:
+    transform 0.28s ease,
+    opacity 0.28s ease;
+  pointer-events: none;
 }
 
 .fading-slideshow-rail--left {
+  left: 0;
   justify-content: center;
+  transform: translateX(-105%);
 }
 
 .fading-slideshow-rail--right {
+  right: 0;
   justify-content: flex-start;
   padding-top: 16px;
+  transform: translateX(105%);
+}
+
+.fading-slideshow-layout.is-chrome-revealed .fading-slideshow-rail--left,
+.fading-slideshow-layout.is-chrome-revealed .fading-slideshow-rail--right {
+  transform: translateX(0);
+  pointer-events: auto;
 }
 
 .fading-slideshow-rail-group {
@@ -1148,27 +1199,17 @@ button.active {
   outline-offset: 2px;
 }
 
-.fading-slideshow-main {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-  padding: 10px 4px 12px;
-}
-
 .fading-slideshow-stage {
-  flex: 0 0 85vh;
-  flex: 0 0 85dvh;
-  height: 85vh;
-  height: 85dvh;
-  max-height: 85vh;
-  max-height: 85dvh;
-  min-height: 0;
+  position: absolute;
+  inset: 0;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  position: relative;
-  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  padding: 12px;
+  box-sizing: border-box;
 }
 
 .fading-slideshow-counter {
@@ -1182,17 +1223,13 @@ button.active {
   pointer-events: none;
 }
 
-/* Zona de visualització: 85% alçada del navegador; la foto s’escala sencera dins (sense retall ni distorsió). */
+/* Foto a pantalla completa: proporció original via object-fit contain (sense marc que col·lapsa). */
 .fading-slideshow-img-wrap {
   position: relative;
   width: 100%;
   height: 100%;
   max-width: 100%;
   max-height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
 }
 
 .fading-slideshow-img {
@@ -1284,14 +1321,26 @@ button.active {
   max-width: 72ch;
 }
 
-.fading-slideshow-bottom {
-  flex-shrink: 0;
+.fading-slideshow-bottom-dock {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 22;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  margin-top: 8px;
-  max-width: 100%;
+  padding: 10px 12px 14px;
+  background: linear-gradient(to top, rgba(5, 8, 12, 0.92) 0%, rgba(5, 8, 12, 0.55) 55%, transparent 100%);
+  transform: translateY(100%);
+  transition: transform 0.28s ease;
+  pointer-events: none;
+}
+
+.fading-slideshow-layout.is-chrome-revealed .fading-slideshow-bottom-dock {
+  transform: translateY(0);
+  pointer-events: auto;
 }
 
 .fading-slideshow-filmstrip {
